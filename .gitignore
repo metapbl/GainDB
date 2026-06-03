@@ -10,6 +10,9 @@ venv/
 # 테스트용 오디오 (저장소에 포함하지 않음)
 *.mp3
 
+# 원본 mp3gain C 소스 (LGPL, 사양 참고용 로컬 보관 - 저장소 제외)
+mp3gain/
+
 # OS / 에디터
 .vscode/
 Thumbs.db

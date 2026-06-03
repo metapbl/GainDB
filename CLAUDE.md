@@ -144,15 +144,16 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 
 ### 12.1. 진척 로그 / 다음 세션 시작점
 
-**1단계 완료** (프레임 파서 + `global_gain` 읽기/쓰기). 결과물:
+**1단계 완료** (프레임 파서 + `global_gain` 읽기/쓰기). 결과물: `gaindb/frame.py`(읽기 파서), `gaindb/writer.py`(±N 무손실 적용 + CRC 재계산), `scan_gain.py`/`apply_gain.py`(CLI). Debussy 파일로 round-trip 바이트 동일 검증 완료.
 
-- `gaindb/frame.py` — 읽기 파서(`_BitReader` peek8/set8/skip, 헤더 파싱, 프레임 길이, ID3v2·Xing/Info 스킵, `global_gain` 추출).
-- `gaindb/writer.py` — `±N` 무손실 적용(`apply_gain`) + CRC 재계산(다항식 0x8005).
-- `scan_gain.py` / `apply_gain.py` — CLI.
-- 검증: Debussy 테스트 파일 +1 후 min/max 36/210 → 37/211 정확, -1 round-trip 후 바이트 단위 완전 동일(무손실 증명).
-- 미커밋 변경분 없음.
+**2단계 진행 중 — 분석기 코어 완료·검증**. 결과물:
 
-**다음 = 2단계 ReplayGain 분석기.** 순서: ① PCM 디코딩 도구 환경 점검(ffmpeg/pydub, venv) → ② equal-loudness 필터 + RMS + 통계(95퍼센타일)를 numpy 로 구현 → ③ 목표 89dB 에 맞는 게인 스텝 산출, 1단계 `apply_gain` 과 연결.
+- `gaindb/decode.py` — ffmpeg/ffprobe subprocess 로 MP3→PCM. (left, right, sample_rate) 반환, 원본 사양 스케일(±32768)로 정규화. ffmpeg 는 PATH 호출(GPL 동봉 안 함, 개인 로컬).
+- `gaindb/analysis.py` — ReplayGain Track gain. clean-room: 필터 계수는 C 소스가 아니라 공식 사양(Hydrogenaudio "Original ReplayGain specification" Tables 1·2)에서 옮김. 지원 샘플레이트는 **44.1k·48k 두 종만**(사양에 수치가 있는 것). yulewalk→Butterworth 캐스케이드(scipy.signal.lfilter) → 50ms RMS → 0.01dB 히스토그램 → 95퍼센타일 → PINK_REF(64.82) 차감.
+- 의존성: numpy + scipy (7번 갱신). venv `.venv` 사용.
+- 검증: 3곡(44.1k 2곡, 48k 1곡)에서 ffmpeg `replaygain` 필터와 **모두 0.02 dB 이내 일치**(우리/ffmpeg: -0.79/-0.77, -3.60/-3.58, -6.05/-6.03). 두 계수 세트 다 검증됨.
 
-- 시작 시 사용자가 `mp3gain/src/gain_analysis.c` + `gain_analysis.h` 본문을 붙여넣어 제공한다. clean-room 으로 필터 계수·통계 사양만 추출.
+**다음 = 2단계 마무리(③ dB→스텝 변환 + 1단계 apply_gain 연결).** dB 를 정수 게인 스텝으로 양자화(표준 방식 `round(dB/1.5)`), 0-gain 프레임 처리(11번 함정) 합의 후 구현. 이어 Album gain(여러 곡 히스토그램 누적), 그다음 4·5단계(태그 undo, CLI 통합).
+
+- 미해결 관찰: 48k 곡에서 `track_peak > 1.0`(1.033) 확인 — 클리핑 방지(peak 메타데이터) 다룰 때 의미. 우리 게인 산출엔 영향 없음.
 - 로컬에 미커밋 변경분이 생기면 첫 메시지에 함께 알린다.

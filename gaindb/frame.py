@@ -50,9 +50,13 @@ class FrameInfo:
 
 
 class _BitReader:
-    """바이트열의 특정 시작점부터 비트 단위로 진행하는 리더."""
+    """바이트열의 특정 시작점부터 비트 단위로 진행하는 리더/라이터."""
 
-    def __init__(self, data: bytes, byte_pos: int, bit_pos: int = 0):
+    # 원본 set8Bits의 마스킹 상수(두 바이트에 걸친 8비트 덮어쓰기용)
+    _MASK_LEFT = (0x00, 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE)
+    _MASK_RIGHT = (0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01)
+
+    def __init__(self, data, byte_pos: int, bit_pos: int = 0):
         self.data = data
         self.byte_pos = byte_pos
         self.bit_pos = bit_pos  # 0..7, 현재 바이트 안에서의 비트 오프셋(MSB부터)
@@ -68,6 +72,14 @@ class _BitReader:
         lo = self.data[self.byte_pos + 1]
         val = ((hi << 8) | lo) >> (8 - self.bit_pos)
         return val & 0xFF
+
+    def set8(self, val: int) -> None:
+        """현재 비트 위치에 8비트 값을 덮어쓴다(위치 이동 없음).
+        data 는 변경 가능한 bytearray 여야 한다."""
+        b = self.bit_pos
+        shifted = (val & 0xFF) << (8 - b)
+        self.data[self.byte_pos] = (self.data[self.byte_pos] & self._MASK_LEFT[b]) | (shifted >> 8)
+        self.data[self.byte_pos + 1] = (self.data[self.byte_pos + 1] & self._MASK_RIGHT[b]) | (shifted & 0xFF)
 
 
 def _is_valid_header(data: bytes, pos: int) -> bool:

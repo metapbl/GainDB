@@ -120,6 +120,8 @@ MP3 전용이다. AAC/FLAC/Opus 등 타 포맷 지원 제안은 하지 않는다
 - **타 포맷 적용 불가**(범위 제약, 9.1).
 - **원본 코드 직접 번역 금지**(라이선스, 3·9.2).
 - **GitHub blob/ 경로 크롤 시 한국어/본문 누락 가능** — 소스·문서는 `raw.githubusercontent.com` 경로로 가져온다.
+- **이 미러의 `.c` 파일은 `application/octet-stream` MIME** 라 Claude 크롤러가 직접 못 읽음(raw 모드 거부, blob API 는 base64 라 비효율). C 소스는 **사용자가 직접 받아 붙여넣어 제공**한다(브라우저 "Download raw file" 또는 master.zip 의 `src/`). 헤더 `.h` 는 `text/plain` 이라 크롤 가능.
+- **0-gain 프레임은 ±N 으로 안 바뀜**(사양 1.4): `gain==0` 이면 그대로 둠. 따라서 round-trip 완전복원은 0-gain 프레임이 없는 파일에서만 보장.
 
 ## 11. 새 세션 시작 방법
 
@@ -127,6 +129,20 @@ MP3 전용이다. AAC/FLAC/Opus 등 타 포맷 지원 제안은 하지 않는다
 
 ### 11.1. 다음 세션 시작점
 
-`mp3gain.c` 의 프레임 파싱 / `global_gain` 위치 계산 부분을 5 의 raw URL 로 읽는 것부터 시작 → 그에 대응하는 Python 프레임 파서(7 의 1단계) 작성. clean-room 으로 사양만 참고.
+**1단계 완료** (프레임 파서 + `global_gain` 읽기/쓰기). 구현·검증된 것:
 
-- 로컬에 미반영(미커밋) 변경분이 있으면 첫 메시지에 함께 알린다.
+- `gaindb/frame.py` — 읽기 파서. `_BitReader`(peek8/set8/skip), 헤더 파싱, 프레임 길이 계산, ID3v2·Xing/Info 스킵, `global_gain` 추출.
+- `gaindb/writer.py` — `±N` 무손실 적용(`apply_gain`) + CRC 재계산(다항식 0x8005). 좌우 동일/채널별 게인 지원.
+- `scan_gain.py` / `apply_gain.py` — CLI.
+- 검증: Debussy 테스트 파일에서 +1 후 min/max 36/210 → 37/211 정확, -1 round-trip 후 바이트 단위 완전 동일(무손실 증명). `mp3gain.c` 의 `scanFrameGain`/`changeGain` 비트 시퀀스와 동작 일치.
+- 미커밋 변경분 없음.
+
+**다음 = 2단계 ReplayGain 분석기.** 순서:
+
+1. PCM 디코딩 도구 환경 점검 (ffmpeg 설치 여부 / pydub / venv 구성).
+2. equal-loudness 필터 + RMS + 통계(95퍼센타일 부근)를 numpy 로 구현.
+3. 목표 89dB 에 맞는 게인 스텝 수 산출 → 1단계 `apply_gain` 과 연결해 자동 정규화.
+
+- 참고 사양: `gain_analysis.c`(22KB) + `gain_analysis.h`(2KB). **`.c` 는 크롤 불가이므로 사용자가 직접 붙여넣어 제공**(10 함정 참조). 헤더 `.h` 는 raw URL 크롤 가능.
+- clean-room 유지: 필터 계수·통계 사양만 참조, 코드 복붙 금지.
+- 로컬에 미커밋 변경분이 생기면 첫 메시지에 함께 알린다.

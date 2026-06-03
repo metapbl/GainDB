@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 가상환경
+venv/
+.venv/
+
+# 테스트용 오디오 (저장소에 포함하지 않음)
+*.mp3
+
+# OS / 에디터
+.vscode/
+Thumbs.db
+.DS_Store

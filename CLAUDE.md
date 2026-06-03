@@ -1,7 +1,7 @@
 # Gain dB — Claude 컨텍스트 파일
 
-> 이 파일은 새 세션 시작 시 Claude 에게 프로젝트 맥락을 즉시 제공하기 위한 컨텍스트 파일입니다.
-> claude.ai 웹 채팅에서는 첫 메시지에 본 파일(과 작업 로그)의 raw URL 을 던져 Claude 가 직접 가져오게 한다 (자세한 방법은 맨 아래 "11. 새 세션 시작 방법" 참조).
+> 새 세션 시작 시 Claude 에게 프로젝트 맥락을 즉시 제공하는 컨텍스트 파일.
+> 첫 메시지에 본 파일 본문(또는 raw URL)을 주고, 그 세션 단계에 필요한 C 소스를 함께 붙여넣는다 (자세한 방법은 "11. 새 세션 시작 방법" 참조).
 
 ---
 
@@ -11,7 +11,7 @@
 - **기술 이름(폴더·저장소·패키지)**: `GaindB`
 - **성격**: MP3 파일의 음량을 **무손실(재인코딩 없이)** 로 분석·조정하는 도구. 원본 MP3Gain 의 핵심 기능을 Python 으로 재구현.
 - **범위**: **MP3 단독 전용**. AAC/FLAC/Opus 등 타 포맷은 의도적으로 다루지 않는다 (사유는 4·9 참조).
-- **위치**: AVD(AV_Downloader)로 "MP3 지정" 다운로드한 음원의 음량을 고르게 맞추는 **후속 단계 도구**로 설계. 단독으로도 동작.
+- **위치**: AVD(AV_Downloader)로 "MP3 지정" 다운로드한 음원의 음량을 고르게 맞추는 **후속 단계 도구**. 단독으로도 동작.
 - **로컬 경로**: `C:\Users\ggoyo_zhxlvdr\GaindB`
 - **라이선스 방침**: 3 참조 (clean-room 우선, 개인 로컬 사용).
 
@@ -20,74 +20,70 @@
 - **작업 방식**: 1인 개발자 + AI 페어 프로그래밍.
 - **성격**: 기능이 고정된 일회성 유틸리티. 지속 릴리즈·유지보수 대상 아님. 한 번 완성해 동작하면 종료.
 - **버전관리**: 로컬 Git (원격 저장소 없음 기본, 단계별 커밋으로 안전망 확보). 공개는 최후의 선택지.
+- **이 파일 관리**: 컨텍스트 파일은 짧게 유지한다. 단계 완료 시 11.1 의 진척 로그만 갱신하고, 끝난 단계의 세부 구현 설명은 한두 줄 요약으로 압축한다. 새 항목 추가 시 기존 항목과 중복·비대화되지 않게 한다.
 
 ## 3. 라이선스 방침
 
 - 원본 MP3Gain 은 C 로 작성된 **LGPL v2.1** 오픈소스(2009년경 개발 중단).
 - **clean-room 방식 우선**: 원본 C 코드를 직접 번역(복붙)하지 않고, 공개된 사양(ReplayGain 알고리즘, MPEG 오디오 프레임 구조)만 보고 독립 구현한다. 알고리즘·파일 포맷은 저작권 대상이 아니므로 LGPL 구속을 피할 수 있음.
-- 원본 코드를 그대로 번역하면 결과물에 LGPL 이 따라옴(소스 공개·저작자/라이선스 고지 의무). 다른 언어로 옮겨도 2차적 저작물로 간주됨.
-- 개인 로컬 사용 중에는 "배포(distribution)"가 없으므로 LGPL 의무는 사실상 발생하지 않음. 배포 계획이 생기면 그때 변호사 검토 필요 (Claude 는 변호사가 아님).
+- 원본 코드를 그대로 번역하면 결과물에 LGPL 이 따라옴(소스 공개·고지 의무). 다른 언어로 옮겨도 2차적 저작물로 간주됨.
+- 개인 로컬 사용 중에는 "배포"가 없으므로 LGPL 의무는 사실상 발생하지 않음. 배포 계획이 생기면 그때 변호사 검토 필요 (Claude 는 변호사가 아님).
 
 ## 4. 핵심 기술 원리
 
-- **무손실 음량 조정**: MP3 각 프레임의 사이드 정보 안 `global_gain`(8bit) 필드를 직접 ±N 하여 음량 조절. 디코더는 `2^(gain/4)` 로 샘플을 곱하므로 1스텝 ≈ 1.5dB. 재인코딩 없음 → 무손실. 이 부분이 "음량 적용"의 전부이며, **MP3 고유 구조라 타 포맷에 적용 불가**(범위를 MP3 전용으로 못 박는 기술적 근거).
+- **무손실 음량 조정**: MP3 각 프레임의 사이드 정보 안 `global_gain`(8bit) 필드를 직접 ±N 하여 음량 조절. 디코더는 `2^(gain/4)` 로 샘플을 곱하므로 1스텝 ≈ 1.5dB. 재인코딩 없음 → 무손실. 이 부분이 "음량 적용"의 전부이며, **MP3 고유 구조라 타 포맷에 적용 불가**(범위를 MP3 전용으로 못 박는 근거).
 - **음량 분석**: PCM 으로 디코딩 후 David Robinson 의 ReplayGain 알고리즘(equal-loudness 필터 + RMS + 통계, 95퍼센타일 부근)으로 인지 음량 계산. 목표값(기본 89dB)에 맞추는 데 필요한 게인 스텝 수를 산출.
 - **Track gain / Album gain** 두 모드.
 - **undo**: 변경 내역을 APEv2/ID3v2 태그에 기록해 원복 가능.
 
-## 5. 원본 참고 자료 (도구 호출 전용 URL)
+## 5. 원본 참고 자료
 
-- 소스 미러(이 버전엔 디코더 `mpglibDBL` 없음): https://github.com/Sound-Linux-More/mp3gain
+- 소스 미러: https://github.com/Sound-Linux-More/mp3gain (`src/` 아래에 C 소스)
 - 원조 풀버전: https://sourceforge.net/projects/mp3gain/
-- **소스 본문은 raw 경로로 가져온다**(blob/ 경로는 변환 누락 위험): `https://raw.githubusercontent.com/Sound-Linux-More/mp3gain/master/src/<파일명>`
-- 전체 파일 트리 확인(API): `https://api.github.com/repos/Sound-Linux-More/mp3gain/git/trees/master?recursive=1`
-- 실패 확인된 경로(헛수고 방지): Debian sources 페이지(봇 차단), GitHub blob 웹페이지(목록만 반환). API 우회로 해결됨.
+- **C 소스 본문은 사용자가 직접 받아 붙여넣어 제공한다** (사유는 10 참조). 받는 법: GitHub blob 페이지의 "Download raw file" 또는 `master.zip` 전체를 받아 `src/` 사용.
 
-### 5.1. 원본 핵심 C 소스 (clean-room 으로 읽을 대상)
+### 5.1. 원본 핵심 C 소스 (clean-room 으로 사양만 추출할 대상)
 
-- `mp3gain.c` (85KB) — 메인 + MP3 프레임 파싱 + `global_gain` 적용. 가장 큼, 핵심.
-- `gain_analysis.c` (22KB) — ReplayGain 음량 분석(필터 계수·RMS·통계).
-- `apetag.c` (22KB) — APEv2 태그(undo 정보).
-- `id3tag.c` (39KB) — ID3v2 RVA2 태그 처리.
-- `rg_error.c` — 오류 처리. `replaygaindll.c` — Windows DLL 래퍼(무시 가능).
-- 나머지(.dsp/.dsw/.sln/.vcproj/.rc/Makefile)는 빌드·프로젝트 파일로 코드 아님.
+- `mp3gain.c` (85KB) — 메인 + MP3 프레임 파싱 + `global_gain` 적용. **[1단계에서 사용 완료]**
+- `gain_analysis.c` (22KB) + `gain_analysis.h` (2KB) — ReplayGain 음량 분석(필터 계수·RMS·통계). **[2단계 대상]**
+- `apetag.c` (22KB) — APEv2 태그(undo 정보). **[4단계 대상]**
+- `id3tag.c` (39KB) — ID3v2 RVA2 태그 처리. **[4단계 대상]**
+- 나머지(.dsp/.dsw/.sln/.vcproj/.rc/Makefile, `replaygaindll.c`)는 빌드·래퍼 파일로 무시.
 
 ## 6. 기술 스택 (예정)
 
-- **언어**: Python 3 (개발 환경 3.13 등)
-- **신호처리**: numpy (필터·RMS·통계)
+- **언어**: Python 3 (개발 환경 3.13/3.14 등). 1단계는 순수 표준 라이브러리로 구현됨(외부 의존성 없음).
+- **신호처리**: numpy (2단계 필터·RMS·통계).
 - **MP3 디코딩(PCM 추출)**: 직접 구현하지 말고 외부 도구(ffmpeg 직접 호출 또는 pydub) 사용 — 원본의 `mpglibDBL` 디코더는 옮기지 않는다.
-- **가상환경**: venv
+- **가상환경**: venv.
 
 ## 7. 구현 단계 (난이도·우선순위 순)
 
-1. **[핵심] MP3 프레임 파서 + `global_gain` 읽기/쓰기** (~300–500줄, 순수 Python 가능)
-    - 먼저 `global_gain` 값을 읽어 출력 → 그다음 ±1 수정·저장 → 음량 변화 확인.
-2. **[핵심] ReplayGain 분석기** (~200–400줄, numpy 사용)
-    - equal-loudness 필터 + RMS + 통계.
-3. **MP3 디코딩(PCM 추출)**: 외부 도구 사용 (~수십 줄).
+1. **[완료] MP3 프레임 파서 + `global_gain` 읽기/쓰기** — 순수 Python. 읽기·쓰기·무손실 round-trip 검증 끝(상세는 11.1).
+2. **[핵심·진행 예정] ReplayGain 분석기** (~200–400줄, numpy) — equal-loudness 필터 + RMS + 통계.
+3. **MP3 디코딩(PCM 추출)**: 외부 도구 사용 (~수십 줄). 2단계의 입력 공급.
 4. **태그 처리(undo: APEv2/ID3v2)** (~200–400줄, 처음엔 생략 가능).
 5. **CLI / 일괄 처리 / 옵션** (~100–300줄).
 
 - 예상 총 분량: 완전판 1,000–1,800줄 / 최소 핵심판 600–900줄.
-- 난이도는 거의 전부 1단계(프레임 파싱)와 2단계(필터 정확도)에 몰려 있음.
+- 난이도는 거의 전부 1단계(프레임 파싱, 완료)와 2단계(필터 정확도)에 몰려 있음.
 
 ## 8. 개발 환경 · 작업 흐름
 
-- **OS**: Windows (개발). 셸은 VS Code 통합 터미널(PowerShell). cwd=워크스페이스 루트 가정, `cd` 는 필요할 때만.
+- **OS**: Windows. 셸은 VS Code 통합 터미널(PowerShell). cwd=워크스페이스 루트 가정, `cd` 는 필요할 때만.
 - **에디터**: VS Code.
-- **커밋**: 의미 단위가 끝날 때마다 즉시 커밋. [Conventional Commits](https://www.conventionalcommits.org/) 형식 (`feat:`/`fix:`/`chore:`/`docs:`/`refactor:`).
+- **커밋**: 의미 단위가 끝날 때마다 즉시 커밋. Conventional Commits 형식 (`feat:`/`fix:`/`chore:`/`docs:`/`refactor:`).
 - **PowerShell 함정**: `>` 리다이렉션은 UTF-16 LE BOM 으로 씀. 대안 `... | Out-File -Encoding utf8 <파일>`.
 
 ## 9. Claude 응답 규칙
 
 ### 9.1. 범위 고수
 
-MP3 전용이다. AAC/FLAC/Opus 등 타 포맷 지원 제안은 하지 않는다(요청 시 4·아래 근거로 한계 설명). 무손실 게인 조정은 MP3 `global_gain` 필드 기법이라 타 포맷에 원리적으로 적용 불가.
+MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인 조정은 MP3 `global_gain` 필드 기법이라 타 포맷에 원리적으로 적용 불가.
 
 ### 9.2. clean-room 준수
 
-원본 C 소스는 **사양 이해 목적으로만** 읽고, 코드를 그대로 옮기지 않는다. 큰 파일(`mp3gain.c` 85KB)은 핵심 함수 위주로 나눠 정독한다. 본문은 5 의 raw URL 로 가져온다.
+사용자가 제공한 원본 C 소스는 **사양 이해 목적으로만** 읽고, 코드를 그대로 옮기지 않는다. 알고리즘·비트 레이아웃·필터 계수 같은 공개 사양만 차용해 Python 으로 독립 재작성한다.
 
 ### 9.3. 코드 제시 단위
 
@@ -101,7 +97,7 @@ MP3 전용이다. AAC/FLAC/Opus 등 타 포맷 지원 제안은 하지 않는다
 
 ### 9.5. 터미널 명령 동봉
 
-파일을 수정·추가·삭제하는 코드를 제시할 때는 디스크 반영·커밋까지 필요한 명령을 같은 응답에 함께 제시. 기본 흐름 ① `git add <파일>` ② `git status` ③ `git commit -m "..."`. (원격 저장소를 쓰지 않으므로 `git push` 는 생략, 도입 시 추가.) 환경은 PowerShell, cwd=루트. 신규 파일·디렉터리는 `New-Item -ItemType {Directory|File} -Force` 로 만든 뒤 본문은 VS Code 에 붙여 넣음 — `-Force` 는 기존 파일을 빈 파일로 덮으므로 한 줄 경고.
+파일을 수정·추가·삭제하는 코드를 제시할 때는 디스크 반영·커밋 명령을 같은 응답에 함께 제시. 기본 흐름 ① `git add <파일>` ② `git status` ③ `git commit -m "..."`. (원격 저장소 없으므로 `git push` 생략.) 환경은 PowerShell, cwd=루트. 신규 파일·디렉터리는 `New-Item -ItemType {Directory|File} -Force` 로 만든 뒤 본문은 VS Code 에 붙여 넣음 — `-Force` 는 기존 파일을 빈 파일로 덮으므로 한 줄 경고.
 
 ### 9.6. 마크다운 파일 전송
 
@@ -115,34 +111,27 @@ MP3 전용이다. AAC/FLAC/Opus 등 타 포맷 지원 제안은 하지 않는다
 
 ## 10. 알려진 함정 (영구 제약)
 
-- **`global_gain` 위치 계산이 1단계의 핵심 난점**: 프레임 헤더 → 사이드 정보 안의 비트 오프셋을 MPEG 버전·채널 모드별로 정확히 짚어야 함. 여기 정확도가 프로젝트 성패를 가름.
-- **분석에는 디코딩이 필요하지만 적용에는 불필요**: 음량 *적용*은 프레임 게인 필드만 건드리면 됨(디코딩 불필요). 음량 *분석*만 PCM 디코딩 필요. 두 경로를 혼동하지 말 것.
-- **타 포맷 적용 불가**(범위 제약, 9.1).
-- **원본 코드 직접 번역 금지**(라이선스, 3·9.2).
-- **GitHub blob/ 경로 크롤 시 한국어/본문 누락 가능** — 소스·문서는 `raw.githubusercontent.com` 경로로 가져온다.
-- **이 미러의 `.c` 파일은 `application/octet-stream` MIME** 라 Claude 크롤러가 직접 못 읽음(raw 모드 거부, blob API 는 base64 라 비효율). C 소스는 **사용자가 직접 받아 붙여넣어 제공**한다(브라우저 "Download raw file" 또는 master.zip 의 `src/`). 헤더 `.h` 는 `text/plain` 이라 크롤 가능.
-- **0-gain 프레임은 ±N 으로 안 바뀜**(사양 1.4): `gain==0` 이면 그대로 둠. 따라서 round-trip 완전복원은 0-gain 프레임이 없는 파일에서만 보장.
+- **`global_gain` 위치 계산이 1단계의 핵심 난점이었음**: 프레임 헤더 → 사이드 정보 안의 비트 오프셋을 MPEG 버전·채널 모드별로 정확히 짚어야 함. (1단계에서 해결·검증 완료.)
+- **분석에는 디코딩이 필요하지만 적용에는 불필요**: 음량 *적용*은 프레임 게인 필드만 건드림(디코딩 불필요). 음량 *분석*만 PCM 디코딩 필요. 두 경로를 혼동하지 말 것.
+- **0-gain 프레임은 ±N 으로 안 바뀜**: `gain==0` 이면 그대로 둠. round-trip 완전복원은 0-gain 프레임이 없는 파일에서만 보장.
+- **타 포맷 적용 불가**(범위 제약, 9.1) / **원본 코드 직접 번역 금지**(라이선스, 3·9.2).
+- **이 미러의 `.c` 는 크롤 불가**: `application/octet-stream` MIME 라 Claude 크롤러가 직접 못 읽는다. 그래서 C 소스는 사용자가 직접 붙여넣어 제공한다(5 참조). Claude 가 크롤로 가져오려 시도하지 말 것.
 
 ## 11. 새 세션 시작 방법
 
-새 세션 첫 메시지에 본 파일의 raw URL 을 던지고, "먼저 읽어달라"는 한 줄을 덧붙인다. (작업 로그 파일을 따로 둘 경우 그 raw URL 도 함께.) Claude 가 검색·크롤 도구로 즉시 최신 상태와 원본 소스를 가져온다. **세션에 크롤/검색 도구가 켜져 있어야 한다.**
+새 세션 첫 메시지에 본 파일 본문(또는 raw URL)을 주고 "먼저 읽어달라"는 한 줄을 덧붙인다. 이어 그 세션 단계에 필요한 C 소스(.c/.h)를 붙여넣어 제공한다. 검색 도구는 최신 정보 확인용으로만 쓰고, 원본 소스 입수에는 쓰지 않는다.
 
-### 11.1. 다음 세션 시작점
+### 11.1. 진척 로그 / 다음 세션 시작점
 
-**1단계 완료** (프레임 파서 + `global_gain` 읽기/쓰기). 구현·검증된 것:
+**1단계 완료** (프레임 파서 + `global_gain` 읽기/쓰기). 결과물:
 
-- `gaindb/frame.py` — 읽기 파서. `_BitReader`(peek8/set8/skip), 헤더 파싱, 프레임 길이 계산, ID3v2·Xing/Info 스킵, `global_gain` 추출.
-- `gaindb/writer.py` — `±N` 무손실 적용(`apply_gain`) + CRC 재계산(다항식 0x8005). 좌우 동일/채널별 게인 지원.
+- `gaindb/frame.py` — 읽기 파서(`_BitReader` peek8/set8/skip, 헤더 파싱, 프레임 길이, ID3v2·Xing/Info 스킵, `global_gain` 추출).
+- `gaindb/writer.py` — `±N` 무손실 적용(`apply_gain`) + CRC 재계산(다항식 0x8005).
 - `scan_gain.py` / `apply_gain.py` — CLI.
-- 검증: Debussy 테스트 파일에서 +1 후 min/max 36/210 → 37/211 정확, -1 round-trip 후 바이트 단위 완전 동일(무손실 증명). `mp3gain.c` 의 `scanFrameGain`/`changeGain` 비트 시퀀스와 동작 일치.
+- 검증: Debussy 테스트 파일 +1 후 min/max 36/210 → 37/211 정확, -1 round-trip 후 바이트 단위 완전 동일(무손실 증명).
 - 미커밋 변경분 없음.
 
-**다음 = 2단계 ReplayGain 분석기.** 순서:
+**다음 = 2단계 ReplayGain 분석기.** 순서: ① PCM 디코딩 도구 환경 점검(ffmpeg/pydub, venv) → ② equal-loudness 필터 + RMS + 통계(95퍼센타일)를 numpy 로 구현 → ③ 목표 89dB 에 맞는 게인 스텝 산출, 1단계 `apply_gain` 과 연결.
 
-1. PCM 디코딩 도구 환경 점검 (ffmpeg 설치 여부 / pydub / venv 구성).
-2. equal-loudness 필터 + RMS + 통계(95퍼센타일 부근)를 numpy 로 구현.
-3. 목표 89dB 에 맞는 게인 스텝 수 산출 → 1단계 `apply_gain` 과 연결해 자동 정규화.
-
-- 참고 사양: `gain_analysis.c`(22KB) + `gain_analysis.h`(2KB). **`.c` 는 크롤 불가이므로 사용자가 직접 붙여넣어 제공**(10 함정 참조). 헤더 `.h` 는 raw URL 크롤 가능.
-- clean-room 유지: 필터 계수·통계 사양만 참조, 코드 복붙 금지.
+- 시작 시 사용자가 `gain_analysis.c`(22KB) + `gain_analysis.h`(2KB) 본문을 붙여넣어 제공한다. clean-room 으로 필터 계수·통계 사양만 추출.
 - 로컬에 미커밋 변경분이 생기면 첫 메시지에 함께 알린다.

@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import BinaryIO, Optional
 
@@ -393,3 +394,215 @@ def read_mp3gain_ape_tag(filename: str):
             file_tags.tag_offset = file_size
 
     return info, file_tags
+
+
+# ---------------------------------------------------------------------------
+# 4단계 ②: APEv2 쓰기 (원본 WriteMP3GainAPETag 동등)
+# ---------------------------------------------------------------------------
+
+def _write_le32(value: int) -> bytes:
+    """원본 Write_LE_Uint32: 리틀엔디언 4바이트."""
+    return bytes((
+        value & 0xFF,
+        (value >> 8) & 0xFF,
+        (value >> 16) & 0xFF,
+        (value >> 24) & 0xFF,
+    ))
+
+
+def _fmt_gain(value: float) -> str:
+    """원본 '%-+9.6f' + ' dB'.
+
+    C 의 %-+9.6f: 부호 강제(+/-), 최소폭 9, 소수 6자리, 좌측정렬(폭 미달 시
+    오른쪽 공백). 6자리 소수면 부호+정수1+점+6 = 최소 9자리라 보통 폭 충족.
+    원본은 이 9바이트만 memcpy 후 ' dB' 3바이트를 붙인다.
+    """
+    s = f"{value:+.6f}"          # 부호 강제, 소수 6자리
+    s = s.ljust(9)              # 최소폭 9, 좌측정렬
+    # 원본은 valueString 의 앞 9바이트만 복사. 폭 초과 시(예: -10.5) 잘릴 수 있으나
+    # 게인 dB 는 통상 한 자리 정수라 9 이내. 원본과 동일하게 앞 9바이트 사용.
+    return s[:9] + " dB"
+
+
+def _fmt_peak(value: float) -> str:
+    """원본 '%-8.6f': 부호 없음, 최소폭 8, 소수 6자리, 좌측정렬. 앞 8바이트 사용."""
+    s = f"{value:.6f}"
+    s = s.ljust(8)
+    return s[:8]
+
+
+def _ape_field(name: str, value: str) -> bytes:
+    """APE 필드 하나를 원본 바이트 레이아웃으로 직렬화.
+
+    레이아웃: vsize[4 LE] + flags[4 LE]=0 + name(ASCII) + '\\0' + value(UTF-8).
+    """
+    name_b = name.encode("ascii")
+    value_b = value.encode("utf-8")
+    return (
+        _write_le32(len(value_b))
+        + _write_le32(0)
+        + name_b
+        + b"\x00"
+        + value_b
+    )
+
+
+def _make_ape_footer(
+    is_header: bool, tag_len: int, tag_count: int, base: Optional[bytes]
+) -> bytes:
+    """APE 푸터 또는 헤더 32바이트 생성 (원본 WriteMP3GainAPETag 의 footer/header 구성).
+
+    is_header=True 이면 Flags 에 bit29(이것이 헤더)를 추가로 켠다.
+    Length 는 '자신을 제외한 상대편 32바이트 + 본문' = tag_len - 32 (원본은 항상
+    헤더+푸터 둘 다 쓰므로 newTagLength - sizeof(other 한쪽) 로 계산되며 동일값).
+    base 가 주어지면(기존 footer/header 보존) Version/Reserved 등을 유지하고
+    Length·TagCount·Flags(헤더비트)만 갱신. 없으면 v2000 으로 새로 만든다.
+    """
+    if base is not None and len(base) == APE_FOOTER_SIZE:
+        buf = bytearray(base)
+    else:
+        buf = bytearray(APE_FOOTER_SIZE)
+        buf[0:8] = b"APETAGEX"
+        buf[8:12] = _write_le32(2000)          # Version
+        buf[24:32] = b"\x00" * 8                # Reserved
+
+    buf[12:16] = _write_le32(tag_len - APE_FOOTER_SIZE)  # Length
+    buf[16:20] = _write_le32(tag_count)                  # TagCount
+
+    # Flags: 항상 "태그에 헤더 있음"(bit31). 헤더면 "이것이 헤더"(bit29) 추가.
+    flags = APE_FLAG_HAS_HEADER
+    if is_header:
+        flags |= (1 << 29)
+    buf[20:24] = _write_le32(flags)
+
+    return bytes(buf)
+
+
+def _restore_timestamp(filename: str, saved) -> None:
+    if saved is not None:
+        os.utime(filename, (saved.st_atime, saved.st_mtime))
+
+
+def write_mp3gain_ape_tag(
+    filename: str,
+    info: MP3GainTagInfo,
+    file_tags: FileTags,
+    save_timestamp: bool = False,
+) -> bool:
+    """원본 WriteMP3GainAPETag 동등.
+
+    file_tags 는 read_mp3gain_ape_tag 로 미리 채워져 있어야 한다(tag_offset,
+    보존된 otherFields/Lyrics3/ID3v1). info 의 have_* 에 따라 mp3gain/ReplayGain
+    필드를 기록한다. 새 태그는 항상 header(32)+otherFields+mp3gain필드+footer(32)
+    구조. 쓸 필드가 하나도 없으면(otherFields 도 없고 have_* 도 전부 False) APE
+    태그를 쓰지 않고 꼬리만 남긴다.
+
+    반환: 성공 시 True.
+    """
+    saved_stat = None
+    if save_timestamp:
+        try:
+            saved_stat = os.stat(filename)
+        except OSError:
+            saved_stat = None
+
+    ape = file_tags.ape_tag
+
+    # otherFields(보존된 비-mp3gain 필드) 와 그 개수.
+    if ape is not None:
+        other_fields = ape.other_fields
+        other_count = _count_ape_fields(other_fields)
+    else:
+        other_fields = b""
+        other_count = 0
+
+    # mp3gain/ReplayGain 필드를 원본 순서대로 직렬화.
+    fields = bytearray()
+    field_count = 0
+
+    if info.have_min_max_gain:
+        fields += _ape_field(
+            "MP3GAIN_MINMAX",
+            f"{info.min_gain:03d},{info.max_gain:03d}",
+        )
+        field_count += 1
+    if info.have_album_min_max_gain:
+        fields += _ape_field(
+            "MP3GAIN_ALBUM_MINMAX",
+            f"{info.album_min_gain:03d},{info.album_max_gain:03d}",
+        )
+        field_count += 1
+    if info.have_undo:
+        wrap_ch = "W" if info.undo_wrap else "N"
+        fields += _ape_field(
+            "MP3GAIN_UNDO",
+            f"{info.undo_left:+04d},{info.undo_right:+04d},{wrap_ch}",
+        )
+        field_count += 1
+    if info.have_track_gain:
+        fields += _ape_field("REPLAYGAIN_TRACK_GAIN", _fmt_gain(info.track_gain))
+        field_count += 1
+    if info.have_track_peak:
+        fields += _ape_field("REPLAYGAIN_TRACK_PEAK", _fmt_peak(info.track_peak))
+        field_count += 1
+    if info.have_album_gain:
+        fields += _ape_field("REPLAYGAIN_ALBUM_GAIN", _fmt_gain(info.album_gain))
+        field_count += 1
+    if info.have_album_peak:
+        fields += _ape_field("REPLAYGAIN_ALBUM_PEAK", _fmt_peak(info.album_peak))
+        field_count += 1
+
+    new_tag_count = other_count + field_count
+    body = other_fields + bytes(fields)
+    # 새 태그 총 길이 = 헤더(32) + 본문 + 푸터(32).
+    new_tag_length = APE_FOOTER_SIZE * 2 + len(body)
+
+    # 기존 태그가 새 태그보다 길면 파일을 tag_offset 까지 truncate (원본 동작).
+    if ape is not None and ape.original_tag_size > new_tag_length:
+        with open(filename, "r+b") as f:
+            f.truncate(file_tags.tag_offset)
+
+    base_footer = ape.footer if ape is not None else None
+    base_header = ape.header if (ape is not None and ape.have_header) else None
+
+    new_header = _make_ape_footer(True, new_tag_length, new_tag_count, base_header)
+    new_footer = _make_ape_footer(False, new_tag_length, new_tag_count, base_footer)
+
+    with open(filename, "r+b") as f:
+        f.seek(file_tags.tag_offset)
+        if new_tag_count > 0:
+            f.write(new_header)
+            f.write(body)
+            f.write(new_footer)
+        # 보존된 꼬리 재기록: Lyrics3 가 있으면 그것만(정의상 id3v1 포함),
+        # 없으면 id3v1 단독.
+        if file_tags.lyrics3_tag_size > 0 and file_tags.lyrics3_tag is not None:
+            f.write(file_tags.lyrics3_tag)
+        elif file_tags.id3v1_tag is not None:
+            f.write(file_tags.id3v1_tag)
+        # 새 끝 위치에서 잘라내기(꼬리가 짧아진 경우 잔여 바이트 제거).
+        f.truncate()
+
+    if save_timestamp:
+        _restore_timestamp(filename, saved_stat)
+
+    return True
+
+
+def _count_ape_fields(blob: bytes) -> int:
+    """otherFields 블롭에 들어 있는 APE 필드 개수를 센다.
+
+    각 필드: vsize[4]+flags[4]+name+'\\0'+value. write 시 footer TagCount 계산용.
+    """
+    count = 0
+    p = 0
+    n = len(blob)
+    while p + 8 <= n:
+        vsize = _read_le32(blob, p)
+        p += 8
+        isize = _strlen_max(blob, p, n - p)
+        if p + isize + 1 + vsize > n:
+            break
+        p += isize + 1 + vsize
+        count += 1
+    return count

@@ -176,3 +176,5 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 **신규 식별(기능 축소 아님, 1.1 합의 필요):** 본체 `mp3gain.c` 검토 중 `scanFrameGain`(각 프레임 global_gain 의 파일 전체 min/max 를 디코딩 없이 스캔 — `MP3GAIN_MINMAX` 태그의 원천)이 진척 로그에 누락돼 있었음. 4단계 ③(changeGainAndTag 동등) 단계에서 `frame.py` 확장 또는 tag 경로로 추가 예정. 또한 본체는 recalc 비트마스크(FULL/AMP/MIN_MAX)로 태그 신뢰 시 디코딩을 건너뛰는 최적화를 하며, 이는 5단계 CLI 에서 재현 대상.
 
 **4단계 남은 분할:** ② APEv2 쓰기(`WriteMP3GainAPETag` 동등: 헤더+푸터 재구성, otherFields 선배치 + mp3gain 필드 고정순서, Length/TagCount 갱신, 짧아지면 truncate, Lyrics3/ID3v1 꼬리 재기록, 값 포맷 `%-+9.6f dB`/`%-8.6f`/`%03d,%03d`/`%+04d,%+04d,%c`) → ③ changeGainAndTag 동등 + scanFrameGain → ④ undo/remove + apply_gain 연결 → ⑤ ID3v2 읽기·쓰기(RVA2 + TXXX).
+
+**4단계 ② 완료** (APEv2 쓰기). `write_mp3gain_ape_tag` + 값 포맷 헬퍼(`_fmt_gain`/`_fmt_peak`/`_ape_field`/`_make_ape_footer`). 헤더+푸터 재구성, otherFields 선배치 + mp3gain 필드 고정순서(MINMAX→ALBUM_MINMAX→UNDO→TRACK_GAIN→PEAK→ALBUM_GAIN→PEAK), Length/TagCount/Flags 갱신, 짧아지면 truncate, Lyrics3/ID3v1 꼬리 재기록, save_timestamp 는 os.utime 으로 재현. 검증: round-trip(우리 파서 재독 일치) + mutagen 상호운용(값 포맷 정확) + ID3v1 꼬리 보존 확인.

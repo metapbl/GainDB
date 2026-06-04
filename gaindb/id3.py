@@ -1,21 +1,24 @@
 """ID3v2 (RVA2 + TXXX) 태그 읽기/쓰기 — 원본 mp3gain id3tag.c 동등 재구현 (clean-room).
 
-이 모듈은 ⑤-A(읽기)를 담당한다. 쓰기(⑤-B)·결선(⑤-C)은 이어서 추가한다.
+이 모듈은 ⑤-A(읽기) + ⑤-B(쓰기)를 담당한다. 결선(⑤-C)은 이어서 추가한다.
 
 원본 동작 요약:
   - 읽기: 파일 앞 ID3v2 → 없으면 끝 ID3v2.4 footer → 없으면 끝 ID3v1.
     ID3v2.2/2.3/2.4 를 모두 내부적으로 2.4 로 통일해 파싱하고,
     RVA2 / TXXX(ReplayGain) / TXXX(MP3GAIN_*) 에서 게인 정보를 추출한다.
+  - 쓰기: 항상 파일 앞 단일 ID3v2.4, 전체 unsync, ext header 없음, 2KB 패딩,
+    footer 없음, 임시파일(.TMP) 재기록 후 rename(os.replace).
 
-게인 정보 구조체·문자열 파싱 헬퍼는 gaindb.tag 의 것을 재사용한다(snake_case).
+게인 정보 구조체·문자열/포맷 헬퍼는 gaindb.tag 의 것을 재사용한다(snake_case).
 """
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Optional, List
 
-from gaindb.tag import MP3GainTagInfo, _atof
+from gaindb.tag import MP3GainTagInfo, _atof, _fmt_gain, _fmt_peak
 
 
 # ---- 오류 코드 (원본 rg_error.h 동등; 음수) -------------------------------
@@ -332,6 +335,7 @@ def _decode_mp3gain_frame(frame: Id3Frame, info: Optional[MP3GainTagInfo]) -> in
             info.album_max_gain = f[1]
         return 1
     return 0
+
 
 # ---- ID3v2 직렬화 헬퍼 (⑤-B1; 원본 id3_put_unsync_data / id3_make_frame /
 #      id3_make_rva2_frame / id3_write_tag 동등) ----------------------------
@@ -777,3 +781,181 @@ def read_mp3gain_id3_tag(filename: str, info: MP3GainTagInfo) -> int:
             _decode_mp3gain_frame(frame, info)
 
     return status
+
+
+# ---- 공개 API: 쓰기/제거 (⑤-B2; 원본 WriteMP3GainID3Tag /
+#      RemoveMP3GainID3Tag 동등) --------------------------------------------
+
+def _restore_timestamp(filename: str, saved) -> None:
+    """저장해 둔 stat 으로 atime/mtime 복원. tag.py 의 동명 헬퍼와 대칭."""
+    if saved is not None:
+        os.utime(filename, (saved.st_atime, saved.st_mtime))
+
+
+def _copy_data(inf, outf, offset: int, count: int) -> None:
+    """inf 의 offset 부터 count 바이트를 outf 로 복사. count<0 이면 끝까지.
+
+    원본 id3_copy_data 동등(64KB 청크). 에러는 예외로 전파.
+    """
+    bufsize = 65536
+    inf.seek(offset, 0)
+    remaining = count
+    while remaining != 0:
+        k = bufsize if (remaining < 0 or remaining > bufsize) else remaining
+        chunk = inf.read(k)
+        if not chunk:
+            break
+        outf.write(chunk)
+        if remaining > 0:
+            remaining -= len(chunk)
+
+
+def write_mp3gain_id3_tag(
+    filename: str,
+    info: MP3GainTagInfo,
+    save_timestamp: bool = False,
+) -> int:
+    """ID3v2 태그에 게인 정보를 (재)기록. 원본 WriteMP3GainID3Tag 동등.
+
+    항상 파일 앞 단일 ID3v2.4 태그를 쓰거나 갱신한다. 기존 RG 프레임은 제거하고
+    새 프레임을 고정 순서로 append. 변경할 게 없으면(need_update 거짓) 파일을
+    건드리지 않고 0 반환. 변경 시 임시파일(.TMP)에 새 태그 + 원본 잔여를 쓰고
+    os.replace 로 교체.
+
+    반환: 1=기록함, 0=변경 불필요, 음수=에러.
+    """
+    saved_stat = None
+    if save_timestamp:
+        try:
+            saved_stat = os.stat(filename)
+        except OSError:
+            saved_stat = None
+
+    try:
+        f = open(filename, "rb")
+    except OSError:
+        return M3G_ERR_FILEOPEN
+
+    try:
+        status, tag = _search_tag(f)
+
+        if status < 0:
+            return status
+
+        if status == 0:
+            # 태그 없음 → 빈 태그 생성(version=0: 원본 전체 복사 분기 표시).
+            tag = Id3Tag(offset=0, length=0, version=0, flags=0, frames=[])
+
+        # 기존 RG 프레임 제거.
+        need_update = False
+        kept = []
+        for frame in tag.frames:
+            if (_decode_rva2_frame(frame, None) == 1 or
+                    _decode_txxx_frame(frame, None) == 1 or
+                    _decode_mp3gain_frame(frame, None) == 1):
+                need_update = True
+            else:
+                kept.append(frame)
+        tag.frames = kept
+
+        # 새 RG 프레임 append (TXXX 는 소문자: 원본 주석 — Winamp 호환).
+        if (info.have_track_gain or info.have_track_peak or
+                info.have_album_gain or info.have_album_peak):
+            need_update = True
+            tag.frames.append(
+                _make_txxx_frame(b"replaygain_reference_loudness", b"89.0 dB"))
+
+        if info.have_track_gain:
+            need_update = True
+            tag.frames.append(
+                _make_rva2_frame(False, info.track_gain,
+                                 info.have_track_peak, info.track_peak))
+            tag.frames.append(
+                _make_txxx_frame(b"replaygain_track_gain",
+                                 _fmt_gain(info.track_gain).encode("latin-1")))
+        if info.have_track_peak:
+            need_update = True
+            tag.frames.append(
+                _make_txxx_frame(b"replaygain_track_peak",
+                                 _fmt_peak(info.track_peak).encode("latin-1")))
+
+        if info.have_album_gain:
+            need_update = True
+            tag.frames.append(
+                _make_rva2_frame(True, info.album_gain,
+                                 info.have_album_peak, info.album_peak))
+            tag.frames.append(
+                _make_txxx_frame(b"replaygain_album_gain",
+                                 _fmt_gain(info.album_gain).encode("latin-1")))
+        if info.have_album_peak:
+            need_update = True
+            tag.frames.append(
+                _make_txxx_frame(b"replaygain_album_peak",
+                                 _fmt_peak(info.album_peak).encode("latin-1")))
+
+        # mp3gain 고유 프레임 append.
+        if info.have_min_max_gain:
+            need_update = True
+            tag.frames.append(
+                _make_txxx_frame(
+                    b"MP3GAIN_MINMAX",
+                    f"{info.min_gain:03d},{info.max_gain:03d}".encode("latin-1")))
+        if info.have_album_min_max_gain:
+            need_update = True
+            tag.frames.append(
+                _make_txxx_frame(
+                    b"MP3GAIN_ALBUM_MINMAX",
+                    f"{info.album_min_gain:03d},{info.album_max_gain:03d}"
+                    .encode("latin-1")))
+        if info.have_undo:
+            need_update = True
+            wrap_ch = "W" if info.undo_wrap else "N"
+            tag.frames.append(
+                _make_txxx_frame(
+                    b"MP3GAIN_UNDO",
+                    f"{info.undo_left:+04d},{info.undo_right:+04d},{wrap_ch}"
+                    .encode("latin-1")))
+
+        if not need_update:
+            # 변경할 게 없음 — 파일 무수정.
+            return 0
+
+        # 새 태그 직렬화.
+        new_tag = _write_tag(tag)
+        if new_tag is None:
+            # need_update 인데 프레임이 0개인 경우(기존 RG 만 제거된 상황 등):
+            # 빈 ID3v2 태그를 쓰지 않고 원본에서 기존 태그만 들어낸다.
+            new_tag = b""
+
+        # 임시파일에 새 태그 + 원본 잔여 기록.
+        tmpname = filename + ".TMP"
+        with open(tmpname, "wb") as outf:
+            if new_tag:
+                outf.write(new_tag)
+            if tag.version == 0:
+                # 원본에 ID3v2 없음 → 전체 복사(ID3v1 꼬리 포함 보존).
+                _copy_data(f, outf, 0, -1)
+            else:
+                # 원본 앞 ID3v2 만 들어내고 나머지 복사.
+                _copy_data(f, outf, 0, tag.offset)
+                _copy_data(f, outf, tag.offset + tag.length, -1)
+    finally:
+        f.close()
+
+    # 원자적 교체(Windows 포함: os.replace 가 기존 파일 덮어씀).
+    os.replace(tmpname, filename)
+
+    if save_timestamp:
+        _restore_timestamp(filename, saved_stat)
+
+    return 1
+
+
+def remove_mp3gain_id3_tag(filename: str, save_timestamp: bool = False) -> int:
+    """ID3v2 태그에서 게인 정보 제거. 원본 RemoveMP3GainID3Tag 동등.
+
+    모든 have_* 가 꺼진 빈 info 로 write 를 호출 → RG 프레임만 제거되고 append
+    는 없으므로, 제거가 일어났으면 1, 없었으면 0 반환.
+    """
+    info = MP3GainTagInfo()  # 모든 have_* 기본 False
+    return write_mp3gain_id3_tag(filename, info, save_timestamp)

@@ -187,6 +187,9 @@ def _read_ape_tag(
     tag_offset 직전에서 APEv1/v2 푸터를 찾아 파싱한다.
     인식 필드(REPLAYGAIN_*, MP3GAIN_*)는 info 에 채우고, 나머지는 ape_tag.other_fields
     에 원본 바이트 그대로 보존. 찾으면 깎은 tag_offset, 아니면 원래 값 반환.
+
+    APE 푸터/헤더 구조(각 4바이트 LE): ID[8] Version[8..] Length[12..]
+    TagCount[16..] Flags[20..] Reserved[24..32].
     """
     if tag_offset < APE_FOOTER_SIZE:
         return tag_offset
@@ -205,8 +208,8 @@ def _read_ape_tag(
     if tag_len < APE_FOOTER_SIZE or tag_offset < tag_len:
         return tag_offset
 
-    footer_flags = _read_le32(footer, 16)
-    orig_tag_count = _read_le32(footer, 20)
+    orig_tag_count = _read_le32(footer, 16)  # TagCount: offset 16
+    footer_flags = _read_le32(footer, 20)    # Flags:    offset 20
 
     # 필드 데이터(푸터 직전 tag_len - 32 바이트) 읽기.
     body_len = tag_len - APE_FOOTER_SIZE
@@ -229,7 +232,7 @@ def _read_ape_tag(
             break
         vsize = _read_le32(body, p)
         # flags = _read_le32(body, p + 4)  # 보존만, 해석 안 함
-        field_start = p          # 'p - 8' 대응 위치(여기선 vsize/flags 포함 시작)
+        field_start = p          # vsize/flags 포함 필드 시작(원본의 'p - 8' 대응)
         p += 8
 
         remaining = body_len - p
@@ -261,7 +264,7 @@ def _read_ape_tag(
     # 헤더 존재 시(footer flags bit31) 추가로 32바이트 읽고 깎음.
     if footer_flags & APE_FLAG_HAS_HEADER:
         if new_offset < APE_FOOTER_SIZE:
-            # 원본은 여기서 return 0 (이미 *apeTag 는 세팅됨). 보수적으로 보존만.
+            # 원본은 여기서 return (이미 ape 는 세팅됨). 보수적으로 보존만.
             file_tags.ape_tag = ape
             return new_offset
         new_offset -= APE_FOOTER_SIZE

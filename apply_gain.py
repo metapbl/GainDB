@@ -15,6 +15,8 @@ min/max 를 얻어 태그(info)에 먼저 채우고(원본 허용오차 비교�
 그 위에서 change_gain_and_tag 가 적용분만큼 재차감하며 태그를 갱신한다.
 skip_tag 면 태그를 건드리지 않고 게인만 적용한다(원본 changeGain 분기).
 
+use_id3 면 APE 대신 ID3v2 로 태그를 읽고/쓴다(원본 -s i 동등).
+
 주의: 파일을 직접 수정한다. 되돌리려면 undo(태그 기반) 또는 반대 부호 수동 적용.
 클리핑 경고·자동 클립(-k)·클립 질의는 5단계(CLI) 에서 다룬다(합의된 단계 분할).
 """
@@ -32,8 +34,8 @@ from gaindb.analysis import (
 )
 from gaindb.writer import apply_gain, scan_gain
 from gaindb.tag import (
-    read_mp3gain_ape_tag,
-    write_mp3gain_ape_tag,
+    read_mp3gain_tags,
+    _write_mp3gain_tag,
     change_gain_and_tag,
 )
 
@@ -109,6 +111,7 @@ def apply_track_gain(
     mp3_gain_mod: int = 0,
     wrap: bool = False,
     skip_tag: bool = False,
+    use_id3: bool = False,
 ) -> dict:
     """
     한 MP3 파일에 Track ReplayGain 을 무손실 적용한다(원본 applyTrack 순서).
@@ -116,6 +119,8 @@ def apply_track_gain(
     흐름: decode → analyze_track(89dB raw dB) + track_peak + scan_gain(min/max)
     → (태그 기록 시) read 로 info 채우기 → dB+mod → 스텝 양자화 + mp3_gain_mod
     → change_gain_and_tag(적용분 재차감) 또는 skip_tag 시 apply_gain.
+
+    use_id3 면 APE 대신 ID3v2 경로로 태그를 읽고/쓴다(원본 -s i).
 
     반환 dict:
       - status: "ok" | "no_change" | "not_enough_samples"
@@ -144,7 +149,7 @@ def apply_track_gain(
     info = None
     file_tags = None
     if not skip_tag:
-        info, file_tags = read_mp3gain_ape_tag(path)
+        info, file_tags = read_mp3gain_tags(path, use_id3)
         _fill_track_info(info, db_gain, peak, min_gain, max_gain)
 
     # 89dB raw dB 에 dB 보정을 더한 뒤 정수 스텝으로 양자화(원본 순서).
@@ -154,7 +159,7 @@ def apply_track_gain(
         # 게인 변화 없음. 태그가 dirty 면 태그만 기록(원본 동작).
         tag_written = False
         if (not skip_tag) and info.dirty:
-            write_mp3gain_ape_tag(path, info, file_tags)
+            _write_mp3gain_tag(path, info, file_tags, use_id3=use_id3)
             tag_written = True
         return {
             "status": "no_change",
@@ -175,7 +180,8 @@ def apply_track_gain(
         }
 
     # change_gain_and_tag 가 게인 적용 + undo 누적 + 적용분 재차감 + 태그 기록.
-    change_gain_and_tag(path, steps, steps, info, file_tags, wrap=wrap)
+    change_gain_and_tag(path, steps, steps, info, file_tags, wrap=wrap,
+                        use_id3=use_id3)
     return {
         "status": "ok",
         "db_gain": db_gain,
@@ -191,6 +197,7 @@ def apply_album_gain(
     mp3_gain_mod: int = 0,
     wrap: bool = False,
     skip_tag: bool = False,
+    use_id3: bool = False,
 ) -> dict:
     """
     여러 MP3 파일에 Album ReplayGain 을 무손실 적용한다(원본 album 순서).
@@ -200,6 +207,8 @@ def apply_album_gain(
     의 min/max) → 각 곡 read 로 track+album 값 채우기 → 스텝 양자화 →
     전 곡에 동일 스텝을 change_gain_and_tag(또는 skip_tag 시 apply_gain) 적용.
 
+    use_id3 면 APE 대신 ID3v2 경로로 태그를 읽고/쓴다(원본 -s i).
+
     반환 dict:
       - status: "ok" | "no_change" | "not_enough_samples"
       - db_gain: 앨범 분석 dB(89dB 기준). not_enough_samples 면 None.
@@ -208,7 +217,7 @@ def apply_album_gain(
     """
     histograms = []
     # 곡별 분석 결과 보관(track 값 채우기·album 누적용).
-    per = []  # [{"path", "db_gain"(track), "peak", "min", "max"}]
+    per = []  # [{"path", "track_db", "peak", "min", "max"}]
     for path in paths:
         left, right, sample_rate = decode_pcm(path)
         histograms.append(track_histogram(left, right, sample_rate))
@@ -254,7 +263,7 @@ def apply_album_gain(
         info = None
         file_tags = None
         if not skip_tag:
-            info, file_tags = read_mp3gain_ape_tag(path)
+            info, file_tags = read_mp3gain_tags(path, use_id3)
             # 곡별 track 분석값이 not_enough 가 아니면 track 값도 채움.
             if item["track_db"] is not NOT_ENOUGH_SAMPLES:
                 _fill_track_info(info, item["track_db"], item["peak"],
@@ -264,7 +273,7 @@ def apply_album_gain(
         if steps == 0:
             tag_written = False
             if (not skip_tag) and info.dirty:
-                write_mp3gain_ape_tag(path, info, file_tags)
+                _write_mp3gain_tag(path, info, file_tags, use_id3=use_id3)
                 tag_written = True
             per_file.append({"path": path, "frames_changed": 0,
                              "tag_written": tag_written})
@@ -275,7 +284,8 @@ def apply_album_gain(
             per_file.append({"path": path, "frames_changed": changed,
                              "tag_written": False})
         else:
-            change_gain_and_tag(path, steps, steps, info, file_tags, wrap=wrap)
+            change_gain_and_tag(path, steps, steps, info, file_tags, wrap=wrap,
+                                use_id3=use_id3)
             per_file.append({"path": path, "frames_changed": None,
                              "tag_written": True})
 

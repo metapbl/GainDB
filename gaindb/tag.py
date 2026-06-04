@@ -11,6 +11,8 @@
   ReadMP3Lyrics3v2Tag     -> _read_lyrics3v2_tag
   ReadMP3ID3v1Tag         -> _read_id3v1_tag
   ReadMP3GainAPETag       -> read_mp3gain_ape_tag
+  WriteMP3GainTag         -> _write_mp3gain_tag        (⑤-C; useId3 분기 래퍼)
+  (main 의 태그 읽기 분기) -> read_mp3gain_tags          (⑤-C; APE→ID3 순서)
 """
 
 from __future__ import annotations
@@ -647,6 +649,57 @@ def remove_mp3gain_ape_tag(filename: str, save_timestamp: bool = False) -> bool:
     return True
 
 
+# ---------------------------------------------------------------------------
+# 4단계 ⑤-C: useId3 분기 래퍼 (원본 WriteMP3GainTag / main 의 태그 읽기 분기 동등)
+# ---------------------------------------------------------------------------
+
+def _write_mp3gain_tag(
+    filename: str,
+    info: MP3GainTagInfo,
+    file_tags: FileTags,
+    save_timestamp: bool = False,
+    use_id3: bool = False,
+) -> None:
+    """원본 WriteMP3GainTag 동등.
+
+    use_id3 이면 ID3v2 로 기록하고, 기록이 실패하지 않았으면(>= 0) stale APE
+    태그를 제거한다(원본 비대칭: APE 로 쓸 때는 stale ID3 를 건드리지 않음).
+    use_id3 가 아니면 APE 로만 기록한다.
+
+    id3 모듈은 순환 import 회피를 위해 함수 내부에서 import (id3.py 가 이
+    모듈을 import 하므로).
+    """
+    if use_id3:
+        from gaindb.id3 import write_mp3gain_id3_tag
+        if write_mp3gain_id3_tag(filename, info, save_timestamp) >= 0:
+            remove_mp3gain_ape_tag(filename, save_timestamp)
+    else:
+        write_mp3gain_ape_tag(filename, info, file_tags, save_timestamp)
+
+
+def read_mp3gain_tags(filename: str, use_id3: bool = False):
+    """원본 main 의 태그 읽기 분기 동등 (APE → 필요 시 ID3 덮어쓰기).
+
+    항상 APE 를 먼저 읽고, use_id3 이면: (1) APE 에서 게인 관련 필드를 하나라도
+    읽었으면 dirty 를 켜 ID3v2 로의 업그레이드를 강제하고, (2) ID3v2 를 읽어
+    같은 info 에 덮어쓴다(ID3 값이 있으면 APE 값을 덮음).
+
+    반환: (info, file_tags). file_tags 는 APE 쓰기 경로에서만 의미가 있다.
+    """
+    info, file_tags = read_mp3gain_ape_tag(filename)
+
+    if use_id3:
+        from gaindb.id3 import read_mp3gain_id3_tag
+        if (info.have_track_gain or info.have_album_gain or
+                info.have_min_max_gain or info.have_album_min_max_gain or
+                info.have_undo):
+            # APE 에 mp3gain 정보가 있으면 ID3v2 로 업그레이드 강제.
+            info.dirty = True
+        read_mp3gain_id3_tag(filename, info)
+
+    return info, file_tags
+
+
 def change_gain_and_tag(
     filename: str,
     left_change: int,
@@ -655,15 +708,16 @@ def change_gain_and_tag(
     file_tags: FileTags,
     wrap: bool = False,
     save_timestamp: bool = False,
+    use_id3: bool = False,
 ) -> bool:
     """원본 mp3gain.c 의 changeGainAndTag 동등.
 
     실제 프레임 게인을 적용(writer.apply_gain)한 뒤, 성공하면 info 를 일관 갱신하고
-    APE 태그를 다시 쓴다. undo 는 항상 누적, gain/peak/minmax 는 좌우 변화량이
+    태그를 다시 쓴다. undo 는 항상 누적, gain/peak/minmax 는 좌우 변화량이
     같을 때만 갱신(좌우 다르면 채널 분리라 의미가 깨지므로 건드리지 않음).
 
     dB 차감 상수는 원본 근사값 1.505 (= 5*log10(2) 근사) 를 그대로 사용한다.
-    useId3 분기는 ⑤단계에서 래핑 예정 — 현재는 APE 경로만 직접 호출.
+    태그 쓰기는 _write_mp3gain_tag 래퍼로 분기(use_id3 에 따라 ID3/APE).
 
     반환: 게인을 적용하고 태그를 갱신했으면 True, 변화량이 0이면 False.
     """
@@ -736,6 +790,6 @@ def change_gain_and_tag(
                     0 if cur_max < 0 else 255 if cur_max > 255 else cur_max
                 )
 
-    # --- 태그 다시 쓰기 (현재 APE 경로만; useId3 분기는 ⑤) ---
-    write_mp3gain_ape_tag(filename, info, file_tags, save_timestamp)
+    # --- 태그 다시 쓰기 (use_id3 분기는 _write_mp3gain_tag 래퍼가 처리) ---
+    _write_mp3gain_tag(filename, info, file_tags, save_timestamp, use_id3)
     return True

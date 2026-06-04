@@ -1,0 +1,689 @@
+"""ID3v2 (RVA2 + TXXX) 태그 읽기/쓰기 — 원본 mp3gain id3tag.c 동등 재구현 (clean-room).
+
+이 모듈은 ⑤-A(읽기)를 담당한다. 쓰기(⑤-B)·결선(⑤-C)은 이어서 추가한다.
+
+원본 동작 요약:
+  - 읽기: 파일 앞 ID3v2 → 없으면 끝 ID3v2.4 footer → 없으면 끝 ID3v1.
+    ID3v2.2/2.3/2.4 를 모두 내부적으로 2.4 로 통일해 파싱하고,
+    RVA2 / TXXX(ReplayGain) / TXXX(MP3GAIN_*) 에서 게인 정보를 추출한다.
+
+게인 정보 구조체는 gaindb.tag.MP3GainTagInfo 를 재사용한다.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Optional, List
+
+from gaindb.tag import MP3GainTagInfo
+
+
+# ---- 오류 코드 (원본 rg_error.h 동등; 음수) -------------------------------
+
+M3G_ERR_READ = -1
+M3G_ERR_TAGFORMAT = -2
+M3G_ERR_FILEOPEN = -3
+
+
+# ---- 태그/프레임 플래그 상수 (원본 #define 동등) --------------------------
+
+TAGFL_UNSYNC = 0x80
+TAGFL_EXTHDR = 0x40
+TAGFL_EXPR = 0x20
+TAGFL_FOOTER = 0x10
+
+FRAMEFL_BAD = 0x00F0
+FRAMEFL_TAGALTER = 0x4000
+FRAMEFL_GROUP = 0x0040
+FRAMEFL_COMPR = 0x0008
+FRAMEFL_CRYPT = 0x0004
+FRAMEFL_UNSYNC = 0x0002
+FRAMEFL_DLEN = 0x0001
+
+SYNCSAFE_INT_BAD = 0xFFFFFFFF
+
+
+# ---- ID3v2.2 → 2.4 프레임 ID 업그레이드 테이블 (원본 동등) ---------------
+
+_UPGRADE_ID3V22 = {
+    b"BUF": b"RBUF", b"CNT": b"PCNT", b"COM": b"COMM", b"CRA": b"AENC",
+    b"ETC": b"ETCO", b"EQU": b"EQUA", b"GEO": b"GEOB", b"IPL": b"IPLS",
+    b"LNK": b"LINK", b"MCI": b"MCDI", b"MLL": b"MLLT", b"PIC": b"APIC",
+    b"POP": b"POPM", b"REV": b"RVRB", b"RVA": b"RVAD", b"SLT": b"SYLT",
+    b"STC": b"SYTC", b"TAL": b"TALB", b"TBP": b"TBPM", b"TCM": b"TCOM",
+    b"TCO": b"TCON", b"TCR": b"TCOP", b"TDA": b"TDAT", b"TDY": b"TDLY",
+    b"TEN": b"TENC", b"TFT": b"TFLT", b"TIM": b"TIME", b"TKE": b"TKEY",
+    b"TLA": b"TLAN", b"TLE": b"TLEN", b"TMT": b"TMED", b"TOA": b"TOPE",
+    b"TOF": b"TOFN", b"TOL": b"TOLY", b"TOR": b"TORY", b"TOT": b"TOAL",
+    b"TP1": b"TPE1", b"TP2": b"TPE2", b"TP3": b"TPE3", b"TP4": b"TPE4",
+    b"TPA": b"TPOS", b"TPB": b"TPUB", b"TRC": b"TSRC", b"TRD": b"TRDA",
+    b"TRK": b"TRCK", b"TSI": b"TSIZ", b"TSS": b"TSSE", b"TT1": b"TIT1",
+    b"TT2": b"TIT2", b"TT3": b"TIT3", b"TXT": b"TEXT", b"TXX": b"TXXX",
+    b"TYE": b"TYER", b"UFI": b"UFID", b"ULT": b"USLT", b"WAF": b"WOAF",
+    b"WAR": b"WOAR", b"WAS": b"WOAS", b"WCM": b"WCOM", b"WCP": b"WCOP",
+    b"WPB": b"WPUB", b"WXX": b"WXXX",
+}
+
+
+# ---- 데이터 구조 (원본 ID3v2FrameStruct / ID3v2TagStruct 동등) -----------
+
+@dataclass
+class Id3Frame:
+    """ID3v2 프레임 하나. data 는 헤더 제외, (필요시 unsync 디코드된) 본문 바이트."""
+    frameid: bytes              # 4 바이트
+    flags: int = 0
+    hskip: int = 0              # group/crypt/dlen 플래그 파라미터 길이
+    data: bytes = b""
+
+
+@dataclass
+class Id3Tag:
+    offset: int = 0             # 파일 내 태그 오프셋
+    length: int = 0             # 헤더/푸터 포함 전체 길이
+    version: int = 0            # (major<<8)|revision; 0 = 태그 없음
+    flags: int = 0
+    frames: List[Id3Frame] = field(default_factory=list)
+
+
+# ---- 정수/동기화 헬퍼 (원본 id3_get/put_* 동등) --------------------------
+
+def _get_int32(p: bytes) -> int:
+    return (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]
+
+
+def _get_syncsafe_int(p: bytes) -> int:
+    if (p[0] | p[1] | p[2] | p[3]) & 0x80:
+        return SYNCSAFE_INT_BAD
+    return (p[0] << 21) | (p[1] << 14) | (p[2] << 7) | p[3]
+
+
+def _put_syncsafe_int(i: int) -> bytes:
+    return bytes((
+        (i >> 21) & 0x7F,
+        (i >> 14) & 0x7F,
+        (i >> 7) & 0x7F,
+        i & 0x7F,
+    ))
+
+
+def _get_unsync_data(src: bytes) -> bytes:
+    """unsynchronisation 디코드: 0xFF 0x00 → 0xFF. 원본 id3_get_unsync_data 동등."""
+    out = bytearray()
+    n = len(src)
+    i = 0
+    while i < n:
+        out.append(src[i])
+        if src[i] == 0xFF and i + 1 < n and src[i + 1] == 0x00:
+            i += 1  # 삽입된 0x00 을 건너뜀
+        i += 1
+    return bytes(out)
+
+
+# ---- RVA2 / TXXX 디코더 ---------------------------------------------------
+
+def _decode_rva2_frame(frame: Id3Frame, info: Optional[MP3GainTagInfo]) -> int:
+    """RVA2 프레임(track/album, master channel)을 디코드.
+
+    info 가 주어지면 게인 정보를 채운다. info=None 이면 매칭 여부만 판정.
+    원본 id3_decode_rva2_frame 동등. 매칭이면 1, 아니면 0 반환.
+    """
+    if frame.frameid != b"RVA2":
+        return 0
+
+    data = frame.data
+    length = len(data)
+    p = frame.hskip
+
+    # identification: "track"/"album" (+ NUL), 대소문자 무관
+    if p + 6 <= length and data[p:p + 6] in (b"track\0", b"TRACK\0"):
+        is_album = False
+        p += 6
+    elif p + 6 <= length and data[p:p + 6] in (b"album\0", b"ALBUM\0"):
+        is_album = True
+        p += 6
+    else:
+        return 0
+
+    # per-channel 데이터
+    while p + 4 <= length:
+        channel = data[p]
+        # 16-bit signed BE = adjustment * 512
+        raw = ((data[p + 1] << 8) | data[p + 2])
+        if data[p + 1] & 0x80:
+            raw -= 0x10000   # signed
+        gain = raw / 512.0
+        peakbits = data[p + 3]
+        nbytes = (peakbits + 7) // 8
+        if p + 4 + nbytes > length:
+            break
+        peak = 0.0
+        if peakbits > 0:
+            peak += data[p + 4]
+        if peakbits > 8:
+            peak += data[p + 5] / 256.0
+        if peakbits > 16:
+            peak += data[p + 6] / 65536.0
+        if peakbits > 0:
+            peak = peak / float(1 << ((peakbits - 1) & 7))
+        p += 4 + nbytes
+        if channel == 1:  # master volume
+            if info is not None:
+                if is_album:
+                    info.haveAlbumGain = True
+                    info.albumGain = gain
+                    info.haveAlbumPeak = (peakbits > 0)
+                    info.albumPeak = peak
+                else:
+                    info.haveTrackGain = True
+                    info.trackGain = gain
+                    info.haveTrackPeak = (peakbits > 0)
+                    info.trackPeak = peak
+    return 1
+
+
+def _txxx_strings(frame: Id3Frame):
+    """TXXX 프레임에서 (description, value) 두 문자열을 추출.
+
+    인코딩 0(ISO-8859-1)/3(UTF-8) 만 허용. 원본의 buf 처리 방식 재현
+    (description NUL 종료, 그 뒤가 value). 매칭 불가 시 None.
+    """
+    if frame.frameid != b"TXXX":
+        return None
+    data = frame.data
+    length = len(data)
+    p = frame.hskip
+    if p >= length or data[p] not in (0, 3):
+        return None
+    p += 1
+    # 원본은 최대 62바이트(buf[64])만 복사. 동등하게 자른다.
+    raw = data[p:p + 62]
+    # description = 첫 NUL 까지, value = 그 다음 NUL 까지
+    nul = raw.find(b"\0")
+    if nul < 0:
+        desc = raw
+        value = b""
+    else:
+        desc = raw[:nul]
+        rest = raw[nul + 1:]
+        nul2 = rest.find(b"\0")
+        value = rest if nul2 < 0 else rest[:nul2]
+    enc = "utf-8" if data[frame.hskip] == 3 else "latin-1"
+    try:
+        return desc.decode(enc, "replace"), value.decode(enc, "replace")
+    except Exception:
+        return None
+
+
+def _decode_txxx_frame(frame: Id3Frame, info: Optional[MP3GainTagInfo]) -> int:
+    """ReplayGain 표준 TXXX 프레임 디코드. 원본 id3_decode_txxx_frame 동등."""
+    parsed = _txxx_strings(frame)
+    if parsed is None:
+        return 0
+    desc, value = parsed
+    key = desc.upper()
+    if key == "REPLAYGAIN_ALBUM_GAIN":
+        if info is not None:
+            info.haveAlbumGain = True
+            info.albumGain = _atof(value)
+        return 1
+    if key == "REPLAYGAIN_TRACK_GAIN":
+        if info is not None:
+            info.haveTrackGain = True
+            info.trackGain = _atof(value)
+        return 1
+    if key == "REPLAYGAIN_ALBUM_PEAK":
+        if info is not None:
+            info.haveAlbumPeak = True
+            info.albumPeak = _atof(value)
+        return 1
+    if key == "REPLAYGAIN_TRACK_PEAK":
+        if info is not None:
+            info.haveTrackPeak = True
+            info.trackPeak = _atof(value)
+        return 1
+    if key == "REPLAYGAIN_REFERENCE_LOUDNESS":
+        # 정보는 안 쓰지만 재기록 시 삭제 대상이므로 매칭으로 처리
+        return 1
+    return 0
+
+
+def _decode_mp3gain_frame(frame: Id3Frame, info: Optional[MP3GainTagInfo]) -> int:
+    """mp3gain 고유 TXXX 프레임 디코드. 원본 id3_decode_mp3gain_frame 동등."""
+    parsed = _txxx_strings(frame)
+    if parsed is None:
+        return 0
+    desc, value = parsed
+    key = desc.upper()
+    if key == "MP3GAIN_UNDO":
+        f = _scan_undo(value)  # (left, right, char) or None
+        if f is not None and info is not None:
+            info.haveUndo = True
+            info.undoLeft = f[0]
+            info.undoRight = f[1]
+            info.undoWrap = f[2] in ("w", "W")
+        return 1
+    if key == "MP3GAIN_MINMAX":
+        f = _scan_two_ints(value)
+        if f is not None and info is not None:
+            info.haveMinMaxGain = True
+            info.minGain = f[0]
+            info.maxGain = f[1]
+        return 1
+    if key == "MP3GAIN_ALBUM_MINMAX":
+        f = _scan_two_ints(value)
+        if f is not None and info is not None:
+            info.haveAlbumMinMaxGain = True
+            info.albumMinGain = f[0]
+            info.albumMaxGain = f[1]
+        return 1
+    return 0
+
+
+# ---- C 스타일 파싱 헬퍼 (atof / sscanf 동등) -----------------------------
+
+def _atof(s: str) -> float:
+    """C atof 동등: 선행 공백 무시 후 파싱 가능한 만큼만, 실패 시 0.0."""
+    s = s.strip()
+    i = 0
+    n = len(s)
+    if i < n and s[i] in "+-":
+        i += 1
+    seen_dot = False
+    seen_e = False
+    j = i
+    while j < n:
+        c = s[j]
+        if c.isdigit():
+            j += 1
+        elif c == "." and not seen_dot and not seen_e:
+            seen_dot = True
+            j += 1
+        elif c in "eE" and not seen_e and j > i:
+            seen_e = True
+            j += 1
+            if j < n and s[j] in "+-":
+                j += 1
+        else:
+            break
+    try:
+        return float(s[:j]) if s[:j] not in ("", "+", "-", ".") else 0.0
+    except ValueError:
+        return 0.0
+
+
+def _scan_two_ints(s: str):
+    """sscanf(s, "%d,%d") 동등. 둘 다 파싱되면 (a,b), 아니면 None."""
+    parts = s.split(",")
+    if len(parts) < 2:
+        return None
+    a = _atoi(parts[0])
+    b = _atoi(parts[1])
+    if a is None or b is None:
+        return None
+    return (a, b)
+
+
+def _scan_undo(s: str):
+    """sscanf(s, "%d,%d,%c") 동등. (a,b,char) 또는 None."""
+    parts = s.split(",")
+    if len(parts) < 3:
+        return None
+    a = _atoi(parts[0])
+    b = _atoi(parts[1])
+    if a is None or b is None:
+        return None
+    rest = parts[2].lstrip()  # %c 는 공백 후 첫 글자... C %c 는 공백 안 건너뜀
+    # C 의 "%d,%d,%c": 콤마 직후 첫 문자 1개. 공백 미스킵.
+    c = parts[2][:1]
+    if c == "":
+        return None
+    return (a, b, c)
+
+
+def _atoi(s: str):
+    """C atoi 동등: 선행 공백 무시 후 정수 앞부분만. 실패 시 None(엄밀 매칭용)."""
+    s = s.strip()
+    i = 0
+    n = len(s)
+    if i < n and s[i] in "+-":
+        i += 1
+    j = i
+    while j < n and s[j].isdigit():
+        j += 1
+    if j == i:
+        return None
+    try:
+        return int(s[:j])
+    except ValueError:
+        return None
+
+
+# ---- ID3v2 파서 -----------------------------------------------------------
+
+def _parse_v2_tag(f) -> tuple:
+    """현재 위치에서 ID3v2 태그 파싱.
+
+    반환: (status, Id3Tag). status 1=성공, 0=없음, 음수=에러.
+    원본 id3_parse_v2_tag 동등.
+    """
+    tag = Id3Tag()
+    tag.offset = f.tell()
+    buf = f.read(10)
+    if len(buf) != 10:
+        return 0, tag
+    if buf[0:3] != b"ID3":
+        return 0, tag
+
+    major = buf[3]
+    flags = buf[5]
+    if major == 2:
+        if flags & ~TAGFL_UNSYNC:
+            return M3G_ERR_TAGFORMAT, tag
+    elif major == 3:
+        if flags & ~(TAGFL_UNSYNC | TAGFL_EXTHDR | TAGFL_EXPR):
+            return M3G_ERR_TAGFORMAT, tag
+    elif major == 4:
+        if flags & ~(TAGFL_UNSYNC | TAGFL_EXTHDR | TAGFL_EXPR | TAGFL_FOOTER):
+            return M3G_ERR_TAGFORMAT, tag
+    else:
+        return M3G_ERR_TAGFORMAT, tag
+
+    dlen = _get_syncsafe_int(buf[6:10])
+    if dlen == SYNCSAFE_INT_BAD:
+        return M3G_ERR_TAGFORMAT, tag
+
+    tag.flags = flags
+    tag.version = (buf[3] << 8) | buf[4]
+    tag.length = 10 + dlen + (10 if (flags & TAGFL_FOOTER) else 0)
+
+    tagdata = f.read(dlen)
+    if len(tagdata) != dlen:
+        return M3G_ERR_TAGFORMAT, tag
+
+    ver = tag.version >> 8
+
+    # 2.2/2.3 전체 unsync 디코드
+    if ver != 4 and (flags & TAGFL_UNSYNC):
+        tagdata = _get_unsync_data(tagdata)
+        dlen = len(tagdata)
+
+    p = 0
+    # extended header 스킵
+    if flags & TAGFL_EXTHDR:
+        if p + 6 > dlen:
+            return M3G_ERR_TAGFORMAT, tag
+        if ver == 4:
+            k = _get_syncsafe_int(tagdata[p:p + 4])
+            if k == SYNCSAFE_INT_BAD or k > dlen:
+                return M3G_ERR_TAGFORMAT, tag
+            p += k
+        elif ver == 3:
+            k = _get_int32(tagdata[p:p + 4])
+            if k > dlen:
+                return M3G_ERR_TAGFORMAT, tag
+            p += 4 + k
+
+    # 프레임 스캔
+    while p < dlen and tagdata[p] != 0:
+        if ver == 2:
+            if p + 5 > dlen:
+                return M3G_ERR_TAGFORMAT, tag
+            frameid = _UPGRADE_ID3V22.get(bytes(tagdata[p:p + 3]), b"\0\0\0\0")
+            flen = (tagdata[p + 3] << 16) | (tagdata[p + 4] << 8) | tagdata[p + 5]
+            fflags = 0
+            if flen > dlen:
+                return M3G_ERR_TAGFORMAT, tag
+            p += 6
+        elif ver == 3:
+            if p + 10 > dlen:
+                return M3G_ERR_TAGFORMAT, tag
+            frameid = bytes(tagdata[p:p + 4])
+            flen = _get_int32(tagdata[p + 4:p + 8])
+            fflags = (tagdata[p + 8] << 7) & 0xFF00
+            if tagdata[p + 9] & 0x80:
+                fflags |= FRAMEFL_COMPR | FRAMEFL_DLEN
+            if tagdata[p + 9] & 0x40:
+                fflags |= FRAMEFL_CRYPT
+            if tagdata[p + 9] & 0x20:
+                fflags |= FRAMEFL_GROUP
+            if tagdata[p + 9] & 0x1F:
+                fflags |= FRAMEFL_BAD
+            if flen > dlen:
+                return M3G_ERR_TAGFORMAT, tag
+            p += 10
+        elif ver == 4:
+            if p + 10 > dlen:
+                return M3G_ERR_TAGFORMAT, tag
+            frameid = bytes(tagdata[p:p + 4])
+            flen = _get_syncsafe_int(tagdata[p + 4:p + 8])
+            fflags = (tagdata[p + 8] << 8) | tagdata[p + 9]
+            if flen == SYNCSAFE_INT_BAD or flen > dlen:
+                return M3G_ERR_TAGFORMAT, tag
+            p += 10
+        else:
+            return M3G_ERR_TAGFORMAT, tag
+
+        if p + flen > dlen:
+            return M3G_ERR_TAGFORMAT, tag
+
+        frameid = bytearray(frameid)
+
+        # 미지원 프레임 드롭
+        if (frameid[0] == 0 or
+                bytes(frameid) == b"RVAD" or
+                bytes(frameid) == b"RGAD" or
+                bytes(frameid) == b"XRVA"):
+            p += flen
+            continue
+
+        # 업그레이드 불가한 2.3 프레임 드롭
+        if ver == 3 and (fflags & (FRAMEFL_CRYPT | FRAMEFL_BAD)):
+            p += flen
+            continue
+
+        # 플래그 대비 너무 짧은 프레임 드롭
+        fhskip = ((1 if fflags & FRAMEFL_GROUP else 0) +
+                  (1 if fflags & FRAMEFL_CRYPT else 0) +
+                  (4 if fflags & FRAMEFL_DLEN else 0))
+        if fhskip > flen:
+            p += flen
+            continue
+
+        # 너무 짧은 2.2 PIC(→APIC) 드롭
+        if ver == 2 and bytes(frameid) == b"APIC" and flen < 6:
+            p += flen
+            continue
+
+        # TYER → TDRC
+        if bytes(frameid) == b"TYER":
+            frameid = bytearray(b"TDRC")
+
+        # tag alteration 시 폐기 요청 프레임 드롭
+        if fflags & FRAMEFL_TAGALTER:
+            p += flen
+            continue
+
+        frame = Id3Frame(frameid=bytes(frameid), flags=fflags, hskip=fhskip)
+
+        # 프레임 데이터 복사
+        if ver == 4 and (fflags & FRAMEFL_UNSYNC):
+            frame.data = _get_unsync_data(tagdata[p:p + flen])
+            p += flen
+        elif ver == 2 and bytes(frameid) == b"APIC":
+            # PIC → APIC 포맷 변환
+            body = bytearray()
+            body.append(tagdata[p])  # text encoding
+            three = bytes(tagdata[p + 1:p + 4])
+            if three == b"PNG":
+                body += b"image/png\0"
+            elif three == b"JPG":
+                body += b"image/jpeg\0"
+            elif tagdata[p + 1] == 0:
+                body += tagdata[p + 1:p + 4]
+                body.append(0)
+            body += tagdata[p + 4:p + flen]
+            frame.data = bytes(body)
+            p += flen
+        else:
+            frame.data = bytes(tagdata[p:p + flen])
+            p += flen
+
+        # 업그레이드된 2.3 DLEN 프레임의 플래그 파라미터 재정렬
+        if ver == 3 and (fflags & FRAMEFL_DLEN):
+            d = bytearray(frame.data)
+            k = _get_int32(d[0:4])
+            if fflags & FRAMEFL_GROUP:
+                d[0] = d[4]
+                d[1:5] = _put_syncsafe_int(k)
+            else:
+                d[0:4] = _put_syncsafe_int(k)
+            frame.data = bytes(d)
+
+        tag.frames.append(frame)
+
+    if p > dlen:
+        return M3G_ERR_TAGFORMAT, tag
+
+    return 1, tag
+
+
+def _make_text_frame(frameid: bytes, *parts: bytes) -> Id3Frame:
+    """간단 프레임 생성 (ID3v1 변환용). parts 를 그대로 이어붙인다."""
+    return Id3Frame(frameid=frameid, flags=0, hskip=0, data=b"".join(parts))
+
+
+def _parse_v1_tag(f) -> tuple:
+    """ID3v1 태그를 ID3v2.4 프레임으로 변환. 원본 id3_parse_v1_tag 동등."""
+    tag = Id3Tag()
+    tag.offset = f.tell()
+    buf = f.read(128)
+    if len(buf) != 128:
+        return 0, tag
+    if buf[0:3] != b"TAG":
+        return 0, tag
+
+    tag.length = 128
+    tag.version = 0
+    tag.flags = 0
+
+    def field30(off):
+        s = buf[off:off + 30]
+        s = s.rstrip(b" ").rstrip(b"\0").rstrip(b" ")
+        return s
+
+    if buf[3] != 0:
+        tag.frames.append(_make_text_frame(b"TIT2", b"\0", field30(3)))
+    if buf[33] != 0:
+        tag.frames.append(_make_text_frame(b"TPE1", b"\0", field30(33)))
+    if buf[63] != 0:
+        tag.frames.append(_make_text_frame(b"TALB", b"\0", field30(63)))
+    if all(0x30 <= buf[93 + k] <= 0x39 for k in range(4)):
+        tag.frames.append(_make_text_frame(b"TDRC", b"\0", buf[93:97]))
+    if buf[97] != 0:
+        tag.frames.append(
+            _make_text_frame(b"COMM", b"\0", b"XXX", b"\0", field30(97)))
+    if buf[125] == 0 and buf[126] != 0:
+        tag.frames.append(
+            _make_text_frame(b"TRCK", b"\0", str(buf[126]).encode("latin-1")))
+
+    return 1, tag
+
+
+# ---- 태그 탐색 (앞 ID3v2 → 끝 ID3v2.4 → 끝 ID3v1) -----------------------
+
+def _search_tag(f) -> tuple:
+    """원본 id3_search_tag 동등. 반환: (status, Id3Tag)."""
+    f.seek(0, 0)
+    status, tag = _parse_v2_tag(f)
+
+    id3v1_pos = 0
+
+    if status == 0:
+        f.seek(0, 2)
+        pos = f.tell()
+
+        while pos > 128:
+            # ID3v2.4 footer 탐색
+            f.seek(pos - 10, 0)
+            buf = f.read(10)
+            if len(buf) != 10:
+                return M3G_ERR_READ, tag
+            if (buf[0:3] == b"3DI" and buf[3] == 4 and
+                    ((buf[6] | buf[7] | buf[8] | buf[9]) & 0x80) == 0):
+                k = _get_syncsafe_int(buf[6:10])
+                if 20 + k < pos:
+                    pos -= 20 + k
+                    f.seek(pos, 0)
+                    status, tag = _parse_v2_tag(f)
+                    break
+
+            # ID3v1 / Lyrics3v2 탐색
+            f.seek(pos - 128, 0)
+            buf = f.read(3)
+            if len(buf) != 3:
+                return M3G_ERR_READ, tag
+            if buf == b"TAG":
+                pos -= 128
+                id3v1_pos = pos
+                if pos > 26:
+                    f.seek(pos - 15, 0)
+                    lyr = f.read(15)
+                    if len(lyr) != 15:
+                        return M3G_ERR_READ, tag
+                    if lyr[6:15] == b"LYRICS200":
+                        k = 0
+                        ok = True
+                        for j in range(6):
+                            if not (0x30 <= lyr[j] <= 0x39):
+                                ok = False
+                                break
+                            k = 10 * k + (lyr[j] - 0x30)
+                        if ok and k >= 11 and k + 15 < pos:
+                            pos -= k + 15
+                continue
+
+            # APE 태그 탐색
+            f.seek(pos - 32, 0)
+            buf = f.read(32)
+            if len(buf) != 32:
+                return M3G_ERR_READ, tag
+            if buf[0:8] == b"APETAGEX":
+                k = buf[12] | (buf[13] << 8) | (buf[14] << 16) | (buf[15] << 24)
+                if buf[23] & 0x80:
+                    k += 32
+                if 32 <= k < pos:
+                    pos -= k
+                    continue
+
+            break
+
+    if status == 0 and id3v1_pos != 0:
+        f.seek(id3v1_pos, 0)
+        status, tag = _parse_v1_tag(f)
+
+    return status, tag
+
+
+# ---- 공개 API: 읽기 -------------------------------------------------------
+
+def read_mp3gain_id3_tag(filename: str, info: MP3GainTagInfo) -> int:
+    """ID3v2 태그에서 게인 정보를 읽어 info 에 채운다.
+
+    원본 ReadMP3GainID3Tag 동등. 반환: 1=태그 발견·처리, 0=태그 없음, 음수=에러.
+    """
+    try:
+        f = open(filename, "rb")
+    except OSError:
+        return M3G_ERR_FILEOPEN
+    try:
+        status, tag = _search_tag(f)
+    finally:
+        f.close()
+
+    if status == 1:
+        for frame in tag.frames:
+            _decode_rva2_frame(frame, info)
+            _decode_txxx_frame(frame, info)
+            _decode_mp3gain_frame(frame, info)
+
+    return status

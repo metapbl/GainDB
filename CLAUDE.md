@@ -35,6 +35,7 @@ GaindB/
 │  ├─ frame.py             # [1단계] 프레임 파서: _BitReader, 헤더 파싱, global_gain 읽기
 │  ├─ writer.py            # [1단계] global_gain ±N 무손실 적용 + CRC 재계산
 │  ├─ decode.py            # [2/3단계] ffmpeg/ffprobe 로 MP3→PCM
+│  ├─ id3.py              # [5단계 ⑤] ID3v2 태그(RVA2 + TXXX) 읽기/쓰기
 │  └─ analysis.py          # [2단계] ReplayGain 분석(Track/Album), dB→스텝 변환
 ├─ scan_gain.py            # [1단계] CLI: 파일의 global_gain 값 스캔·출력
 ├─ apply_gain.py           # [1·2단계] CLI: 수동/auto/album 게인 적용
@@ -192,4 +193,34 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 
 **④ 합의된 단계 분할(축소 아님, 1.1):** 클리핑 경고·자동 클립(-k)·클립 질의(-c 미지정 시), directGain/directSingleChannelGain 의 태그 연동, useId3 분기는 5단계(CLI)/⑤ 로 미룸.
 
-**다음 = 4단계 ⑤** (ID3v2 읽기·쓰기: RVA2 + TXXX). `change_gain_and_tag`·`WriteMP3GainTag` 의 useId3 분기 래핑 포함(현재는 APE 경로만 직접 호출). 새 세션에 id3tag.c/.h 붙여넣기 필요.
+**4단계 ⑤-A 완료·검증 완료** (ID3v2 읽기: RVA2 + TXXX). 새 모듈 `gaindb/id3.py`
+(APE=tag.py / ID3=id3.py 대칭 배치). `read_mp3gain_id3_tag` + `_search_tag`(앞
+ID3v2 → 끝 ID3v2.4 footer `3DI` → 끝 ID3v1; 끝 탐색 시 ID3v1/Lyrics3v2/APE 꼬리
+스킵) + `_parse_v2_tag`(2.2/2.3/2.4 → 내부 2.4 통일: 업그레이드 테이블, unsync 디코드,
+ext header 스킵, 프레임 드롭 규칙, 2.3→2.4 DLEN 재정렬, 2.2 PIC→APIC, TYER→TDRC) +
+`_parse_v1_tag`(ID3v1→v2.4 프레임) + 디코더 `_decode_rva2_frame`/`_decode_txxx_frame`/
+`_decode_mp3gain_frame`. 게인 구조체·`_atof` 는 tag.py 재사용(snake_case). 디코더는
+info=None 이면 매칭 여부만 판정(⑤-B 의 RG 프레임 제거에 재사용).
+- 검증(verify_id3_read.py, git 제외): v2.4 full(RVA2+TXXX+MP3GAIN_* 전 필드)·
+  RVA2-only·TXXX-only·v2.3·v1-only 5종 전부 PASS. RVA2 는 /512·16bit fixed-point
+  양자화로 약 0.002 dB·0.001 격자(허용오차 내 일치), TXXX 는 정밀 일치.
+- **원본 동일 재현 확인**: UTF-16(인코딩 1) TXXX 는 원본 mp3gain 도 미인식(원본은
+  인코딩 0/3 만 처리). 우리도 동일하게 미인식 → 일치. v2.3 검증 fixture 는 원본이
+  읽을 수 있는 인코딩 0(latin-1)으로 작성. (쓰기 ⑤-B 도 원본처럼 인코딩 0 으로 통일 예정.)
+- 미세 메모: 동적 속성 할당 때문에 camelCase 오타가 조용히 통과할 수 있었음(검증이
+  v2.3 에서 잡음). ⑤ 마무리 때 `MP3GainTagInfo` 에 slots 적용 검토 가능(미합의).
+
+**다음 = 4단계 ⑤-B** (ID3v2 쓰기). 사양 정리·합의 완료. 원본 `WriteMP3GainID3Tag`:
+항상 파일 앞 단일 ID3v2.4, 전체 unsync, ext header 없음, 2KB 패딩, footer 없음,
+임시파일(.TMP) 재기록 후 rename(Windows 는 rename 전 원본 remove). 절차: 기존 태그
+read → RG 프레임 전부 제거(decode_*가 1 반환) → 새 프레임 고정 순서 append(TXXX
+description 소문자·인코딩 0; reference_loudness "89.0 dB" → RVA2(track)+TXXX
+track_gain → TXXX track_peak → RVA2(album)+TXXX album_gain → TXXX album_peak →
+MP3GAIN_MINMAX → ALBUM_MINMAX → UNDO) → need_update 없으면 무수정. 값 포맷은 APE 와
+동일(gain `%-+9.6f dB`, peak `%-8.6f`, minmax `%03d,%03d`, undo `%+04d,%+04d,%c`).
+RVA2: ident+`\0`+channel=1+gain×512(int16 BE 클램프)+peakbits(16/0)+peak×32768(uint16).
+합의된 분할: ⑤-B1 직렬화·프레임 생성 헬퍼(`_put_unsync_data`/`_make_frame`(s/b/h)/
+`_make_rva2_frame`/`_make_txxx_frame`/`_write_tag`(2KB 패딩)) → ⑤-B2
+`write_mp3gain_id3_tag`(RG 제거+append+임시파일 재기록+타임스탬프)+`remove_mp3gain_id3_tag`.
+이후 ⑤-C: `change_gain_and_tag`/`WriteMP3GainTag` 의 useId3 분기 래핑(ID3 쓰기 후
+stale APE 제거; read 경로는 APE→ID3 순서). 새 세션에 id3tag.c/.h 는 이미 제공받음(재첨부 불필요).

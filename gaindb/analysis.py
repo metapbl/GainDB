@@ -20,6 +20,8 @@ dB 산출식은 원본과 동일한 등가식(10*log10(meanSquare))을 따른다
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 from scipy.signal import lfilter
 
@@ -29,6 +31,10 @@ STEPS_PER_DB = 100           # 히스토그램 0.01dB 해상도
 MAX_DB = 120                 # 히스토그램 범위 0..120 dB
 RMS_WINDOW_MS = 50           # RMS 윈도우 길이(ms)
 PINK_REF = 64.82             # 캘리브레이션 기준값(dB)
+
+# dB → MP3 게인 스텝 변환 제수. 원본 mp3gain 과 동일하게 5*log10(2) 를 쓴다.
+# 디코더가 global_gain 을 2^(gain/4) 로 적용 → 1스텝 = 20*log10(2^0.25) = 5*log10(2) dB.
+_DB_PER_STEP_DIVISOR = 5.0 * math.log10(2.0)
 
 # --- 공식 사양 계수 (Tables 1·2). lfilter(b, a, x) 규약: a[0]=1.0 ---
 # Yulewalk: b = [b0..b10], a = [1.0, a1..a10]
@@ -148,9 +154,25 @@ def analyze_track(
     """
     Track replay gain(dB)을 산출해 반환한다.
 
-    left, right: decode.decode_pcm 이 준 ±32768 스케일 float64 채널.
+    left, right: decode 가 준 ±32768 스케일 float64 채널.
     sample_rate: 44100 또는 48000 (그 외는 ValueError).
     충분한 샘플이 없으면 NOT_ENOUGH_SAMPLES 를 반환.
     """
     hist = _loudness_histogram(left, right, sample_rate)
     return _gain_from_histogram(hist)
+
+
+def db_to_steps(db_change: float) -> int:
+    """
+    ReplayGain dB 변화량을 정수 MP3 게인 스텝으로 양자화한다.
+
+    원본 mp3gain 과 동일한 round-half-away-from-zero 방식:
+    0 방향으로 자른 뒤 분수부가 0.5 이상이면 절댓값을 1 키운다.
+    파이썬 round() 의 banker's rounding 과 0.5 경계에서 어긋나므로 쓰지 않는다.
+    """
+    raw = db_change / _DB_PER_STEP_DIVISOR
+    truncated = int(raw)  # int() 는 0 방향 절단
+    frac = abs(raw) - abs(truncated)
+    if frac < 0.5:
+        return truncated
+    return truncated + (-1 if raw < 0 else 1)

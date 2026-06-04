@@ -20,3 +20,4 @@ Thumbs.db
 verify_id3_read.py
 verify_id3_write.py
 verify_5c.py
+verify_*.py

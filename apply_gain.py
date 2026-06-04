@@ -9,7 +9,14 @@ apply_gain.py - MP3 파일의 global_gain 을 무손실 조정하는 스크립�
 수동 모드: 게인스텝은 정수. 1스텝 = 약 1.5dB. 양수=키우기, 음수=줄이기.
 자동 모드: ReplayGain 분석으로 89dB 기준 적정 스텝을 계산해 곡별로 적용한다.
 앨범 모드: 여러 곡의 히스토그램을 누적해 앨범 단일 스텝을 산출, 전 곡에 동일 적용.
-주의: 파일을 직접 수정한다. 되돌리려면 반대 부호로 다시 실행(수동) 하거나 undo(추후 단계).
+
+auto/album 은 원본 mp3gain 의 main 순서를 따른다: 분석으로 89dB 기준 dB·peak·
+min/max 를 얻어 태그(info)에 먼저 채우고(원본 허용오차 비교로 dirty 판정),
+그 위에서 change_gain_and_tag 가 적용분만큼 재차감하며 태그를 갱신한다.
+skip_tag 면 태그를 건드리지 않고 게인만 적용한다(원본 changeGain 분기).
+
+주의: 파일을 직접 수정한다. 되돌리려면 undo(태그 기반) 또는 반대 부호 수동 적용.
+클리핑 경고·자동 클립(-k)·클립 질의는 5단계(CLI) 에서 다룬다(합의된 단계 분할).
 """
 
 import sys
@@ -18,11 +25,82 @@ from gaindb.decode import decode_pcm
 from gaindb.analysis import (
     analyze_track,
     track_histogram,
+    track_peak,
     gain_from_histograms,
     db_to_steps,
     NOT_ENOUGH_SAMPLES,
 )
-from gaindb.writer import apply_gain
+from gaindb.writer import apply_gain, scan_gain
+from gaindb.tag import (
+    read_mp3gain_ape_tag,
+    write_mp3gain_ape_tag,
+    change_gain_and_tag,
+)
+
+# 원본 허용오차 (main 루프).
+_GAIN_EPS = 0.01        # track/album gain: dB
+_PEAK_EPS = 3.3         # track peak: ±32768 스케일에서의 차이
+_ALBUM_PEAK_EPS = 0.0001  # album peak: 정규화 스케일에서의 차이
+
+
+def _fill_track_info(info, db_gain, peak, min_gain, max_gain):
+    """원본 main 의 track 값 채우기(허용오차 비교 → dirty/세팅).
+
+    db_gain: 89dB 기준 raw dB. peak: 정규화 peak. min/max: scan_gain 결과.
+    값을 info 에 채우고, 무언가 바뀌면 info.dirty 를 켠다.
+    """
+    # track gain: 미보유거나 0.01dB 이상 차이면 갱신.
+    if (not info.have_track_gain) or (abs(db_gain - info.track_gain) >= _GAIN_EPS):
+        info.dirty = True
+        info.have_track_gain = True
+        info.track_gain = db_gain
+
+    # min/max global_gain: 미보유거나 불일치면 갱신.
+    if min_gain is not None and max_gain is not None:
+        if (not info.have_min_max_gain) or (
+            info.min_gain != min_gain or info.max_gain != max_gain
+        ):
+            info.dirty = True
+            info.have_min_max_gain = True
+            info.min_gain = min_gain
+            info.max_gain = max_gain
+
+    # track peak: 미보유거나 ±32768 스케일 3.3 이상 차이면 갱신.
+    maxsample = peak * 32768.0
+    if (not info.have_track_peak) or (
+        abs(maxsample - info.track_peak * 32768.0) >= _PEAK_EPS
+    ):
+        info.dirty = True
+        info.have_track_peak = True
+        info.track_peak = maxsample / 32768.0
+
+
+def _fill_album_info(info, db_gain, album_peak, album_min, album_max):
+    """원본 main 의 album 값 채우기(허용오차 비교 → dirty/세팅).
+
+    album_peak 은 곡별 track_peak 의 max(정규화). album_min/max 는 곡별 min/max 의
+    min/max. db_gain 은 89dB 기준 album raw dB.
+    """
+    if (not info.have_album_gain) or (abs(db_gain - info.album_gain) >= _GAIN_EPS):
+        info.dirty = True
+        info.have_album_gain = True
+        info.album_gain = db_gain
+
+    if album_min is not None and album_max is not None:
+        if (not info.have_album_min_max_gain) or (
+            info.album_min_gain != album_min or info.album_max_gain != album_max
+        ):
+            info.dirty = True
+            info.have_album_min_max_gain = True
+            info.album_min_gain = album_min
+            info.album_max_gain = album_max
+
+    if (not info.have_album_peak) or (
+        abs(album_peak - info.album_peak) >= _ALBUM_PEAK_EPS
+    ):
+        info.dirty = True
+        info.have_album_peak = True
+        info.album_peak = album_peak
 
 
 def apply_track_gain(
@@ -30,21 +108,21 @@ def apply_track_gain(
     db_gain_mod: float = 0.0,
     mp3_gain_mod: int = 0,
     wrap: bool = False,
+    skip_tag: bool = False,
 ) -> dict:
     """
-    한 MP3 파일에 Track ReplayGain 을 무손실 적용한다.
+    한 MP3 파일에 Track ReplayGain 을 무손실 적용한다(원본 applyTrack 순서).
 
-    흐름: PCM 디코딩 → ReplayGain 분석(dB) → 정수 스텝 양자화 → global_gain 적용.
+    흐름: decode → analyze_track(89dB raw dB) + track_peak + scan_gain(min/max)
+    → (태그 기록 시) read 로 info 채우기 → dB+mod → 스텝 양자화 + mp3_gain_mod
+    → change_gain_and_tag(적용분 재차감) 또는 skip_tag 시 apply_gain.
 
-    db_gain_mod:  변환 전 더하는 보정 dB(원본 -d). 89dB 기준 유지를 위해 변환 직전에 더한다.
-    mp3_gain_mod: 변환 후 더하는 정수 스텝 보정(원본 -m).
-    wrap:         True 면 0~255 클램프 대신 wrap(원본 -w). 기본 False.
-
-    반환: 결과 요약 dict.
+    반환 dict:
       - status: "ok" | "no_change" | "not_enough_samples"
       - db_gain: 분석 dB(89dB 기준). not_enough_samples 면 None.
       - steps: 적용한 정수 스텝. not_enough_samples 면 None.
       - frames_changed: 실제 수정한 프레임 수.
+      - tag_written: 태그를 기록했으면 True.
     """
     left, right, sample_rate = decode_pcm(path)
 
@@ -55,25 +133,55 @@ def apply_track_gain(
             "db_gain": None,
             "steps": None,
             "frames_changed": 0,
+            "tag_written": False,
         }
 
+    peak = track_peak(left, right)
+    del left, right
+    min_gain, max_gain = scan_gain(path)
+
+    # 태그 기록 모드면 기존 태그를 읽어 track 값으로 채운다(원본 순서).
+    info = None
+    file_tags = None
+    if not skip_tag:
+        info, file_tags = read_mp3gain_ape_tag(path)
+        _fill_track_info(info, db_gain, peak, min_gain, max_gain)
+
+    # 89dB raw dB 에 dB 보정을 더한 뒤 정수 스텝으로 양자화(원본 순서).
     steps = db_to_steps(db_gain + db_gain_mod) + mp3_gain_mod
 
     if steps == 0:
-        # 이미 목표 음량 수준 → 파일을 건드리지 않는다(원본 동작).
+        # 게인 변화 없음. 태그가 dirty 면 태그만 기록(원본 동작).
+        tag_written = False
+        if (not skip_tag) and info.dirty:
+            write_mp3gain_ape_tag(path, info, file_tags)
+            tag_written = True
         return {
             "status": "no_change",
             "db_gain": db_gain,
             "steps": 0,
             "frames_changed": 0,
+            "tag_written": tag_written,
         }
 
-    changed = apply_gain(path, steps, wrap=wrap)
+    if skip_tag:
+        changed = apply_gain(path, steps, wrap=wrap)
+        return {
+            "status": "ok",
+            "db_gain": db_gain,
+            "steps": steps,
+            "frames_changed": changed,
+            "tag_written": False,
+        }
+
+    # change_gain_and_tag 가 게인 적용 + undo 누적 + 적용분 재차감 + 태그 기록.
+    change_gain_and_tag(path, steps, steps, info, file_tags, wrap=wrap)
     return {
         "status": "ok",
         "db_gain": db_gain,
         "steps": steps,
-        "frames_changed": changed,
+        "frames_changed": None,  # change_gain_and_tag 는 프레임 수를 따로 안 돌려줌
+        "tag_written": True,
     }
 
 
@@ -82,28 +190,39 @@ def apply_album_gain(
     db_gain_mod: float = 0.0,
     mp3_gain_mod: int = 0,
     wrap: bool = False,
+    skip_tag: bool = False,
 ) -> dict:
     """
-    여러 MP3 파일에 Album ReplayGain 을 무손실 적용한다.
+    여러 MP3 파일에 Album ReplayGain 을 무손실 적용한다(원본 album 순서).
 
-    흐름: 각 곡 decode → 히스토그램만 남기고 PCM 해제 → 누적 → 앨범 단일 dB →
-    정수 스텝 양자화 → 전 곡에 동일 스텝 적용(적용은 디코딩 불필요).
+    흐름: 각 곡 decode → 히스토그램 누적 + 곡별 track_peak/min/max 수집 →
+    album dB(누적) + album_peak(곡별 peak 의 max) + album_min/max(곡별 min/max
+    의 min/max) → 각 곡 read 로 track+album 값 채우기 → 스텝 양자화 →
+    전 곡에 동일 스텝을 change_gain_and_tag(또는 skip_tag 시 apply_gain) 적용.
 
-    db_gain_mod / mp3_gain_mod / wrap: apply_track_gain 과 동일 의미.
-    개별 곡의 샘플 부족은 따지지 않고 누적 후 한 번만 판정한다(앨범 전체로 충분할 수 있음).
-
-    반환: 결과 요약 dict.
+    반환 dict:
       - status: "ok" | "no_change" | "not_enough_samples"
       - db_gain: 앨범 분석 dB(89dB 기준). not_enough_samples 면 None.
       - steps: 적용한 정수 스텝. not_enough_samples 면 None.
-      - per_file: [{"path": str, "frames_changed": int}, ...] 순서는 입력 순.
+      - per_file: [{"path": str, ...}] 순서는 입력 순.
     """
     histograms = []
+    # 곡별 분석 결과 보관(track 값 채우기·album 누적용).
+    per = []  # [{"path", "db_gain"(track), "peak", "min", "max"}]
     for path in paths:
         left, right, sample_rate = decode_pcm(path)
         histograms.append(track_histogram(left, right, sample_rate))
-        # PCM 은 더 필요 없음 → 참조 해제로 메모리 회수.
+        track_db = analyze_track(left, right, sample_rate)
+        peak = track_peak(left, right)
         del left, right
+        min_gain, max_gain = scan_gain(path)
+        per.append({
+            "path": path,
+            "track_db": track_db,
+            "peak": peak,
+            "min": min_gain,
+            "max": max_gain,
+        })
 
     db_gain = gain_from_histograms(histograms)
     if db_gain is NOT_ENOUGH_SAMPLES:
@@ -114,24 +233,55 @@ def apply_album_gain(
             "per_file": [{"path": p, "frames_changed": 0} for p in paths],
         }
 
+    # album peak = 곡별 track_peak 의 max, album min/max = 곡별 min/max 의 min/max.
+    album_peak = 0.0
+    album_max = 0
+    album_min = 255
+    for item in per:
+        if item["peak"] > album_peak:
+            album_peak = item["peak"]
+        if item["max"] is not None and item["max"] > album_max:
+            album_max = item["max"]
+        if item["min"] is not None and item["min"] < album_min:
+            album_min = item["min"]
+
     steps = db_to_steps(db_gain + db_gain_mod) + mp3_gain_mod
 
-    if steps == 0:
-        # 앨범 전체가 이미 목표 음량 수준 → 어떤 파일도 건드리지 않는다.
-        return {
-            "status": "no_change",
-            "db_gain": db_gain,
-            "steps": 0,
-            "per_file": [{"path": p, "frames_changed": 0} for p in paths],
-        }
-
     per_file = []
-    for path in paths:
-        changed = apply_gain(path, steps, wrap=wrap)
-        per_file.append({"path": path, "frames_changed": changed})
+    for item in per:
+        path = item["path"]
+        # 각 곡 태그에 track 값 + album 값을 채운다(원본 순서: track 먼저, album 다음).
+        info = None
+        file_tags = None
+        if not skip_tag:
+            info, file_tags = read_mp3gain_ape_tag(path)
+            # 곡별 track 분석값이 not_enough 가 아니면 track 값도 채움.
+            if item["track_db"] is not NOT_ENOUGH_SAMPLES:
+                _fill_track_info(info, item["track_db"], item["peak"],
+                                 item["min"], item["max"])
+            _fill_album_info(info, db_gain, album_peak, album_min, album_max)
 
+        if steps == 0:
+            tag_written = False
+            if (not skip_tag) and info.dirty:
+                write_mp3gain_ape_tag(path, info, file_tags)
+                tag_written = True
+            per_file.append({"path": path, "frames_changed": 0,
+                             "tag_written": tag_written})
+            continue
+
+        if skip_tag:
+            changed = apply_gain(path, steps, wrap=wrap)
+            per_file.append({"path": path, "frames_changed": changed,
+                             "tag_written": False})
+        else:
+            change_gain_and_tag(path, steps, steps, info, file_tags, wrap=wrap)
+            per_file.append({"path": path, "frames_changed": None,
+                             "tag_written": True})
+
+    status = "no_change" if steps == 0 else "ok"
     return {
-        "status": "ok",
+        "status": status,
         "db_gain": db_gain,
         "steps": steps,
         "per_file": per_file,
@@ -152,15 +302,18 @@ def _run_auto(path: str) -> int:
         print("분석할 샘플이 부족합니다. 적용하지 않았습니다.")
         return 1
     if result["status"] == "no_change":
-        print(
+        msg = (
             f"분석 게인 {result['db_gain']:+.2f} dB → 0 스텝. "
             "이미 목표 음량 수준이라 변경하지 않았습니다."
         )
+        if result["tag_written"]:
+            msg += " (태그만 갱신)"
+        print(msg)
         return 0
     steps = result["steps"]
     print(
         f"분석 게인 {result['db_gain']:+.2f} dB → {steps:+d} 스텝 "
-        f"(약 {steps * 1.5:+.1f} dB) 적용 완료: {result['frames_changed']}개 프레임 수정"
+        f"(약 {steps * 1.5:+.1f} dB) 적용, 태그 갱신 완료."
     )
     return 0
 
@@ -171,20 +324,21 @@ def _run_album(paths) -> int:
         print("앨범 전체에서 분석할 샘플이 부족합니다. 적용하지 않았습니다.")
         return 1
 
+    steps = result["steps"]
     if result["status"] == "no_change":
         print(
             f"앨범 게인 {result['db_gain']:+.2f} dB → 0 스텝. "
-            "이미 목표 음량 수준이라 어떤 파일도 변경하지 않았습니다."
+            "게인 변경 없음(필요 시 태그만 갱신). 곡별 결과:"
         )
-        return 0
-
-    steps = result["steps"]
-    print(
-        f"앨범 게인 {result['db_gain']:+.2f} dB → {steps:+d} 스텝 "
-        f"(약 {steps * 1.5:+.1f} dB) 적용. 곡별 결과:"
-    )
+    else:
+        print(
+            f"앨범 게인 {result['db_gain']:+.2f} dB → {steps:+d} 스텝 "
+            f"(약 {steps * 1.5:+.1f} dB) 적용. 곡별 결과:"
+        )
     for item in result["per_file"]:
-        print(f"  {item['path']}: {item['frames_changed']}개 프레임 수정")
+        fc = item.get("frames_changed")
+        fc_str = f"{fc}개 프레임 수정" if fc is not None else "태그 갱신"
+        print(f"  {item['path']}: {fc_str}")
     return 0
 
 

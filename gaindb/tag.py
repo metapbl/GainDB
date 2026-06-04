@@ -608,6 +608,45 @@ def _count_ape_fields(blob: bytes) -> int:
     return count
 
 
+def remove_mp3gain_ape_tag(filename: str, save_timestamp: bool = False) -> bool:
+    """원본 RemoveMP3GainAPETag 동등.
+
+    APE 태그를 읽어, mp3gain/ReplayGain 필드가 하나라도 있으면(have_* OR)
+    dirty 로 표시한 뒤 have_* 를 전부(undo 포함) 끄고 다시 쓴다. write 의
+    new_tag_count > 0 분기 덕분에, 남는 필드(otherFields)가 없으면 APE 태그가
+    통째로 제거되고 꼬리(Lyrics3/ID3v1)만 남는다. 원래 mp3gain 필드가 없던
+    파일이면(dirty 아님) 파일을 전혀 건드리지 않는다.
+
+    반환: 항상 True (원본 동작).
+    """
+    info, file_tags = read_mp3gain_ape_tag(filename)
+
+    # 읽은 직후 mp3gain 필드가 하나라도 있으면 변경 대상.
+    info.dirty = (
+        info.have_album_gain
+        or info.have_album_peak
+        or info.have_track_gain
+        or info.have_track_peak
+        or info.have_min_max_gain
+        or info.have_album_min_max_gain
+        or info.have_undo
+    )
+
+    # 전부 끈다(undo 포함). write 가 켜진 필드만 쓰므로 결과적으로 mp3gain 제거.
+    info.have_album_gain = False
+    info.have_album_peak = False
+    info.have_track_gain = False
+    info.have_track_peak = False
+    info.have_min_max_gain = False
+    info.have_album_min_max_gain = False
+    info.have_undo = False
+
+    if info.dirty:
+        write_mp3gain_ape_tag(filename, info, file_tags, save_timestamp)
+
+    return True
+
+
 def change_gain_and_tag(
     filename: str,
     left_change: int,

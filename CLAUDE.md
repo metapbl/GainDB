@@ -37,8 +37,9 @@ GaindB/
 │  ├─ decode.py            # [2/3단계] ffmpeg/ffprobe 로 MP3→PCM
 │  ├─ id3.py              # [5단계 ⑤] ID3v2 태그(RVA2 + TXXX) 읽기/쓰기
 │  └─ analysis.py          # [2단계] ReplayGain 분석(Track/Album), dB→스텝 변환
-├─ scan_gain.py            # [1단계] CLI: 파일의 global_gain 값 스캔·출력
+├─ scan_gain.py            # [1단계·개발용 검증 CLI] global_gain 스캔·출력 (5단계 통합 CLI 로 흡수 예정)
 ├─ apply_gain.py           # [1·2단계] CLI: 수동/auto/album 게인 적용
+├─ inspect_tag.py          # [4단계·개발용 검증 CLI] 태그 상태 덤프 (5단계 통합 CLI 로 흡수 예정)
 ├─ mp3gain/                # 원본 C 소스(LGPL, 사양 참고용). git 제외
 │  ├─ LICENSE  Makefile  README.md
 │  └─ src/
@@ -201,9 +202,10 @@ ext header 스킵, 프레임 드롭 규칙, 2.3→2.4 DLEN 재정렬, 2.2 PIC→
 `_parse_v1_tag`(ID3v1→v2.4 프레임) + 디코더 `_decode_rva2_frame`/`_decode_txxx_frame`/
 `_decode_mp3gain_frame`. 게인 구조체·`_atof` 는 tag.py 재사용(snake_case). 디코더는
 info=None 이면 매칭 여부만 판정(⑤-B 의 RG 프레임 제거에 재사용).
-- 검증(verify_id3_read.py, git 제외): v2.4 full(RVA2+TXXX+MP3GAIN_* 전 필드)·
-  RVA2-only·TXXX-only·v2.3·v1-only 5종 전부 PASS. RVA2 는 /512·16bit fixed-point
-  양자화로 약 0.002 dB·0.001 격자(허용오차 내 일치), TXXX 는 정밀 일치.
+- 검증(verify_id3_read.py): v2.4 full·RVA2-only·TXXX-only·v2.3·v1-only 5종 전부 PASS.
+  RVA2 는 /512·16bit fixed-point 양자화로 약 0.002 dB·0.001 격자(허용오차 내), TXXX 는
+  정밀 일치. (verify_id3_read.py 는 현재 git 제외 + 로컬 보존 — fixture 생성부는 ⑤-B/⑤-C
+  에서 재사용 예정. ⑤ 전체 완료 시 통합 테스트로 정식 등록 검토.)
 - **원본 동일 재현 확인**: UTF-16(인코딩 1) TXXX 는 원본 mp3gain 도 미인식(원본은
   인코딩 0/3 만 처리). 우리도 동일하게 미인식 → 일치. v2.3 검증 fixture 는 원본이
   읽을 수 있는 인코딩 0(latin-1)으로 작성. (쓰기 ⑤-B 도 원본처럼 인코딩 0 으로 통일 예정.)

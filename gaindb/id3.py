@@ -333,6 +333,120 @@ def _decode_mp3gain_frame(frame: Id3Frame, info: Optional[MP3GainTagInfo]) -> in
         return 1
     return 0
 
+# ---- ID3v2 직렬화 헬퍼 (⑤-B1; 원본 id3_put_unsync_data / id3_make_frame /
+#      id3_make_rva2_frame / id3_write_tag 동등) ----------------------------
+
+def _put_unsync_data(src: bytes) -> bytes:
+    """unsynchronisation 인코드. 원본 id3_put_unsync_data 동등.
+
+    0xFF 뒤에 (끝 / 0x00 / 상위3비트가 111) 이 오면 0x00 을 삽입한다.
+    반환 길이가 입력과 같으면 unsync 가 불필요했다는 뜻(호출부에서 판단).
+    """
+    out = bytearray()
+    n = len(src)
+    for i in range(n):
+        out.append(src[i])
+        if src[i] == 0xFF and (
+            i + 1 == n or src[i + 1] == 0x00 or (src[i + 1] & 0xE0) == 0xE0
+        ):
+            out.append(0x00)
+    return bytes(out)
+
+
+def _make_frame(frameid: bytes, fmt: str, *args) -> Id3Frame:
+    """포맷 문자열에 따라 프레임 본문을 조립. 원본 id3_make_frame 동등.
+
+    fmt 문자: 's' = bytes 그대로(NUL 종단 없음), 'b' = 1바이트 정수,
+    'h' = 16비트 BE 정수. 음수 정수도 하위 바이트만 기록(2의 보수).
+    """
+    body = bytearray()
+    ai = 0
+    for c in fmt:
+        a = args[ai]
+        ai += 1
+        if c == "s":
+            body += a
+        elif c == "b":
+            body.append(a & 0xFF)
+        elif c == "h":
+            body.append((a >> 8) & 0xFF)
+            body.append(a & 0xFF)
+        else:
+            raise ValueError(f"bad format char {c!r}")
+    return Id3Frame(frameid=frameid, flags=0, hskip=0, data=bytes(body))
+
+
+def _make_rva2_frame(is_album: bool, gain: float,
+                     have_peak: bool, peak: float) -> Id3Frame:
+    """RVA2 프레임(track/album, master channel) 생성. 원본 id3_make_rva2_frame 동등.
+
+    gain*512 를 int16 BE 클램프, peak*32768 을 uint16. C (int) 0방향 절단을
+    Python int() 로 재현.
+    """
+    ident = b"album" if is_album else b"track"
+    g = int(gain * 512.0)            # C (int): 0 방향 절단
+    if g < -32768:
+        g = -32768
+    if g > 32767:
+        g = 32767
+    g &= 0xFFFF                      # 2의 보수 16비트
+    if have_peak:
+        p = int(peak * 32768.0)      # C (unsigned int)
+        if p < 0:
+            p = 0
+        if p > 65535:
+            p = 65535
+        return _make_frame(b"RVA2", "sbbhbh", ident, 0, 1, g, 16, p)
+    return _make_frame(b"RVA2", "sbbhb", ident, 0, 1, g, 0)
+
+
+def _make_txxx_frame(description: bytes, value: bytes) -> Id3Frame:
+    """TXXX 프레임 생성(인코딩 0/ISO-8859-1). 원본 호출 "bsbs" (0,desc,0,value) 동등.
+
+    description 뒤 NUL 구분자, 그 뒤 value. NUL 종단(끝)은 없음(원본과 동일).
+    """
+    return _make_frame(b"TXXX", "bsbs", 0, description, 0, value)
+
+
+def _write_tag(tag: Id3Tag):
+    """태그를 ID3v2.4(전체 unsync, ext header 없음, 2KB 패딩, footer 없음)로
+    직렬화한 바이트열을 반환. 프레임이 0개면 None. 원본 id3_write_tag 동등.
+    """
+    if not tag.frames:
+        return None
+
+    # 원시 총 길이 계산(헤더 10 + 각 프레임 10 + unsync 데이터 길이) → 2KB 올림
+    dlen = 10
+    for fr in tag.frames:
+        dlen += 10 + len(_put_unsync_data(fr.data))
+    dlen = (dlen + 2047) & ~2047
+
+    out = bytearray(dlen)            # calloc 동등(0 채움 → 패딩)
+
+    # 태그 헤더
+    out[0:3] = b"ID3"
+    out[3] = 4
+    out[4] = 0
+    out[5] = TAGFL_UNSYNC | (tag.flags & TAGFL_EXPR)
+    out[6:10] = _put_syncsafe_int(dlen - 10)
+    p = 10
+
+    # 프레임
+    for fr in tag.frames:
+        fflags = fr.flags & ~FRAMEFL_UNSYNC
+        enc = _put_unsync_data(fr.data)
+        k = len(enc)
+        out[p:p + 4] = fr.frameid
+        out[p + 4:p + 8] = _put_syncsafe_int(k)
+        if k != len(fr.data):
+            fflags |= FRAMEFL_UNSYNC
+        out[p + 8] = (fflags >> 8) & 0xFF
+        out[p + 9] = fflags & 0xFF
+        out[p + 10:p + 10 + k] = enc
+        p += 10 + k
+
+    return bytes(out)
+
 
 # ---- ID3v2 파서 -----------------------------------------------------------
 

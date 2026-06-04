@@ -212,17 +212,30 @@ info=None 이면 매칭 여부만 판정(⑤-B 의 RG 프레임 제거에 재사
 - 미세 메모: 동적 속성 할당 때문에 camelCase 오타가 조용히 통과할 수 있었음(검증이
   v2.3 에서 잡음). ⑤ 마무리 때 `MP3GainTagInfo` 에 slots 적용 검토 가능(미합의).
 
-**다음 = 4단계 ⑤-B** (ID3v2 쓰기). 사양 정리·합의 완료. 원본 `WriteMP3GainID3Tag`:
-항상 파일 앞 단일 ID3v2.4, 전체 unsync, ext header 없음, 2KB 패딩, footer 없음,
-임시파일(.TMP) 재기록 후 rename(Windows 는 rename 전 원본 remove). 절차: 기존 태그
-read → RG 프레임 전부 제거(decode_*가 1 반환) → 새 프레임 고정 순서 append(TXXX
-description 소문자·인코딩 0; reference_loudness "89.0 dB" → RVA2(track)+TXXX
-track_gain → TXXX track_peak → RVA2(album)+TXXX album_gain → TXXX album_peak →
-MP3GAIN_MINMAX → ALBUM_MINMAX → UNDO) → need_update 없으면 무수정. 값 포맷은 APE 와
-동일(gain `%-+9.6f dB`, peak `%-8.6f`, minmax `%03d,%03d`, undo `%+04d,%+04d,%c`).
-RVA2: ident+`\0`+channel=1+gain×512(int16 BE 클램프)+peakbits(16/0)+peak×32768(uint16).
-합의된 분할: ⑤-B1 직렬화·프레임 생성 헬퍼(`_put_unsync_data`/`_make_frame`(s/b/h)/
-`_make_rva2_frame`/`_make_txxx_frame`/`_write_tag`(2KB 패딩)) → ⑤-B2
-`write_mp3gain_id3_tag`(RG 제거+append+임시파일 재기록+타임스탬프)+`remove_mp3gain_id3_tag`.
-이후 ⑤-C: `change_gain_and_tag`/`WriteMP3GainTag` 의 useId3 분기 래핑(ID3 쓰기 후
-stale APE 제거; read 경로는 APE→ID3 순서). 새 세션에 id3tag.c/.h 를 다시 붙여넣어 제공해야 함(⑤-B/⑤-C 의 쓰기·useId3 분기 재현용).
+**4단계 ⑤-B 완료·검증 완료** (ID3v2 쓰기/제거). `gaindb/id3.py` 확장.
+- ⑤-B1(직렬화 헬퍼): `_put_unsync_data`(0xFF 뒤 끝/0x00/111xxxxx → 0x00 삽입),
+  `_make_frame`(s/b/h, 음수 2의보수 하위바이트), `_make_rva2_frame`(gain×512 int16
+  클램프·2의보수, peak×32768 uint16, C (int) 0방향절단=Python int()),
+  `_make_txxx_frame`(인코딩 0/latin-1, "bsbs"=0·desc·0·value),
+  `_write_tag`(ID3v2.4·전체 unsync·ext header 없음·2KB 패딩·footer 없음, 프레임 0개면 None).
+- ⑤-B2: `write_mp3gain_id3_tag`(search→RG 프레임 제거[decode_*(,None)==1]→고정순서 append
+  [ref_loudness "89.0 dB" → RVA2 track+TXXX track_gain → TXXX track_peak → RVA2 album+
+  TXXX album_gain → TXXX album_peak → MINMAX → ALBUM_MINMAX → UNDO; TXXX desc 소문자]→
+  need_update 없으면 0 반환·무수정→임시파일.TMP 재기록[version==0 이면 원본 전체 복사,
+  아니면 앞 ID3v2 만 들어내고 복사]→os.replace→타임스탬프), `remove_mp3gain_id3_tag`
+  (빈 info 로 write). 값 포맷은 tag.py 의 `_fmt_gain`/`_fmt_peak` 재사용(latin-1 인코딩).
+  rename 은 원본 WIN32 "remove 후 rename"을 os.replace 로 원자적 대체.
+- 검증(verify_id3_write.py, git 제외·로컬 보존): 5종 전부 PASS. ① round-trip(우리 write→
+  우리 read; read 가 TXXX 로 RVA2 덮어써 gain/peak 1e-6 정밀 일치) ② mutagen 상호운용
+  (RVA2 -0.7890625=-404/512·peak 16bit 격자, TXXX 정밀, MINMAX/UNDO 정확) ③ need_update=0
+  (빈 info+RG 없는 파일 → 반환 0·바이트 불변 해시 일치) ④ 비-RG 프레임(TIT2) 보존+RG 갱신
+  ⑤ remove(게인 제거·TIT2 보존·RVA2 제거 확인).
+- 미세 메모(추후 합의): write 시 read 의 "TXXX 가 RVA2 를 덮음" 동작 덕에 round-trip
+  gain 정밀도가 RVA2 격자가 아닌 TXXX 6자리로 결정됨 — 원본도 동일(둘 다 읽고 나중 것 채택).
+
+**다음 = 4단계 ⑤-C** (change_gain_and_tag/WriteMP3GainTag 의 useId3 분기 래핑).
+tag.py 의 `change_gain_and_tag` 가 현재 APE 경로만 직접 호출 → useId3 일 때 id3.py 의
+`write_mp3gain_id3_tag` 로 분기하고, ID3 쓰기 후 stale APE 제거(원본 동작). read 경로는
+APE→ID3 순서. apply_gain.py 의 태그모드 read 도 동일 분기 필요. ⑤-C 완료 시 4단계 종료 →
+5단계(CLI/옵션/일괄). 새 세션에 mp3gain.c 의 WriteMP3GainTag/changeGainAndTag·useId3 관련
+구간을 붙여넣어 제공해야 함.

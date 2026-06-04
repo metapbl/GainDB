@@ -9,11 +9,20 @@
 
 - **표시 이름**: Gain dB
 - **기술 이름(폴더·저장소·패키지)**: `GaindB`
-- **성격**: MP3 파일의 음량을 **무손실(재인코딩 없이)** 로 분석·조정하는 도구. 원본 MP3Gain 의 기능·동작을 Python 으로 동일하게 재현하는 것을 목표로 하되, 원본 C 코드를 옮기는 "포팅"이 아니라 공개 사양만 보고 독립 구현하는 **clean-room 재구현**이다(상세는 4 참조).
-- **범위**: **MP3 단독 전용**. AAC/FLAC/Opus 등 타 포맷은 의도적으로 다루지 않는다 (사유는 5·10 참조).
+- **성격**: MP3 파일의 음량을 **무손실(재인코딩 없이)** 로 분석·조정하는 도구. 원본 MP3Gain 의 기능·동작·태그 포맷·출력을 Python 으로 **빠짐없이 동일하게 재현**하는 것을 목표로 한다. 단, 원본 C 코드를 옮기는 "포팅"이 아니라 공개 사양·관찰된 동작만 보고 독립 구현하는 **clean-room 재구현**이다(상세는 4 참조).
+- **범위**: **MP3 단독 전용**. AAC/FLAC/Opus 등 타 포맷은 다루지 않는다(원본 mp3gain 본체도 MP3 전용이며 AAC 는 별도 빌드. 사유는 5·10 참조).
 - **위치**: AVD(AV_Downloader)로 "MP3 지정" 다운로드한 음원의 음량을 고르게 맞추는 **후속 단계 도구**. 단독으로도 동작.
 - **로컬 경로**: `C:\Users\ggoyo_zhxlvdr\GaindB`
 - **라이선스 방침**: 4 참조 (clean-room 우선, 개인 로컬 사용).
+
+## 1.1. 원본 동일 재현 원칙 (최우선 원칙)
+
+- 원본 mp3gain 의 **기능·동작·태그 포맷·출력·옵션을 빠짐없이 그대로 재현**한다. 임의로 기능을 빼거나 단순화하지 않는다.
+- 불가피하게 일부를 미루거나 예외를 두어야 할 때는 **Claude 가 임의로 정하지 않는다.** 반드시 사용자와 합의하고, 그 결정을 12.1 진척 로그에 "축소가 아니라 합의된 예외 / 진행 중 미완"임이 드러나게 명시한다.
+- "동일 재현"은 **결과(동작·태그 포맷·출력·수치)의 일치**를 뜻한다. 그 구현은 원본 C 코드를 옮기지 않고 공개 사양·관찰된 동작으로 독립 작성한다 — 즉 동일 재현과 clean-room(4)은 모순되지 않는다(결과는 일치, 코드는 독립).
+- 아래는 사용자와 **이미 합의된 예외/우선 구현**이다. 이는 기능 축소가 아니다.
+  - **디코더(항구적 예외)**: PCM 추출은 원본의 `mpglibDBL` 디코더를 포팅하지 않고 외부 도구(ffmpeg)를 호출한다. LGPL 분리·실용성 때문이며, 구현 수단만 다를 뿐 **분석 결과(라우드니스 dB)는 원본과 일치**시킨다(7 참조).
+  - **샘플레이트(우선 구현·확장 대상)**: 실제 음원의 절대다수가 44.1k·48k 이므로 이 둘을 먼저 구현·검증했다. 원본은 ReplayGain 사양의 모든 샘플레이트 계수를 지원하므로, 나머지 샘플레이트도 원칙상 추가 대상이다(축소가 아니라 미완. 상세는 12.1).
 
 ## 2. 프로젝트 구조
 
@@ -24,22 +33,25 @@ GaindB/
 ├─ gaindb/                 # 패키지
 │  ├─ __init__.py
 │  ├─ frame.py             # [1단계] 프레임 파서: _BitReader, 헤더 파싱, global_gain 읽기
-│  └─ writer.py            # [1단계] global_gain ±N 무손실 적용 + CRC 재계산
+│  ├─ writer.py            # [1단계] global_gain ±N 무손실 적용 + CRC 재계산
+│  ├─ decode.py            # [2/3단계] ffmpeg/ffprobe 로 MP3→PCM
+│  └─ analysis.py          # [2단계] ReplayGain 분석(Track/Album), dB→스텝 변환
 ├─ scan_gain.py            # [1단계] CLI: 파일의 global_gain 값 스캔·출력
-├─ apply_gain.py           # [1단계] CLI: 게인 스텝 적용
+├─ apply_gain.py           # [1·2단계] CLI: 수동/auto/album 게인 적용
 ├─ mp3gain/                # 원본 C 소스(LGPL, 사양 참고용). git 제외
 │  ├─ LICENSE  Makefile  README.md
 │  └─ src/
-│     ├─ mp3gain.c / .h        # [1단계 사용 완료] 프레임 파싱 + global_gain 적용
-│     ├─ gain_analysis.c / .h  # [2단계] ReplayGain 필터 계수·RMS·통계
-│     ├─ apetag.c / .h         # [4단계] APEv2 태그(undo)
-│     ├─ id3tag.c / .h         # [4단계] ID3v2 RVA2 태그
+│     ├─ mp3gain.c / .h        # [참고 완료] 프레임 파싱 + global_gain 적용 + 메인 흐름
+│     ├─ gain_analysis.c / .h  # [참고 완료] ReplayGain 필터 계수·RMS·통계
+│     ├─ apetag.c / .h         # [4단계] APEv2 태그(전 필드 + undo)
+│     ├─ id3tag.c / .h         # [4단계] ID3v2 태그(RVA2 + TXXX)
 │     ├─ rg_error.c / .h       # 오류 처리(보조)
 │     └─ (replaygaindll.*, *.dsp/.dsw/.sln/.vcproj/.rc, resource.h, Makefile — 빌드·래퍼, 무시)
 ├─ CLAUDE.md               # 이 컨텍스트 파일
 ├─ CopyClaudeMd.bat        # CLAUDE.md 사본 동기화 스크립트
 ├─ .gitignore
-└─ *.mp3                   # 테스트 음원(git 제외): "10cm - 사랑은 은하수 다방에서.mp3"(48k), "Debussy - Arabesque No.1.mp3(44.1k)"
+├─ 10cm - 사랑은 은하수 다방에서.mp3   # 테스트 음원(git 제외, 48k)
+└─ Debussy - Arabesque No.1.mp3       # 테스트 음원(git 제외, 44.1k)
 ```
 
 (구조가 바뀌면 이 트리와 12.1 진척 로그를 함께 갱신한다.)
@@ -47,23 +59,23 @@ GaindB/
 ## 3. 협업 모델
 
 - **작업 방식**: 1인 개발자 + AI 페어 프로그래밍.
-- **성격**: 기능이 고정된 일회성 유틸리티. 지속 릴리즈·유지보수 대상 아님. 한 번 완성해 동작하면 종료.
+- **성격**: 원본 mp3gain 의 기능을 완전히 재현하면 완성되는 유틸리티. 한 번 완성해 원본과 동등하게 동작하면 종료.
 - **버전관리**: 로컬 Git (원격 저장소 없음 기본, 단계별 커밋으로 안전망 확보). 공개는 최후의 선택지.
-- **이 파일 관리**: 컨텍스트 파일은 짧게 유지한다. 단계 완료 시 12.1 진척 로그만 갱신하고, 끝난 단계의 세부 구현 설명은 한두 줄 요약으로 압축한다. 새 항목 추가 시 기존 항목과 중복·비대화되지 않게 한다.
+- **이 파일 관리**: 컨텍스트 파일은 짧게 유지한다. 단계 완료 시 12.1 진척 로그만 갱신하고, 끝난 단계의 세부 구현 설명은 한두 줄 요약으로 압축한다. 새 항목 추가 시 기존 항목과 중복·비대화되지 않게 한다. **단, 1.1 원본 동일 재현 원칙을 약화시키는 방향으로는 압축·수정하지 않는다.**
 
 ## 4. 라이선스 방침
 
 - 원본 MP3Gain 은 C 로 작성된 **LGPL v2.1** 오픈소스(2009년경 개발 중단).
-- **clean-room 방식 우선**: 원본 C 코드를 직접 번역(복붙)하지 않고, 공개된 사양(ReplayGain 알고리즘, MPEG 오디오 프레임 구조)만 보고 독립 구현한다. 알고리즘·파일 포맷은 저작권 대상이 아니므로 LGPL 구속을 피할 수 있음.
-- 원본 코드를 그대로 번역하면 결과물에 LGPL 이 따라옴. 다른 언어로 옮겨도 2차적 저작물로 간주됨.
+- **clean-room 방식 우선**: 원본 C 코드를 직접 번역(복붙)하지 않고, 공개된 사양(ReplayGain 알고리즘, MPEG 오디오 프레임 구조, 태그 포맷)과 관찰된 동작만 보고 독립 구현한다. 알고리즘·파일 포맷·태그 포맷은 저작권 대상이 아니므로 LGPL 구속을 피할 수 있음.
+- 원본 코드를 그대로 번역하면 결과물에 LGPL 이 따라옴. 다른 언어로 옮겨도 2차적 저작물로 간주됨. 그러므로 **결과(동작·포맷·출력)는 원본과 일치시키되, 코드는 독립 작성**한다(1.1 참조).
 - 개인 로컬 사용 중에는 "배포"가 없으므로 LGPL 의무는 사실상 발생하지 않음. 원본 C 소스(`mp3gain/`)를 git 에서 제외하는 것도 이 분리를 위함. 배포 계획이 생기면 그때 변호사 검토 필요 (Claude 는 변호사가 아님).
 
 ## 5. 핵심 기술 원리
 
 - **무손실 음량 조정**: MP3 각 프레임의 사이드 정보 안 `global_gain`(8bit) 필드를 직접 ±N 하여 음량 조절. 디코더는 `2^(gain/4)` 로 샘플을 곱하므로 1스텝 ≈ 1.5dB. 재인코딩 없음 → 무손실. **MP3 고유 구조라 타 포맷에 적용 불가**(범위를 MP3 전용으로 못박는 근거).
 - **음량 분석**: PCM 으로 디코딩 후 David Robinson 의 ReplayGain 알고리즘(equal-loudness 필터 + RMS + 통계, 95퍼센타일 부근)으로 인지 음량 계산. 목표값(기본 89dB)에 맞추는 데 필요한 게인 스텝 수를 산출.
-- **Track gain / Album gain** 두 모드.
-- **undo**: 변경 내역을 APEv2/ID3v2 태그에 기록해 원복 가능.
+- **Track gain / Album gain** 두 모드. Album 은 곡별 히스토그램을 누적해 단일 dB 산출 후 전 곡에 동일 스텝 적용.
+- **태그(원본 전 기능 재현 대상)**: 원본은 APEv2(기본) 또는 ID3v2(`-s i`) 태그에 다음을 기록·읽기·갱신·제거한다 — ReplayGain 표준 필드(`REPLAYGAIN_TRACK_GAIN`/`_PEAK`, `REPLAYGAIN_ALBUM_GAIN`/`_PEAK`, ID3 는 추가로 RVA2 프레임·`replaygain_reference_loudness`), mp3gain 고유 필드(`MP3GAIN_MINMAX`, `MP3GAIN_ALBUM_MINMAX`, `MP3GAIN_UNDO`). 게인 적용 시 이 값들을 일관되게 갱신한다(undo 누적, gain 에서 dB 차감, peak 에 2^(N/4) 곱, minmax 에 N 가감 — 원본 `changeGainAndTag` 동작). undo 는 이 누적된 역방향 값으로 원복한다.
 
 ## 6. 원본 참고 자료
 
@@ -71,23 +83,22 @@ GaindB/
 - **원본 C 소스는 로컬 `mp3gain/src/` 에 보관**(master.zip 압축 해제본, 2 트리 참조). LGPL 분리를 위해 git 제외. Claude 는 이 폴더를 직접 읽지 못하므로, Claude 가 필요한 함수/구간을 지목하면 사용자가 해당 파일에서 찾아 붙여넣어 제공한다.
 - 단계별 대상 파일은 2 트리의 `[N단계]` 표시 참조.
 
-## 7. 기술 스택 (예정)
+## 7. 기술 스택
 
 - **언어**: Python 3 (3.13/3.14 등). 1단계는 순수 표준 라이브러리(외부 의존성 없음).
-- **신호처리**: numpy (2단계 필터·RMS·통계).
-- **MP3 디코딩(PCM 추출)**: 직접 구현하지 말고 외부 도구(ffmpeg 직접 호출 또는 pydub) 사용 — 원본의 `mpglibDBL` 디코더는 옮기지 않는다.
-- **가상환경**: venv.
+- **신호처리**: numpy + scipy (2단계 필터·RMS·통계).
+- **MP3 디코딩(PCM 추출)**: 외부 도구(ffmpeg 직접 호출) 사용 — 원본의 `mpglibDBL` 디코더는 옮기지 않는다. 이는 사용자와 합의된 항구적 예외이며(1.1 참조), 구현 수단만 다를 뿐 분석 결과 dB 는 원본과 일치시킨다. ffmpeg 는 PATH 호출(GPL 동봉 안 함, 개인 로컬).
+- **가상환경**: venv (`.venv`).
 
-## 8. 구현 단계 (난이도·우선순위 순)
+## 8. 구현 단계
+
+> 아래 단계는 작업을 나누기 위한 구획일 뿐이며, **어느 단계도 원본 기능을 축소·생략하지 않는다**(1.1). 분량 추정은 참고용이다.
 
 1. **[완료] MP3 프레임 파서 + `global_gain` 읽기/쓰기** — 순수 Python. 읽기·쓰기·무손실 round-trip 검증 끝(상세는 12.1).
-2. **[핵심·진행 예정] ReplayGain 분석기** (~200–400줄, numpy) — equal-loudness 필터 + RMS + 통계.
-3. **MP3 디코딩(PCM 추출)**: 외부 도구 사용 (~수십 줄). 2단계의 입력 공급.
-4. **태그 처리(undo: APEv2/ID3v2)** (~200–400줄, 처음엔 생략 가능).
-5. **CLI / 일괄 처리 / 옵션** (~100–300줄).
-
-- 예상 총 분량: 완전판 1,000–1,800줄 / 최소 핵심판 600–900줄.
-- 난이도는 거의 전부 1단계(완료)와 2단계(필터 정확도)에 몰려 있음.
+2. **[완료] ReplayGain 분석기** (numpy/scipy) — equal-loudness 필터 + RMS + 통계, Track/Album gain, dB→스텝 변환. 44.1k·48k 검증 완료(나머지 샘플레이트는 확장 대상, 1.1·12.1).
+3. **[완료] MP3 디코딩(PCM 추출)**: ffmpeg/ffprobe subprocess. 2단계 입력 공급(`gaindb/decode.py`).
+4. **[진행 예정] 태그 처리** — 원본의 태그 기능 **전체**를 재현한다. APEv2(기본)·ID3v2(`-s i`) 두 시스템, ReplayGain 표준 필드·mp3gain 고유 필드(MINMAX/ALBUM_MINMAX/UNDO) 읽기·쓰기·갱신·제거, 게인 적용 시 태그 값 일관 갱신(`changeGainAndTag` 동작), undo(`-u`). otherFields(타 도구 필드) 보존, 파일 끝 ID3v1/Lyrics3 꼬리 감지·보존.
+5. **[진행 예정] CLI / 옵션 / 일괄 처리** — 원본 옵션을 빠짐없이 재현(`-r`/`-a`/`-e`/`-g`/`-l`/`-d`/`-m`/`-k`/`-c`/`-w`/`-s c|d|s|r|i|a`/`-u`/`-o`/`-q`/`-p`/`-x`/`-f`/`-t`/`-T` 등), 클리핑 경고·자동 클립(`-k`), database 출력(`-o`) 포함.
 
 ## 9. 개발 환경 · 작업 흐름
 
@@ -98,13 +109,14 @@ GaindB/
 
 ## 10. Claude 응답 규칙
 
-### 10.1. 범위 고수
+### 10.1. 범위 고수 (포맷)
 
-MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인 조정은 MP3 `global_gain` 필드 기법이라 타 포맷에 원리적으로 적용 불가.
+MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인 조정은 MP3 `global_gain` 필드 기법이라 타 포맷에 원리적으로 적용 불가. (이는 포맷 범위 규정일 뿐, 원본 기능 축소가 아니다 — 원본 mp3gain 본체도 MP3 전용.)
 
-### 10.2. clean-room 준수
+### 10.2. 원본 동일 재현 + clean-room 준수
 
-사용자가 제공한 원본 C 소스는 **사양 이해 목적으로만** 읽고, 코드를 그대로 옮기지 않는다. 알고리즘·비트 레이아웃·필터 계수 같은 공개 사양만 차용해 Python 으로 독립 재작성한다.
+- 원본 기능을 **임의로 빼거나 단순화하지 않는다**(1.1). 무언가를 미루거나 예외로 두려면 먼저 사용자와 합의하고 12.1 에 명시한다.
+- 사용자가 제공한 원본 C 소스는 **사양·동작 이해 목적으로만** 읽고, 코드를 그대로 옮기지 않는다. 알고리즘·비트 레이아웃·필터 계수·태그 포맷 같은 공개 사양만 차용해 Python 으로 독립 재작성한다.
 
 ### 10.3. 코드 제시 단위
 
@@ -122,7 +134,7 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 
 ### 10.6. 마크다운 파일 전송
 
-마크다운 파일 본문에 코드 펜스가 있으면 바깥 펜스는 안쪽보다 백틱을 하나 더 쓴다(안쪽 ``` → 바깥 ````).
+마크다운 파일 본문에 코드 펜스가 있으면 바깥 펜스는 안쪽보다 백틱을 하나 더 쓴다(안쪽 3개 → 바깥 4개).
 
 ### 10.7. 서식
 
@@ -134,8 +146,8 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 
 - **`global_gain` 위치 계산이 1단계의 핵심 난점이었음**: 사이드 정보 안의 비트 오프셋을 MPEG 버전·채널 모드별로 정확히 짚어야 함. (1단계에서 해결·검증 완료.)
 - **분석에는 디코딩 필요, 적용엔 불필요**: 음량 *적용*은 프레임 게인 필드만 건드림(디코딩 불필요). 음량 *분석*만 PCM 디코딩 필요. 두 경로 혼동 금지.
-- **0-gain 프레임은 ±N 으로 안 바뀜**: `gain==0` 이면 그대로 둠. round-trip 완전복원은 0-gain 프레임이 없는 파일에서만 보장.
-- **타 포맷 적용 불가**(10.1) / **원본 코드 직접 번역 금지**(4·10.2).
+- **0-gain 프레임은 ±N 으로 안 바뀜**: `gain==0` 이면 그대로 둠(원본 동작). round-trip 완전복원은 0-gain 프레임이 없는 파일에서만 보장.
+- **타 포맷 적용 불가**(10.1) / **원본 코드 직접 번역 금지**(4·10.2) / **원본 기능 임의 축소 금지**(1.1·10.2).
 - **이 미러의 `.c` 는 크롤 불가**: `application/octet-stream` MIME. 그래서 C 소스는 로컬 보관 + 사용자가 붙여넣어 제공(6 참조). Claude 가 크롤로 가져오려 시도하지 말 것.
 
 ## 12. 새 세션 시작 방법
@@ -146,18 +158,15 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 
 **1단계 완료** (프레임 파서 + `global_gain` 읽기/쓰기). 결과물: `gaindb/frame.py`(읽기 파서), `gaindb/writer.py`(±N 무손실 적용 + CRC 재계산), `scan_gain.py`/`apply_gain.py`(CLI). Debussy 파일로 round-trip 바이트 동일 검증 완료.
 
-**2단계 진행 중 — 분석기 코어 완료·검증**. 결과물:
+**2단계 완료** (ReplayGain 분석기 + 디코딩 + dB→스텝 + Track/Album). 결과물:
 
-- `gaindb/decode.py` — ffmpeg/ffprobe subprocess 로 MP3→PCM. (left, right, sample_rate) 반환, 원본 사양 스케일(±32768)로 정규화. ffmpeg 는 PATH 호출(GPL 동봉 안 함, 개인 로컬).
-- `gaindb/analysis.py` — ReplayGain Track gain. clean-room: 필터 계수는 C 소스가 아니라 공식 사양(Hydrogenaudio "Original ReplayGain specification" Tables 1·2)에서 옮김. 지원 샘플레이트는 **44.1k·48k 두 종만**(사양에 수치가 있는 것). yulewalk→Butterworth 캐스케이드(scipy.signal.lfilter) → 50ms RMS → 0.01dB 히스토그램 → 95퍼센타일 → PINK_REF(64.82) 차감.
-- 의존성: numpy + scipy (7번 갱신). venv `.venv` 사용.
-- 검증: 3곡(44.1k 2곡, 48k 1곡)에서 ffmpeg `replaygain` 필터와 **모두 0.02 dB 이내 일치**(우리/ffmpeg: -0.79/-0.77, -3.60/-3.58, -6.05/-6.03). 두 계수 세트 다 검증됨.
+- `gaindb/decode.py` — ffmpeg/ffprobe subprocess 로 MP3→PCM. (left, right, sample_rate) 반환, 원본 사양 스케일(±32768)로 정규화. ffmpeg 는 PATH 호출.
+- `gaindb/analysis.py` — ReplayGain. 필터 계수는 공식 사양(Hydrogenaudio "Original ReplayGain specification" Tables 1·2)에서 옮김(clean-room). yulewalk→Butterworth 캐스케이드(scipy.signal.lfilter) → 50ms RMS → 0.01dB 히스토그램 → 95퍼센타일 → PINK_REF(64.82) 차감. `track_histogram`(곡별 히스토그램)·`gain_from_histograms`(누적 합산 후 단일 dB)·`db_to_steps`(원본 round-half-away-from-zero, 제수 5*log10(2)).
+- `apply_gain.py` — `apply_track_gain`, `apply_album_gain`(decode→히스토그램만 보관·PCM 해제→누적→단일 스텝→전 곡 동일 적용), CLI 수동/`auto`/`album` 모드(main 은 모드 우선 판별).
+- 검증: Track 은 3곡에서 ffmpeg `replaygain` 필터와 0.02 dB 이내 일치(-0.79/-0.77, -3.60/-3.58, -6.05/-6.03). Album 은 44.1k+48k 혼합에서 -5.05 dB → -3 스텝(개별 -0.79/-6.05 사이·산술평균 아님) 확인. 혼합 샘플레이트 누적 정상.
+- **샘플레이트**: 현재 44.1k·48k 구현·검증 완료. 원본은 ReplayGain 사양 전 샘플레이트를 지원하므로 나머지도 추가 대상(1.1 — 축소가 아니라 미완. 실제 음원 절대다수가 44.1k/48k 라 우선 구현에 사용자 합의).
+- 미해결 관찰: 48k 곡에서 `track_peak > 1.0`(1.033) 확인 — 클리핑 방지(peak 메타데이터·`-k`) 다룰 때(5단계) 의미. 게인 산출엔 영향 없음.
 
-**다음 = 2단계 마무리(③ dB→스텝 변환 + 1단계 apply_gain 연결).** dB 를 정수 게인 스텝으로 양자화(표준 방식 `round(dB/1.5)`), 0-gain 프레임 처리(11번 함정) 합의 후 구현. 이어 Album gain(여러 곡 히스토그램 누적), 그다음 4·5단계(태그 undo, CLI 통합).
+**다음 = 4단계(태그 처리, 원본 전 기능 재현).** 원본 동작 사양 정리 완료(apetag.c/.h, id3tag.c/.h, mp3gain.c 의 changeGainAndTag 검토 끝). 구현은 검증 가능하도록 분할하되 **어느 것도 생략하지 않는다**(1.1): ① APEv2 읽기 파서(전 필드 + otherFields 보존 + ID3v1/Lyrics3 꼬리 감지) → ② APEv2 쓰기(전 필드 + otherFields 보존) → ③ 게인 적용 시 태그 갱신(changeGainAndTag 동등: undo 누적, gain dB 차감, peak 2^(N/4) 곱, minmax N 가감) → ④ undo/remove + apply_gain 연결 → ⑤ ID3v2 읽기·쓰기(RVA2 + TXXX). MP3GAIN_UNDO 값 포맷은 `%+04d,%+04d,%c`(W/N). 새 모듈 `gaindb/tag.py` 예정.
 
-- 미해결 관찰: 48k 곡에서 `track_peak > 1.0`(1.033) 확인 — 클리핑 방지(peak 메타데이터) 다룰 때 의미. 우리 게인 산출엔 영향 없음.
 - 로컬에 미커밋 변경분이 생기면 첫 메시지에 함께 알린다.
-
-**2단계 ③ 완료 — dB→스텝 변환 + apply_gain 연결.** `gaindb/analysis.py` 에 `db_to_steps`(원본 round-half-away-from-zero, 제수 5*log10(2)) 추가. `apply_gain.py` 에 `apply_track_gain`(decode→analyze→quantize→apply 연결) + CLI `auto` 모드 추가. 0-gain·클램프는 writer.py `_apply_one` 담당, steps==0 이면 미수정. 클리핑 경고(-k)는 5단계로 보류. 두 테스트 음원 사본으로 동작 확인.
-
-**다음 = Album gain.** 여러 곡 히스토그램 누적(원본 GetAlbumGain: B[] 에 각 곡 A[] 누적). analyze 단계에서 곡별 히스토그램을 합산해 앨범 단일 dB 산출 → 모든 곡에 동일 스텝 적용. 그다음 4·5단계(태그 undo, CLI 통합/일괄 처리).

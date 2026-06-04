@@ -185,6 +185,15 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 
 **4단계 1.1 미합의 메모(추후 합의)**: ① writer.apply_gain 의 single-channel 거부가 현재 mono(nchan==1)만 막고, 원본 changeGain 은 joint stereo 도 거부(mode 비트) — undo 가 좌우 다른 값을 적용할 수 있어 joint stereo 거부 추가 검토(결과 영향은 좌우 동일 게인 시 없음). ② MP3GainTagInfo 동적 속성 할당으로 오타가 조용히 통과 가능 — slots 적용 검토. ③ UTF-16(인코딩 1) TXXX 미인식은 원본 동일(원본도 인코딩 0/3 만 처리). ④ 48k 곡 track_peak>1.0(1.033) 관찰 — 클리핑 방지(-k) 다룰 때 의미, 게인 산출엔 영향 없음. ⑤ ID3 round-trip gain 정밀도는 RVA2 격자(/512·16bit)가 아닌 TXXX 6자리로 결정 — 원본 동일(둘 다 읽고 나중 TXXX 채택).
 
-**다음 = 5단계(CLI / 옵션 / 일괄 처리).** 원본 mp3gain 의 옵션 전체 재현(8단계 5 항목 참조). 개발용 CLI(apply_gain.py: auto/album/수동 스텝)를 원본 옵션 체계로 통합하고 scan_gain.py·inspect_tag.py 흡수. 진입 전 옵션을 검증 가능한 하위 묶음으로 분할·합의 예정. 참조 자료: mp3gain.c main + 옵션 파싱(이미 제공됨).
+**5단계 묶음 A·B 완료·검증 완료** (CLI 옵션 파서 + 직접 게인 분기). 결과물: `mp3gain_cli.py`(통합 CLI 진입점, 루트).
+
+- **묶음 A (옵션 파서 골격 + 즉시 동작 옵션)**: 원본 main 의 argv 순회 파서 동등 — 토큰이 정확히 2글자(`-x`/`/x`)일 때만 옵션, 인자는 다음 토큰, `file_start` 추적으로 `files` 산출. `Options`(`__slots__` 적용, 4단계 미합의 메모 ② 선제 차단). 즉시 동작: `-v`(버전), `-h`/`-?`(전체 도움말, `? wrap`→wrap 설명), `-q`, `-o`(databaseFormat + 세 갈래 헤더), `-p`, `-t`/`-T`(대소문자 구분). 나머지 옵션은 파싱만. 배너(버전·의존성)는 Gain dB/ffmpeg 에 맞게 조정(기능 출력은 원본 일치 — 사용자 합의).
+- **묶음 B (직접 게인 실행 분기)**: `-g`(directGain, 양 채널 동일), `-l`(directSingleChannelGain, whichChannel 0=왼쪽/그외=오른쪽), `-u`(undoChanges, 태그 undo 기반 원복). 파일별 루프 + 태그 읽기 골격(`_read_tags`). 실행 분기 우선순위(원본 main 5.2) 자리 확보: checkTagOnly→undo→`-l`→`-g`→deleteTag→분석경로(C~D 미연결 안내).
+- **부수 변경**: `frame.py` `FrameInfo`에 `mode` 필드 추가(0=stereo/1=joint/2=dual/3=mono). `writer.apply_gain` 단일 채널 거부를 mono(`nchan==1`)에서 `mode in (1,3)`(joint stereo·mono)로 확대 — 4단계 미합의 메모 ① 해소(원본 changeGain 의 `mode & 0x01` 거부 동등).
+- **합의 사항(원본 동일 재현, 5.4)**: ① 붙여쓰기 인자 거부(다음 토큰만 인자, `-g5`는 파일명 취급) ② `-l` joint stereo/mono 거부 ③ `-l` whichChannel 0=왼쪽/그외=오른쪽 ④ `-c` 미지정 시 stdin y/n 질의(묶음 C 예정).
+- 검증(verify_cli_ab.py, git 제외): 37 PASS / 0 FAIL. 옵션 파싱 25건(플래그·붙여쓰기·음수인자·`-l` 2인자·`-s` 서브옵션·미인식 경고·다중파일) + 두 음원에서 `-g` round-trip 복원·`-l` joint stereo 거부·`-u` undo 누적(-4)·원복.
+- **미검증 메모**: 두 테스트 음원이 모두 joint stereo(mode=1)라 `-l` 정상 적용 경로(stereo/dual 에서 한쪽 채널만 변경)는 거부 경로만 확인됨. stereo/dual 음원 확보 시 정상 경로 추가 검증 필요(코드 결함 아님, 음원 한계).
+
+**다음 = 5단계 묶음 C (분석 경로 + 적용 모드 + 클리핑).** `-r`(Track 적용)·`-a`(Album 적용)·`-e`(Album 분석 생략)·`-k`(autoClip)·`-c`(클립 경고 무시/미지정 시 stdin y/n 질의)·`-m`/`-d`(게인 보정)·`-x`(maxAmpOnly)·`-f`(Reckless). 기존 apply_gain.py 의 `_run_auto`/`_run_album` 을 원본 main 후반부의 분석→제안 출력→적용→클립 순서·수치로 통합. 분량이 커서 C-1(제안 출력 경로)·C-2(`-r`/`-a` 적용)·C-3(클립 `-k`/`-c`)로 분할·합의 예정. 이후 묶음 D(태그 모드 `-s c/d/s/r/u/i/a` + recalc 비트마스크 + 일괄/Album 집계 연결, scan_gain.py·inspect_tag.py·apply_gain.py 흡수).
 
 - 로컬에 미커밋 변경분이 생기면 첫 메시지에 함께 알린다.

@@ -97,7 +97,7 @@ GaindB/
 1. **[완료] MP3 프레임 파서 + `global_gain` 읽기/쓰기** — 순수 Python. 읽기·쓰기·무손실 round-trip 검증 끝(상세는 12.1).
 2. **[완료] ReplayGain 분석기** (numpy/scipy) — equal-loudness 필터 + RMS + 통계, Track/Album gain, dB→스텝 변환. 44.1k·48k 검증 완료(나머지 샘플레이트는 확장 대상, 1.1·12.1).
 3. **[완료] MP3 디코딩(PCM 추출)**: ffmpeg/ffprobe subprocess. 2단계 입력 공급(`gaindb/decode.py`).
-4. **[진행 예정] 태그 처리** — 원본의 태그 기능 **전체**를 재현한다. APEv2(기본)·ID3v2(`-s i`) 두 시스템, ReplayGain 표준 필드·mp3gain 고유 필드(MINMAX/ALBUM_MINMAX/UNDO) 읽기·쓰기·갱신·제거, 게인 적용 시 태그 값 일관 갱신(`changeGainAndTag` 동작), undo(`-u`). otherFields(타 도구 필드) 보존, 파일 끝 ID3v1/Lyrics3 꼬리 감지·보존.
+4. **[완료] 태그 처리** — APEv2 읽기·쓰기·갱신·제거, scanFrameGain(min/max), changeGainAndTag 동등, undo, auto/album 태그 연결까지 완료. otherFields·Lyrics3/ID3v1 꼬리 보존. ID3v2(RVA2/TXXX)는 ⑤로 분리(아래 12.1). 검증 완료.
 5. **[진행 예정] CLI / 옵션 / 일괄 처리** — 원본 옵션을 빠짐없이 재현(`-r`/`-a`/`-e`/`-g`/`-l`/`-d`/`-m`/`-k`/`-c`/`-w`/`-s c|d|s|r|i|a`/`-u`/`-o`/`-q`/`-p`/`-x`/`-f`/`-t`/`-T` 등), 클리핑 경고·자동 클립(`-k`), database 출력(`-o`) 포함.
 
 ## 9. 개발 환경 · 작업 흐름
@@ -173,7 +173,7 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 
 **4단계 ① 완료** (APEv2 읽기 파서). 결과물: `gaindb/tag.py` — `MP3GainTagInfo`/`ApeTag`/`FileTags` 데이터클래스, `read_mp3gain_ape_tag`(파일 끝에서 APE/Lyrics3v2/ID3v1 꼬리 반복 감지·tag_offset 산출), `_read_ape_tag`(전 필드 파싱 + 비-mp3gain 필드를 otherFields 원본 바이트로 보존 + 푸터 헤더비트 처리), UNDO/MINMAX 고정 오프셋 슬라이싱. APE 푸터 구조 오프셋: TagCount=16, Flags=20. 검증: APE+ID3v1 공존 파일(mutagen 작성)에서 게인 4종·MINMAX·UNDO 정확 파싱, otherFields(35B) 보존, 헤더 인식(original_tag_size=241), 꼬리 스택 분리 정상. 검증 보조 CLI: `inspect_tag.py`.
 
-**신규 식별(기능 축소 아님, 1.1 합의 필요):** 본체 `mp3gain.c` 검토 중 `scanFrameGain`(각 프레임 global_gain 의 파일 전체 min/max 를 디코딩 없이 스캔 — `MP3GAIN_MINMAX` 태그의 원천)이 진척 로그에 누락돼 있었음. 4단계 ③(changeGainAndTag 동등) 단계에서 `frame.py` 확장 또는 tag 경로로 추가 예정. 또한 본체는 recalc 비트마스크(FULL/AMP/MIN_MAX)로 태그 신뢰 시 디코딩을 건너뛰는 최적화를 하며, 이는 5단계 CLI 에서 재현 대상.
+**신규 식별(기능 축소 아님, 1.1 합의 필요):** 본체 `mp3gain.c` 검토 중 `scanFrameGain`(각 프레임 global_gain 의 파일 전체 min/max 를 디코딩 없이 스캔 — `MP3GAIN_MINMAX` 태그의 원천)이 진척 로그에 누락돼 있었음. 4단계 ③(changeGainAndTag 동등) 단계에서 `frame.py` 확장 또는 tag 경로로 추가 예정. 또한 본체는 recalc 비트마스크(FULL/AMP/MIN_MAX)로 태그 신뢰 시 디코딩을 건너뛰는 최적화를 하며, 이는 5단계 CLI 에서 재현 대상. 또한 분석 peak 산출이 진척 로그에서 누락돼 있었음(원본은 `find_maxsample` 로 항상 peak 산출). `analysis.track_peak` 추가로 보완(④에서 완료, 위 참조) — 기능 축소가 아니라 누락 보완.
 
 **4단계 남은 분할:** ② APEv2 쓰기(`WriteMP3GainAPETag` 동등: 헤더+푸터 재구성, otherFields 선배치 + mp3gain 필드 고정순서, Length/TagCount 갱신, 짧아지면 truncate, Lyrics3/ID3v1 꼬리 재기록, 값 포맷 `%-+9.6f dB`/`%-8.6f`/`%03d,%03d`/`%+04d,%+04d,%c`) → ③ changeGainAndTag 동등 + scanFrameGain → ④ undo/remove + apply_gain 연결 → ⑤ ID3v2 읽기·쓰기(RVA2 + TXXX).
 
@@ -183,4 +183,13 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 
 **미세차이 메모(1.1, 추후 합의):** writer.apply_gain 의 single-channel(좌우 다름) 거부가 현재 mono(nchan==1)만 막고, 원본 changeGain 은 joint stereo 도 거부(mode 비트). undo 가 좌우 다른 값을 적용할 수 있어 joint stereo 거부 추가 검토 필요(④/⑤). 결과 동작 영향은 좌우 동일 게인 사용 시 없음.
 
-**4단계 ④ 시작점(다음 세션):** analysis.py 의 `analyze_track`/`track_histogram` 시그니처·반환값 먼저 확인(특히 track_peak 를 내는지 — 12.1 의 "48k peak 1.033" 관찰값 출처). 이어서 ④ 구현: ① `remove_mp3gain_ape_tag`(태그 읽어 mp3gain 필드 있으면 have_* 전부 끄고 write 호출) → ② apply_gain.py 의 auto/album 경로를 `apply_gain` 직접호출에서 `change_gain_and_tag` 로 연결(적용 전 read→info 에 track_gain[89dB 기준 원본 dB]·track_peak·min/max 채우고 dirty, 그 뒤 change_gain_and_tag 가 적용분만큼 재차감 — 원본 본체 순서) → ③ undo 모드(-u: 저장된 undo_left/right 적용)·remove 모드 추가. 방식 A 권장(write_tag/skip_tag 플래그, 기본 태그기록 ON). useId3 분기·ID3(⑤)는 별도 세션.
+**4단계 ④ 완료·검증 완료** (track_peak + remove + auto/album 태그 연결).
+
+- `analysis.track_peak(left, right)` 추가 — 원본 `find_maxsample` 동등. 디코더 출력 원샘플(필터 전)의 좌우 abs max / 32768 = 정규화 peak. decode_pcm 이 좌우 ±32768 스케일로 주므로 원본과 정합(원본도 nchan 무관 ×32768). 검증: 48k 곡 1.0335 재현(12.1 기존 관찰값과 일치).
+- `tag.remove_mp3gain_ape_tag(filename, save_timestamp=False)` — 원본 `RemoveMP3GainAPETag` 동등. read→have_* OR 로 dirty 판정→have_* 전부(undo 포함) 끄기→dirty 면 write. otherFields 없으면 write 의 new_tag_count>0 분기로 APE 통째 제거, 꼬리만 남음. 검증: APE+otherFields(TITLE)+ID3v1 파일에서 mp3gain 필드만 제거·otherFields·꼬리 보존 확인.
+- `apply_gain.py` 전면 재작성 — auto/album 을 원본 main 순서로 `change_gain_and_tag` 에 연결. 흐름: 분석(89dB raw dB)+track_peak+scan_gain(min/max) → (태그모드면) read 로 info 채우기[허용오차: gain 0.01dB, track peak ±32768 스케일 3.3, album peak 0.0001, min/max 불일치] → dB+dBmod → 스텝 양자화+mp3GainMod → change_gain_and_tag 가 적용분 재차감. skip_tag 면 apply_gain 직접 호출(원본 changeGain 분기). album 은 각 곡에 track 값(곡별)+album 값(album_gain 누적·peak=곡별 max·minmax=곡별 min/max 의 min/max) 둘 다 채움.
+- 검증: auto 1곡 — db_gain -0.79→-1스텝, track_gain 0.715(=raw - steps×1.505 정확 일치), track_peak·min/max(35/209)·undo(1,1) 확인. undo 원복으로 track_gain -0.79·min/max 36/210·undo 0,0 정확 복귀. album 2곡(44.1k+48k) — db_gain -5.05→-3스텝, 두 곡 album_gain/peak/minmax 동일(-0.535, 단일값 공유), track 값 곡별, undo(3,3) 확인.
+
+**④ 합의된 단계 분할(축소 아님, 1.1):** 클리핑 경고·자동 클립(-k)·클립 질의(-c 미지정 시), directGain/directSingleChannelGain 의 태그 연동, useId3 분기는 5단계(CLI)/⑤ 로 미룸.
+
+**다음 = 4단계 ⑤** (ID3v2 읽기·쓰기: RVA2 + TXXX). `change_gain_and_tag`·`WriteMP3GainTag` 의 useId3 분기 래핑 포함(현재는 APE 경로만 직접 호출). 새 세션에 id3tag.c/.h 붙여넣기 필요.

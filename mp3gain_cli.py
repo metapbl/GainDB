@@ -6,39 +6,41 @@ mp3gain_cli.py - Gain dB 통합 CLI (원본 mp3gain 옵션 체계 재현)
 [묶음 A] 옵션 파서 골격 + 즉시 동작 옵션(-v/-h/-?/-q/-o/-p/-t/-T).
 [묶음 B] 직접 게인 실행 분기: -u(undo) / -l(단일 채널) / -g(전체 게인).
 [묶음 C-1] 분석 경로 + 제안 출력(-r/-a/-e/-x/-m/-d/-o).
-[묶음 C-2] -r(Track 적용)/-a(Album 적용) 연결. C-1 이 얻은 분석 수치로
-           원본 main 의 적용 분기(길 B)를 CLI 레벨에서 직접 재현한다 —
-           디코딩은 C-1 의 한 패스로 끝내고, info 채우기·change_gain_and_tag
-           는 검증된 apply_gain.py/tag.py 부품을 재사용한다. 적용 문구는
-           원본 영어 그대로(stdout 기능 출력 일치). 클립(-k/-c stdin 질의)은 C-3.
+[묶음 C-2] -r(Track 적용)/-a(Album 적용) 연결(길 B, 단일 디코딩 패스).
+[묶음 C-3] 클립 처리: -k(autoClip) + -c 미지정 시 stdin y/n 질의
+           (queryUserForClipping). Track autoClip 상한
+           floor(4*log10(32767/maxsample)/log10(2)), Album autoClip 상한
+           floor(-4*log10(maxmaxsample)/log10(2)). Album autoClip 하향은 전 곡
+           루프 밖에서 단일 스텝에 한 번만(원본 /*MAA*/ 위치). 클립 질의 문구는
+           원본 영어 그대로. 입력은 input() 기반 등가(첫 글자 Y/N, EOF→N).
 
 [원본 동일 재현 합의 사항 (CLAUDE.md 5.4)]
 - 붙여쓰기 인자 거부: 토큰이 정확히 2글자일 때만 옵션. 인자는 항상 다음 토큰.
 - -l joint stereo/mono 거부: writer.apply_gain 이 mode 1·3 거부(묶음 B 적용).
 - -l whichChannel: 0=왼쪽, 그 외=오른쪽(원본 if(whichChannel) 동등).
-- -c 미지정 시 stdin y/n 클립 질의: 묶음 C-3 에서 적용.
+- -c 미지정 시 stdin y/n 클립 질의(묶음 C-3).
 
 [실행 분기 우선순위 (원본 main 5.2)]
   checkTagOnly → undoChanges → directSingleChannelGain → directGain
-  → deleteTag → 분석 경로(C-2: 분석·제안·적용까지).
+  → deleteTag → 분석 경로(C-3: 분석·제안·적용·클립까지).
 
-[C-1/C-2 의 원본 정합 포인트]
+[C-1/C-2/C-3 의 원본 정합 포인트]
 - dBGainMod(-d)는 양자화 전 dB 에 더하고, mp3GainMod(-m)는 양자화 후 스텝에 더함.
-- Track 클립 경고: maxsample * 2^(steps/4) > 32767.0.
-- Album 곡별 클립 경고: trackPeak * 2^(steps/4) > 1.0 (단위 다름에 유의).
+- Track 클립 경고/질의: maxsample * 2^(steps/4) > 32767.0.
+- Album 곡별 클립 경고/질의: trackPeak * 2^(steps/4) > 1.0 (단위 다름에 유의).
 - maxAmpOnly(-x): dBchange=0 으로 두되 제안 출력 형식은 그대로.
 - Album 조건: 파일 2개 이상 and not apply_track and not analysis_track.
 - NOT_ENOUGH_SAMPLES: 해당 파일 stderr 메시지 후 제안·Album 집계에서 제외.
 - 적용(C-2): intGainChange==0 → "No changes…/tag needs update", !=0 → 적용.
-  분석 직후 _fill_track_info 로 info 에 89dB 기준 track 값을 채우고(원본 curTag
-  갱신 동등), change_gain_and_tag 가 적용분을 재차감한다.
+- 클립(C-3): autoClip 은 하향만(상한보다 클 때). autoClip 아니고 !ignoreClip 이면
+  클립 조건 충족 시에만 질의. 질의 거부면 goAhead=0(미적용, dirty 면 태그만).
 
 [배너 조정] mpglib/저작권/프로그램명 배너는 Gain dB(ffmpeg 기반)에 맞게 조정.
-기능 출력(-o, 분석 수치, 태그, 적용 문구)은 원본 일치.
+기능 출력(-o, 분석 수치, 태그, 적용/클립 문구)은 원본 일치.
 """
 
 import sys
-from math import pow
+from math import pow, log10, floor
 
 from gaindb.writer import apply_gain, scan_gain
 from gaindb.tag import (
@@ -453,7 +455,7 @@ def _run_direct(opt, path):
 
 
 # ------------------------------------------------------------------
-# [묶음 C-1/C-2] 분석 경로 + 제안 출력 + 적용
+# [묶음 C-1/C-2/C-3] 분석 경로 + 제안 출력 + 적용 + 클립
 # ------------------------------------------------------------------
 
 def _quantize_steps(db_change, opt):
@@ -466,6 +468,63 @@ def _quantize_steps(db_change, opt):
     steps = db_to_steps(db_change)
     steps += opt.mp3_gain_mod
     return db_change, steps
+
+
+def _query_user_for_clipping(path, steps):
+    """원본 queryUserForClipping 동등(stdin y/n 질의).
+
+    "WARNING: %s may clip with mp3 gain change %d" 경고 후 "Make change? [y/n]:"
+    로 반복 질의. 첫 글자 Y → True, N → False. EOF(EOFError)면 N(=False).
+    원본은 getchar() 한 글자씩이지만 input() 한 줄의 첫 글자로 등가 재현한다.
+
+    반환: 적용하면 True, 거부하면 False.
+    """
+    print(f"\nWARNING: {path} may clip with mp3 gain change {steps}",
+          file=sys.stderr)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    while True:
+        print("Make change? [y/n]:", end="", file=sys.stderr)
+        sys.stderr.flush()
+        try:
+            line = input()
+        except EOFError:
+            return False  # 원본: EOF → 'N'
+        ch = line[:1].upper()
+        if ch == "Y":
+            return True
+        if ch == "N":
+            return False
+        # Y/N 아니면 다시 묻는다(원본 while 루프 동등).
+
+
+def _auto_clip_track(steps, max_sample):
+    """원본 Track autoClip 동등.
+
+    intMaxNoClipGain = floor(4*log10(32767/maxsample)/log10(2)). 제안 스텝이
+    이보다 크면 하향한다. 하향하면 (새 스텝, True), 아니면 (원 스텝, False).
+    """
+    if max_sample <= 0:
+        return steps, False
+    max_no_clip = int(floor(4.0 * log10(32767.0 / max_sample) / log10(2.0)))
+    if steps > max_no_clip:
+        return max_no_clip, True
+    return steps, False
+
+
+def _auto_clip_album(steps, max_max_sample):
+    """원본 Album autoClip 동등.
+
+    intMaxNoClipGain = floor(-4*log10(maxmaxsample)/log10(2)) (maxmaxsample 은
+    정규화 album peak). 제안 스텝이 이보다 크면 하향. 전 곡 루프 밖에서 한 번만
+    호출한다. 하향하면 (새 스텝, True), 아니면 (원 스텝, False).
+    """
+    if max_max_sample <= 0:
+        return steps, False
+    max_no_clip = int(floor(-4.0 * log10(max_max_sample) / log10(2.0)))
+    if steps > max_no_clip:
+        return max_no_clip, True
+    return steps, False
 
 
 def _analyze_one(opt, path):
@@ -552,12 +611,32 @@ def _print_album_suggestion(opt, db_change, steps, results):
                   f"some clipping may occur in file {path}")
 
 
-def _apply_track(opt, path, steps, info, file_tags):
-    """원본 main 의 applyTrack 적용 분기 동등(클립 분기 자리는 C-3).
+def _write_tag_only(opt, path, info, file_tags):
+    """적용을 건너뛸 때(dirty 면) 태그만 갱신(원본 'Writing tag information')."""
+    if (not opt.skip_tag) and info is not None and info.dirty:
+        print(f"Writing tag information for {path}")
+        _write_mp3gain_tag(path, info, file_tags,
+                           save_timestamp=opt.save_time, use_id3=opt.use_id3)
+
+
+def _do_apply(opt, path, steps, info, file_tags):
+    """게인 적용 공통(원본 'Applying mp3 gain change of N to …' + 적용)."""
+    print(f"Applying mp3 gain change of {steps} to {path}...")
+    if opt.skip_tag:
+        apply_gain(path, steps, wrap=opt.wrap_gain)
+    else:
+        change_gain_and_tag(path, steps, steps, info, file_tags,
+                            wrap=opt.wrap_gain, save_timestamp=opt.save_time,
+                            use_id3=opt.use_id3)
+
+
+def _apply_track(opt, path, steps, max_sample, info, file_tags):
+    """원본 main 의 applyTrack 적용 분기 동등(C-3 클립 포함).
 
     intGainChange==0: "No changes…" + dirty 면 "…but tag needs update" + 태그만.
-    !=0: "Applying mp3 gain change of N to …" + change_gain_and_tag(skip 면 apply).
-    클립(-k autoClip / -c stdin 질의)은 C-3 에서 연결. 현재는 goAhead 항상 참.
+    !=0: autoClip(-k) 하향 → 또는 -c 미지정 시 클립 조건 충족하면 stdin 질의 →
+         goAhead 면 "Applying mp3 gain change of N to …" + 적용,
+         아니면(질의 거부) 미적용 + dirty 면 태그만.
     """
     if steps == 0:
         print(f"No changes to {path} are necessary")
@@ -567,21 +646,30 @@ def _apply_track(opt, path, steps, info, file_tags):
                                save_timestamp=opt.save_time, use_id3=opt.use_id3)
         return
 
-    # (C-3 예정) autoClip(-k) / 클립 질의(-c 미지정) 분기 자리.
-    print(f"Applying mp3 gain change of {steps} to {path}...")
-    if opt.skip_tag:
-        apply_gain(path, steps, wrap=opt.wrap_gain)
+    go_ahead = True
+    if opt.auto_clip:
+        original_steps = steps
+        steps, clipped = _auto_clip_track(steps, max_sample)
+        if clipped:
+            print(f"Applying auto-clipped mp3 gain change of {steps} to {path}\n"
+                  f"(Original suggested gain was {original_steps})")
+    elif not opt.ignore_clip_warning:
+        if max_sample * pow(2.0, steps / 4.0) > 32767.0:
+            go_ahead = _query_user_for_clipping(path, steps)
+
+    if go_ahead:
+        _do_apply(opt, path, steps, info, file_tags)
     else:
-        change_gain_and_tag(path, steps, steps, info, file_tags,
-                            wrap=opt.wrap_gain, save_timestamp=opt.save_time,
-                            use_id3=opt.use_id3)
+        _write_tag_only(opt, path, info, file_tags)
 
 
-def _apply_album_one(opt, path, steps, info, file_tags):
-    """원본 main 의 applyAlbum 적용 루프 한 곡 동등(클립 분기 자리는 C-3).
+def _apply_album_one(opt, path, steps, peak, info, file_tags):
+    """원본 main 의 applyAlbum 적용 루프 한 곡 동등(C-3 곡별 클립 질의 포함).
 
+    steps 는 이미 Album autoClip 하향이 반영된 단일 스텝(루프 밖에서 처리).
     intGainChange==0: "\nNo changes…"(앞 줄바꿈) + dirty 면 태그만.
-    !=0: "Applying mp3 gain change of N to …" + 적용.
+    !=0: -c 미지정 시 곡별 클립(peak*2^(steps/4)>1.0) 충족하면 stdin 질의 →
+         goAhead 면 적용, 아니면 dirty 면 태그만.
     """
     if steps == 0:
         print(f"\nNo changes to {path} are necessary")
@@ -591,22 +679,23 @@ def _apply_album_one(opt, path, steps, info, file_tags):
                                save_timestamp=opt.save_time, use_id3=opt.use_id3)
         return
 
-    # (C-3 예정) 곡별 클립 질의(-c 미지정) 분기 자리.
-    print(f"Applying mp3 gain change of {steps} to {path}...")
-    if opt.skip_tag:
-        apply_gain(path, steps, wrap=opt.wrap_gain)
+    go_ahead = True
+    if not opt.ignore_clip_warning:
+        if peak * pow(2.0, steps / 4.0) > 1.0:
+            go_ahead = _query_user_for_clipping(path, steps)
+
+    if go_ahead:
+        _do_apply(opt, path, steps, info, file_tags)
     else:
-        change_gain_and_tag(path, steps, steps, info, file_tags,
-                            wrap=opt.wrap_gain, save_timestamp=opt.save_time,
-                            use_id3=opt.use_id3)
+        _write_tag_only(opt, path, info, file_tags)
 
 
 def _run_analysis(opt):
-    """원본 main 의 분석 경로 동등(C-2: 분석·제안 출력 + -r/-a 적용까지).
+    """원본 main 의 분석 경로 동등(C-3: 분석·제안·-r/-a 적용·클립까지).
 
     파일별로 분석해 Track 제안을 출력하고(또는 -r 면 적용), Album 조건이면 곡별
     결과를 모아 마지막에 Album 제안을 출력한다(또는 -a 면 적용). 클립(-k/-c stdin
-    질의)은 C-3 에서 연결한다.
+    질의)은 적용 헬퍼가 처리한다.
     """
     rc = 0
     num_files = len(opt.files)
@@ -642,9 +731,9 @@ def _run_analysis(opt):
             _print_track_suggestion(opt, db_change, steps,
                                     max_sample, max_gain, min_gain)
 
-        # Track 적용 (원본 applyTrack 분기).
+        # Track 적용 (원본 applyTrack 분기, C-3 클립 포함).
         if opt.apply_track:
-            _apply_track(opt, path, steps, info, file_tags)
+            _apply_track(opt, path, steps, max_sample, info, file_tags)
 
         if do_album:
             album_results.append(
@@ -681,8 +770,16 @@ def _run_analysis(opt):
 
             # Album 적용 (원본 applyAlbum 분기: 전 곡 동일 스텝).
             if opt.apply_album:
-                for path, _h, _p, _mn, _mx, info, file_tags in album_results:
-                    _apply_album_one(opt, path, steps, info, file_tags)
+                # Album autoClip 하향은 전 곡 루프 밖에서 한 번만(원본 /*MAA*/).
+                if opt.auto_clip:
+                    new_steps, clipped = _auto_clip_album(steps, max_max_sample)
+                    if clipped:
+                        print(f"Applying auto-clipped mp3 gain change of "
+                              f"{new_steps} to album\n"
+                              f"(Original suggested gain was {steps})")
+                        steps = new_steps
+                for path, _h, peak, _mn, _mx, info, file_tags in album_results:
+                    _apply_album_one(opt, path, steps, peak, info, file_tags)
 
     return rc
 
@@ -733,7 +830,7 @@ def main(argv):
                       file=sys.stderr)
         return rc
 
-    # 그 외: 분석 경로(-r/-a/-e/-x/제안 출력/적용) — 묶음 C-1/C-2.
+    # 그 외: 분석 경로(-r/-a/-e/-x/제안 출력/적용/클립) — 묶음 C-1/C-2/C-3.
     return _run_analysis(opt)
 
 

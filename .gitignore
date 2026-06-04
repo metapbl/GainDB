@@ -18,3 +18,4 @@ mp3gain/
 Thumbs.db
 .DS_Store
 verify_id3_read.py
+verify_id3_write.py

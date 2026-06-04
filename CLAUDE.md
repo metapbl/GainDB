@@ -223,4 +223,4 @@ RVA2: ident+`\0`+channel=1+gain×512(int16 BE 클램프)+peakbits(16/0)+peak×32
 `_make_rva2_frame`/`_make_txxx_frame`/`_write_tag`(2KB 패딩)) → ⑤-B2
 `write_mp3gain_id3_tag`(RG 제거+append+임시파일 재기록+타임스탬프)+`remove_mp3gain_id3_tag`.
 이후 ⑤-C: `change_gain_and_tag`/`WriteMP3GainTag` 의 useId3 분기 래핑(ID3 쓰기 후
-stale APE 제거; read 경로는 APE→ID3 순서). 새 세션에 id3tag.c/.h 는 이미 제공받음(재첨부 불필요).
+stale APE 제거; read 경로는 APE→ID3 순서). 새 세션에 id3tag.c/.h 를 다시 붙여넣어 제공해야 함(⑤-B/⑤-C 의 쓰기·useId3 분기 재현용).

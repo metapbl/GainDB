@@ -39,7 +39,7 @@ GaindB/
 ├─ CLAUDE.md               # 이 컨텍스트 파일
 ├─ CopyClaudeMd.bat        # CLAUDE.md 사본 동기화 스크립트
 ├─ .gitignore
-└─ *.mp3                   # 테스트 음원. git 제외
+└─ *.mp3                   # 테스트 음원(git 제외): "10cm - 사랑은 은하수 다방에서.mp3"(48k), "Debussy - Arabesque No.1.mp3(44.1k)"
 ```
 
 (구조가 바뀌면 이 트리와 12.1 진척 로그를 함께 갱신한다.)
@@ -157,3 +157,7 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 
 - 미해결 관찰: 48k 곡에서 `track_peak > 1.0`(1.033) 확인 — 클리핑 방지(peak 메타데이터) 다룰 때 의미. 우리 게인 산출엔 영향 없음.
 - 로컬에 미커밋 변경분이 생기면 첫 메시지에 함께 알린다.
+
+**2단계 ③ 완료 — dB→스텝 변환 + apply_gain 연결.** `gaindb/analysis.py` 에 `db_to_steps`(원본 round-half-away-from-zero, 제수 5*log10(2)) 추가. `apply_gain.py` 에 `apply_track_gain`(decode→analyze→quantize→apply 연결) + CLI `auto` 모드 추가. 0-gain·클램프는 writer.py `_apply_one` 담당, steps==0 이면 미수정. 클리핑 경고(-k)는 5단계로 보류. 두 테스트 음원 사본으로 동작 확인.
+
+**다음 = Album gain.** 여러 곡 히스토그램 누적(원본 GetAlbumGain: B[] 에 각 곡 A[] 누적). analyze 단계에서 곡별 히스토그램을 합산해 앨범 단일 dB 산출 → 모든 곡에 동일 스텝 적용. 그다음 4·5단계(태그 undo, CLI 통합/일괄 처리).

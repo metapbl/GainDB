@@ -93,7 +93,8 @@ def apply_gain(path: str, left_change: int, right_change: int = None, wrap: bool
     """
     MP3 파일의 모든 프레임 global_gain 을 무손실 조정한다.
     right_change 가 None 이면 좌우 동일 게인으로 적용한다.
-    채널별(left != right) 적용은 stereo/dual 채널 파일에서만 허용된다.
+    채널별(left != right) 적용은 stereo/dual 채널 파일에서만 허용된다
+    (원본 changeGain: joint stereo·mono 는 거부 — mode 1·3).
     반환값: 수정한 프레임 수.
     """
     if right_change is None:
@@ -125,8 +126,12 @@ def apply_gain(path: str, left_change: int, right_change: int = None, wrap: bool
             continue
         first = False
 
-        if single_channel and frame.nchan == 1:
-            raise ValueError("채널별 게인은 mono 파일에 적용할 수 없습니다")
+        # 단일 채널(좌우 비대칭) 게인은 stereo(0)·dual channel(2) 에서만 허용.
+        # 원본 changeGain 은 mode 비트 & 0x01 이 참인 joint stereo(1)·mono(3) 를 거부.
+        if single_channel and frame.mode in (1, 3):
+            raise ValueError(
+                "채널별 게인은 mono 또는 joint stereo 파일에 적용할 수 없습니다"
+            )
 
         _change_frame_gain(data, frame, left_change, right_change, wrap)
         count += 1

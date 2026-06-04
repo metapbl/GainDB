@@ -1,26 +1,31 @@
 """
 mp3gain_cli.py - Gain dB 통합 CLI (원본 mp3gain 옵션 체계 재현)
 
-원본 mp3gain.c 의 main() 옵션 파싱과 동등한 argv 순회 파서를 구현한다.
-옵션 인식 규칙·인자 처리·실행 분기 우선순위를 원본 동작 그대로 따른다.
+원본 mp3gain.c 의 main() 옵션 파싱·실행 분기와 동등하게 구현한다.
 
-[묶음 A 범위]
-- 옵션 파서 골격 (2글자 토큰 규칙, 인자=다음 토큰, fileStart 추적)
-- 즉시 동작 옵션: -v(버전), -h/-?(도움말, ? wrap=wrap 설명),
-  -q(quiet), -o(database 형식 + 헤더), -p(타임스탬프), -t/-T(temp)
-- 나머지 옵션은 파싱만 해서 Options 에 저장(동작은 묶음 B~D 에서 연결)
+[묶음 A] 옵션 파서 골격 + 즉시 동작 옵션(-v/-h/-?/-q/-o/-p/-t/-T).
+[묶음 B] 직접 게인 실행 분기: -u(undo) / -l(단일 채널) / -g(전체 게인).
+         태그 읽기 골격 + 파일별 루프. 분석 경로(-r/-a)·태그 모드(-s)는
+         아직 미연결(묶음 C~D).
 
 [원본 동일 재현 합의 사항 (CLAUDE.md 5.4)]
 - 붙여쓰기 인자 거부: 토큰이 정확히 2글자일 때만 옵션. 인자는 항상 다음 토큰.
-  ('-d1.5' 같은 형태는 옵션으로 인식되지 않고 파일명으로 취급된다)
-- -l joint stereo/mono 거부: 묶음 B 에서 적용
-- -c 미지정 시 stdin y/n 클립 질의: 묶음 C 에서 적용
+- -l joint stereo/mono 거부: writer.apply_gain 이 mode 1·3 거부(묶음 B 적용).
+- -l whichChannel: 0=왼쪽, 그 외=오른쪽(원본 if(whichChannel) 동등).
+- -c 미지정 시 stdin y/n 클립 질의: 묶음 C 에서 적용.
 
-[배너 조정] 원본의 mpglib/저작권/프로그램명 배너는 기능 출력이 아니므로
-Gain dB(ffmpeg 기반)에 맞게 조정한다. 기능 출력(-o, 분석 수치, 태그)은 원본 일치.
+[실행 분기 우선순위 (원본 main 5.2)]
+  checkTagOnly → undoChanges → directSingleChannelGain → directGain
+  → deleteTag → 분석 경로. 묶음 B 는 undo/-l/-g 만 구현, 나머지는 안내.
+
+[배너 조정] mpglib/저작권/프로그램명 배너는 Gain dB(ffmpeg 기반)에 맞게 조정.
+기능 출력(-o, 분석 수치, 태그)은 원본 일치.
 """
 
 import sys
+
+from gaindb.writer import apply_gain
+from gaindb.tag import read_mp3gain_tags, change_gain_and_tag
 
 VERSION = "0.5.0-dev"
 PROGNAME = "Gain dB"
@@ -213,9 +218,6 @@ def parse_args(argv):
         # 옵션 인식: 접두가 '-' 또는 '/' 이고 길이가 정확히 2.
         is_option = (len(tok) == 2 and tok[0] in _SWITCH_CHARS)
         if not is_option:
-            # 옵션이 아니면 더 이상 옵션 파싱 안 함(원본은 파일로 취급).
-            # 원본은 루프를 계속 돌지만 2글자 아닌 토큰은 그냥 건너뛴다.
-            # fileStart 는 옵션과 그 인자만큼만 증가하므로, 첫 비옵션부터 파일.
             i += 1
             continue
 
@@ -329,6 +331,98 @@ def _print_database_header(opt):
     sys.stdout.flush()
 
 
+def _read_tags(opt, path):
+    """태그 읽기 골격(원본 main 의 전 파일 태그 선행 읽기 동등).
+
+    skip_tag/delete_tag 면 읽지 않는다. force_recalculate_tag 의 분석값
+    무효화는 분석 경로(묶음 D)에서 처리하므로 여기선 읽기만 한다.
+    반환: (info, file_tags) 또는 (None, None).
+    """
+    if opt.skip_tag or opt.delete_tag:
+        return None, None
+    info, file_tags = read_mp3gain_tags(path, opt.use_id3)
+    if opt.force_update_tag:
+        info.dirty = True
+    return info, file_tags
+
+
+def _run_undo(opt, path):
+    """원본 undoChanges 분기 동등.
+
+    태그의 undo 정보로 역방향 게인을 적용한다. 원본은 directGain 을 켜서
+    이중 태그 기록을 막지만, 우리는 change_gain_and_tag 가 한 번에 적용+기록.
+    """
+    info, file_tags = _read_tags(opt, path)
+    have_undo = info is not None and info.have_undo
+    nonzero = have_undo and (info.undo_left or info.undo_right)
+
+    if nonzero:
+        if (not opt.quiet_mode) and (not opt.database_format):
+            print(f"mp3gain 변경 되돌리는 중 ({info.undo_left},{info.undo_right}) "
+                  f"-> {path} ...", file=sys.stderr)
+        if opt.database_format:
+            print(f"{path}\t{info.undo_left}\t{info.undo_right}")
+        change_gain_and_tag(path, info.undo_left, info.undo_right,
+                            info, file_tags, wrap=opt.wrap_gain,
+                            use_id3=opt.use_id3)
+        return 0
+    else:
+        if opt.database_format:
+            print(f"{path}\t0\t0")
+        elif not opt.quiet_mode:
+            if have_undo:
+                print(f"{path} 에 되돌릴 변경이 없습니다", file=sys.stderr)
+            else:
+                print(f"{path} 에 undo 정보가 없습니다", file=sys.stderr)
+        return 1
+
+
+def _run_direct_single(opt, path):
+    """원본 directSingleChannelGain 분기 동등(-l).
+
+    whichChannel: 0=왼쪽, 그 외=오른쪽. stereo/dual 채널에서만 허용
+    (writer 가 joint stereo·mono 거부).
+    """
+    val = opt.direct_gain_val
+    if not opt.quiet_mode:
+        print(f"채널 {opt.which_channel} 에 게인 {val} 적용 중 -> {path} ...",
+              file=sys.stderr)
+
+    if opt.which_channel:   # 0 이 아니면 오른쪽
+        left, right = 0, val
+    else:                   # 0 이면 왼쪽
+        left, right = val, 0
+
+    if opt.skip_tag:
+        apply_gain(path, left, right, wrap=opt.wrap_gain)
+    else:
+        info, file_tags = _read_tags(opt, path)
+        change_gain_and_tag(path, left, right, info, file_tags,
+                            wrap=opt.wrap_gain, use_id3=opt.use_id3)
+
+    if not opt.quiet_mode:
+        print("완료", file=sys.stderr)
+    return 0
+
+
+def _run_direct(opt, path):
+    """원본 directGain 분기 동등(-g). 양 채널에 동일 게인."""
+    val = opt.direct_gain_val
+    if not opt.quiet_mode:
+        print(f"게인 {val} 적용 중 -> {path} ...", file=sys.stderr)
+
+    if opt.skip_tag:
+        apply_gain(path, val, val, wrap=opt.wrap_gain)
+    else:
+        info, file_tags = _read_tags(opt, path)
+        change_gain_and_tag(path, val, val, info, file_tags,
+                            wrap=opt.wrap_gain, use_id3=opt.use_id3)
+
+    if not opt.quiet_mode:
+        print("완료", file=sys.stderr)
+    return 0
+
+
 def main(argv):
     if len(argv) < 2:
         _err_usage()
@@ -338,39 +432,38 @@ def main(argv):
     if opt.database_format:
         _print_database_header(opt)
 
-    # [묶음 A] 실행 분기는 아직 미연결. 파싱 결과를 확인용으로 요약 출력한다.
-    # (묶음 B~D 에서 각 분기 동작을 채우며 이 요약은 제거 예정.)
-    if not opt.quiet_mode:
-        e = sys.stderr
-        print("[묶음 A] 옵션 파싱 결과 (실행 분기는 후속 묶음에서 연결):", file=e)
-        active = []
-        if opt.apply_track: active.append("-r(track)")
-        if opt.apply_album: active.append("-a(album)")
-        if opt.analysis_track: active.append("-e")
-        if opt.direct_gain: active.append(f"-g {opt.direct_gain_val}")
-        if opt.direct_single_channel_gain:
-            active.append(f"-l ch={opt.which_channel} {opt.direct_gain_val}")
-        if opt.undo_changes: active.append("-u")
-        if opt.check_tag_only: active.append("-s c")
-        if opt.delete_tag: active.append("-s d")
-        if opt.skip_tag: active.append("-s s")
-        if opt.force_recalculate_tag: active.append("-s r")
-        if opt.force_update_tag: active.append("-s u")
-        if opt.use_id3: active.append("-s i(ID3v2)")
-        if opt.auto_clip: active.append("-k")
-        if opt.ignore_clip_warning: active.append("-c")
-        if opt.max_amp_only: active.append("-x")
-        if opt.reckless: active.append("-f")
-        if opt.wrap_gain: active.append("-w")
-        if opt.mp3_gain_mod: active.append(f"-m {opt.mp3_gain_mod}")
-        if opt.db_gain_mod: active.append(f"-d {opt.db_gain_mod}")
-        active.append(f"temp={'on' if opt.using_temp else 'off(-T)'}")
-        active.append(f"save_time={opt.save_time}")
-        active.append(f"db_format={opt.database_format}")
-        print("  활성: " + (", ".join(active) if active else "(없음)"), file=e)
-        print(f"  입력 파일 {len(opt.files)}개: {opt.files}", file=e)
+    if not opt.files:
+        _err_usage()
 
-    return 0
+    # 실행 분기 우선순위(원본 main 5.2). 묶음 B 는 undo/-l/-g 구현.
+    # checkTagOnly / deleteTag / 분석 경로(-r/-a/제안) 는 묶음 C~D 에서 연결.
+    rc = 0
+    for path in opt.files:
+        if opt.check_tag_only:
+            if not opt.quiet_mode:
+                print(f"[미연결] -s c (태그 확인) 는 묶음 D 에서 구현 예정: {path}",
+                      file=sys.stderr)
+            continue
+        if opt.undo_changes:
+            rc = _run_undo(opt, path) or rc
+            continue
+        if opt.direct_single_channel_gain:
+            rc = _run_direct_single(opt, path) or rc
+            continue
+        if opt.direct_gain:
+            rc = _run_direct(opt, path) or rc
+            continue
+        if opt.delete_tag:
+            if not opt.quiet_mode:
+                print(f"[미연결] -s d (태그 삭제) 는 묶음 D 에서 구현 예정: {path}",
+                      file=sys.stderr)
+            continue
+        # 그 외: 분석 경로(-r/-a/제안 출력) — 묶음 C~D.
+        if not opt.quiet_mode:
+            print(f"[미연결] 분석 경로(-r/-a/제안) 는 묶음 C~D 에서 구현 예정: {path}",
+                  file=sys.stderr)
+
+    return rc
 
 
 if __name__ == "__main__":

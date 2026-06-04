@@ -31,7 +31,7 @@ _SAMPLERATE = (
     (44100, 48000, 32000, 0),  # MPEG1
 )
 
-# 채널 모드: (h[3] >> 6) & 0x03  ->  3=mono, 그 외=stereo류
+# 채널 모드: (h[3] >> 6) & 0x03  ->  0=stereo, 1=joint stereo, 2=dual channel, 3=mono
 _MODE_MONO = 3
 
 
@@ -44,6 +44,7 @@ class FrameInfo:
     bitrate_kbps: int      # 비트레이트 (kbps)
     samplerate_hz: int     # 샘플링 주파수 (Hz)
     padding: int           # 패딩 비트 (0 또는 1)
+    mode: int              # 채널 모드 (0=stereo, 1=joint, 2=dual, 3=mono)
     nchan: int             # 채널 수 (1 또는 2)
     frame_len: int         # 프레임 전체 바이트 길이 (패딩 포함)
     gains: list            # 이 프레임의 global_gain 값 리스트 (granule*channel 순서)
@@ -130,6 +131,7 @@ def _parse_header(data: bytes, pos: int) -> FrameInfo:
         bitrate_kbps=_BITRATE[mpegver][bitridx],
         samplerate_hz=_SAMPLERATE[mpegver][freqidx],
         padding=padding,
+        mode=mode,
         nchan=nchan,
         frame_len=_frame_length(mpegver, bitridx, freqidx, padding),
         gains=[],

@@ -606,3 +606,97 @@ def _count_ape_fields(blob: bytes) -> int:
         p += isize + 1 + vsize
         count += 1
     return count
+
+
+def change_gain_and_tag(
+    filename: str,
+    left_change: int,
+    right_change: int,
+    info: MP3GainTagInfo,
+    file_tags: FileTags,
+    wrap: bool = False,
+    save_timestamp: bool = False,
+) -> bool:
+    """원본 mp3gain.c 의 changeGainAndTag 동등.
+
+    실제 프레임 게인을 적용(writer.apply_gain)한 뒤, 성공하면 info 를 일관 갱신하고
+    APE 태그를 다시 쓴다. undo 는 항상 누적, gain/peak/minmax 는 좌우 변화량이
+    같을 때만 갱신(좌우 다르면 채널 분리라 의미가 깨지므로 건드리지 않음).
+
+    dB 차감 상수는 원본 근사값 1.505 (= 5*log10(2) 근사) 를 그대로 사용한다.
+    useId3 분기는 ⑤단계에서 래핑 예정 — 현재는 APE 경로만 직접 호출.
+
+    반환: 게인을 적용하고 태그를 갱신했으면 True, 변화량이 0이면 False.
+    """
+    # writer 는 순환 import 회피를 위해 함수 내부에서 import.
+    from gaindb.writer import apply_gain
+
+    if left_change == 0 and right_change == 0:
+        return False
+
+    # 실제 프레임 게인 적용. 예외 없이 반환되면 성공(원본의 !changeGain 대응).
+    apply_gain(filename, left_change, right_change, wrap)
+
+    # --- undo 누적 (항상) ---
+    if not info.have_undo:
+        info.undo_left = 0
+        info.undo_right = 0
+    info.dirty = True
+    info.undo_right -= right_change
+    info.undo_left -= left_change
+    info.undo_wrap = wrap
+    info.have_undo = True  # undo 가 0 이 되어도 제거하지 않음(원본: 파일 단축 회피)
+
+    # --- 좌우가 같을 때만 나머지 필드 갱신 ---
+    if left_change == right_change:
+        dbl_gain_change = left_change * 1.505  # 원본 근사 상수
+
+        if info.have_track_gain:
+            info.track_gain -= dbl_gain_change
+        if info.have_track_peak:
+            info.track_peak *= 2.0 ** (left_change / 4.0)
+        if info.have_album_gain:
+            info.album_gain -= dbl_gain_change
+        if info.have_album_peak:
+            info.album_peak *= 2.0 ** (left_change / 4.0)
+
+        if info.have_min_max_gain:
+            cur_min = info.min_gain + left_change
+            cur_max = info.max_gain + left_change
+            if wrap:
+                if cur_min < 0 or cur_min > 255 or cur_max < 0 or cur_max > 255:
+                    # wrap 으로 진짜 min/max 를 잃음 → 정보 폐기(원본 동작)
+                    info.have_min_max_gain = False
+            else:
+                # minGain: 원래 0 이면 0 유지(0-gain 보존), 아니면 0~255 클램프
+                info.min_gain = (
+                    0 if info.min_gain == 0
+                    else 0 if cur_min < 0
+                    else 255 if cur_min > 255
+                    else cur_min
+                )
+                # maxGain: 단순 0~255 클램프
+                info.max_gain = (
+                    0 if cur_max < 0 else 255 if cur_max > 255 else cur_max
+                )
+
+        if info.have_album_min_max_gain:
+            cur_min = info.album_min_gain + left_change
+            cur_max = info.album_max_gain + left_change
+            if wrap:
+                if cur_min < 0 or cur_min > 255 or cur_max < 0 or cur_max > 255:
+                    info.have_album_min_max_gain = False
+            else:
+                info.album_min_gain = (
+                    0 if info.album_min_gain == 0
+                    else 0 if cur_min < 0
+                    else 255 if cur_min > 255
+                    else cur_min
+                )
+                info.album_max_gain = (
+                    0 if cur_max < 0 else 255 if cur_max > 255 else cur_max
+                )
+
+    # --- 태그 다시 쓰기 (현재 APE 경로만; useId3 분기는 ⑤) ---
+    write_mp3gain_ape_tag(filename, info, file_tags, save_timestamp)
+    return True

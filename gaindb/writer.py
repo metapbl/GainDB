@@ -145,3 +145,73 @@ def apply_gain(path: str, left_change: int, right_change: int = None, wrap: bool
         f.write(data)
 
     return count
+
+
+def scan_gain(path: str):
+    """모든 프레임의 global_gain 최소/최대값을 수정 없이 수집한다.
+
+    원본 mp3gain.c 의 scanFrameGain 동등. 디코딩 없이 사이드 정보의
+    global_gain 필드만 읽어 파일 전체의 min/max 를 구한다. 0-gain 프레임도
+    포함한다(원본 동작).
+
+    반환: (min_gain, max_gain) 튜플. 유효 프레임이 하나도 없으면 (None, None).
+    """
+    with open(path, "rb") as f:
+        data = bytearray(f.read())
+
+    pos = _skip_id3v2(data)
+    while pos + 4 <= len(data) and not _is_valid_header(data, pos):
+        pos += 1
+
+    min_gain = 256
+    max_gain = -1
+    first = True
+    while pos + 4 <= len(data) and _is_valid_header(data, pos):
+        frame = _parse_header(data, pos)
+        if frame.frame_len <= 0 or pos + frame.frame_len > len(data):
+            break
+
+        if first and _looks_like_info_frame(data, frame):
+            first = False
+            pos += frame.frame_len
+            continue
+        first = False
+
+        side_start = frame.offset + (6 if frame.has_crc else 4)
+        nchan = frame.nchan
+
+        if frame.mpegver == 3:  # MPEG1
+            reader = _BitReader(data, side_start + 1, 1)
+            reader.skip(5 if nchan == 1 else 3)
+            reader.skip(nchan * 4)
+            for _gr in range(2):
+                for _ch in range(nchan):
+                    reader.skip(21)
+                    gain = reader.peek8()
+                    if gain < min_gain:
+                        min_gain = gain
+                    if gain > max_gain:
+                        max_gain = gain
+                    reader.skip(38)
+        else:  # MPEG2 / MPEG2.5
+            reader = _BitReader(data, side_start + 1, 0)
+            reader.skip(1 if nchan == 1 else 2)
+            for _ch in range(nchan):
+                reader.skip(21)
+                gain = reader.peek8()
+                if gain < min_gain:
+                    min_gain = gain
+                if gain > max_gain:
+                    max_gain = gain
+                reader.skip(42)
+
+        pos += frame.frame_len
+        if not (pos + 4 <= len(data) and _is_valid_header(data, pos)):
+            scan = pos
+            while scan + 4 <= len(data) and not _is_valid_header(data, scan):
+                scan += 1
+            pos = scan
+
+    if max_gain < 0:
+        return None, None
+    return min_gain, max_gain

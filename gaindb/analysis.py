@@ -204,3 +204,22 @@ def db_to_steps(db_change: float) -> int:
     if frac < 0.5:
         return truncated
     return truncated + (-1 if raw < 0 else 1)
+
+
+def track_peak(left: np.ndarray, right: np.ndarray) -> float:
+    """
+    한 곡의 정규화 peak(0~1 스케일, 1.0 초과 가능)를 반환한다.
+
+    원본 mp3gain 의 find_maxsample 동등: 디코더 출력 원샘플(필터 적용 전)의
+    좌우 절대 최댓값을 구해 32768.0 으로 나눈다. decode_pcm 이 좌우 모두
+    ±32768 스케일로 주므로(mono 도 좌우 복제) 원본과 스케일이 정합한다.
+    원본 find_maxsample 는 nchan 과 무관하게 항상 *32768.0 을 쓴다.
+
+    샘플이 하나도 없으면 0.0 을 반환한다.
+
+    REPLAYGAIN_TRACK_PEAK 태그 값(정규화)·클리핑 판정의 원천이며,
+    게인 산출(라우드니스 dB)에는 영향을 주지 않는다.
+    """
+    lmax = float(np.abs(left).max()) if left.size else 0.0
+    rmax = float(np.abs(right).max()) if right.size else 0.0
+    return max(lmax, rmax) / 32768.0

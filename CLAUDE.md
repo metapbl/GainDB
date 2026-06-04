@@ -178,3 +178,7 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 **4단계 남은 분할:** ② APEv2 쓰기(`WriteMP3GainAPETag` 동등: 헤더+푸터 재구성, otherFields 선배치 + mp3gain 필드 고정순서, Length/TagCount 갱신, 짧아지면 truncate, Lyrics3/ID3v1 꼬리 재기록, 값 포맷 `%-+9.6f dB`/`%-8.6f`/`%03d,%03d`/`%+04d,%+04d,%c`) → ③ changeGainAndTag 동등 + scanFrameGain → ④ undo/remove + apply_gain 연결 → ⑤ ID3v2 읽기·쓰기(RVA2 + TXXX).
 
 **4단계 ② 완료** (APEv2 쓰기). `write_mp3gain_ape_tag` + 값 포맷 헬퍼(`_fmt_gain`/`_fmt_peak`/`_ape_field`/`_make_ape_footer`). 헤더+푸터 재구성, otherFields 선배치 + mp3gain 필드 고정순서(MINMAX→ALBUM_MINMAX→UNDO→TRACK_GAIN→PEAK→ALBUM_GAIN→PEAK), Length/TagCount/Flags 갱신, 짧아지면 truncate, Lyrics3/ID3v1 꼬리 재기록, save_timestamp 는 os.utime 으로 재현. 검증: round-trip(우리 파서 재독 일치) + mutagen 상호운용(값 포맷 정확) + ID3v1 꼬리 보존 확인.
+
+**4단계 ③ 완료** (scan_gain + change_gain_and_tag). `writer.scan_gain`(전 프레임 global_gain min/max, 0 포함, 디코딩 없음 — MP3GAIN_MINMAX 원천), `tag.change_gain_and_tag`(apply_gain 적용 후 undo 누적[항상] + 좌우 동일 시 gain/peak/minmax 갱신: dB 차감 상수 1.505, peak ×2^(N/4), minmax 가감·wrap 시 정보폐기·비wrap 시 minGain 0-유지 클램프, write_mp3gain_ape_tag 호출). useId3 분기는 ⑤로 분할. 검증: scan (36,210), +3 적용 시 track_gain -8.095·peak 1.737·min/max 39/213·undo -3/-3, undo 원복 시 전 값 정확 복귀.
+
+**미세차이 메모(1.1, 추후 합의):** writer.apply_gain 의 single-channel(좌우 다름) 거부가 현재 mono(nchan==1)만 막고, 원본 changeGain 은 joint stereo 도 거부(mode 비트). undo 가 좌우 다른 값을 적용할 수 있어 joint stereo 거부 추가 검토 필요(④/⑤). 결과 동작 영향은 좌우 동일 게인 사용 시 없음.

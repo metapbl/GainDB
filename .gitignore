@@ -17,4 +17,6 @@ mp3gain/
 .vscode/
 Thumbs.db
 .DS_Store
+
+# 검증 스크립트 (저장소에 포함하지 않음)
 verify_*.py

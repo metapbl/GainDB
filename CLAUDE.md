@@ -170,3 +170,9 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 **다음 = 4단계(태그 처리, 원본 전 기능 재현).** 원본 동작 사양 정리 완료(apetag.c/.h, id3tag.c/.h, mp3gain.c 의 changeGainAndTag 검토 끝). 구현은 검증 가능하도록 분할하되 **어느 것도 생략하지 않는다**(1.1): ① APEv2 읽기 파서(전 필드 + otherFields 보존 + ID3v1/Lyrics3 꼬리 감지) → ② APEv2 쓰기(전 필드 + otherFields 보존) → ③ 게인 적용 시 태그 갱신(changeGainAndTag 동등: undo 누적, gain dB 차감, peak 2^(N/4) 곱, minmax N 가감) → ④ undo/remove + apply_gain 연결 → ⑤ ID3v2 읽기·쓰기(RVA2 + TXXX). MP3GAIN_UNDO 값 포맷은 `%+04d,%+04d,%c`(W/N). 새 모듈 `gaindb/tag.py` 예정.
 
 - 로컬에 미커밋 변경분이 생기면 첫 메시지에 함께 알린다.
+
+**4단계 ① 완료** (APEv2 읽기 파서). 결과물: `gaindb/tag.py` — `MP3GainTagInfo`/`ApeTag`/`FileTags` 데이터클래스, `read_mp3gain_ape_tag`(파일 끝에서 APE/Lyrics3v2/ID3v1 꼬리 반복 감지·tag_offset 산출), `_read_ape_tag`(전 필드 파싱 + 비-mp3gain 필드를 otherFields 원본 바이트로 보존 + 푸터 헤더비트 처리), UNDO/MINMAX 고정 오프셋 슬라이싱. APE 푸터 구조 오프셋: TagCount=16, Flags=20. 검증: APE+ID3v1 공존 파일(mutagen 작성)에서 게인 4종·MINMAX·UNDO 정확 파싱, otherFields(35B) 보존, 헤더 인식(original_tag_size=241), 꼬리 스택 분리 정상. 검증 보조 CLI: `inspect_tag.py`.
+
+**신규 식별(기능 축소 아님, 1.1 합의 필요):** 본체 `mp3gain.c` 검토 중 `scanFrameGain`(각 프레임 global_gain 의 파일 전체 min/max 를 디코딩 없이 스캔 — `MP3GAIN_MINMAX` 태그의 원천)이 진척 로그에 누락돼 있었음. 4단계 ③(changeGainAndTag 동등) 단계에서 `frame.py` 확장 또는 tag 경로로 추가 예정. 또한 본체는 recalc 비트마스크(FULL/AMP/MIN_MAX)로 태그 신뢰 시 디코딩을 건너뛰는 최적화를 하며, 이는 5단계 CLI 에서 재현 대상.
+
+**4단계 남은 분할:** ② APEv2 쓰기(`WriteMP3GainAPETag` 동등: 헤더+푸터 재구성, otherFields 선배치 + mp3gain 필드 고정순서, Length/TagCount 갱신, 짧아지면 truncate, Lyrics3/ID3v1 꼬리 재기록, 값 포맷 `%-+9.6f dB`/`%-8.6f`/`%03d,%03d`/`%+04d,%+04d,%c`) → ③ changeGainAndTag 동등 + scanFrameGain → ④ undo/remove + apply_gain 연결 → ⑤ ID3v2 읽기·쓰기(RVA2 + TXXX).

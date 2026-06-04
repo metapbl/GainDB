@@ -161,6 +161,34 @@ def analyze_track(
     hist = _loudness_histogram(left, right, sample_rate)
     return _gain_from_histogram(hist)
 
+def track_histogram(
+    left: np.ndarray, right: np.ndarray, sample_rate: int
+) -> np.ndarray:
+    """
+    한 곡의 라우드니스 히스토그램(0.01dB 해상도, 길이 STEPS_PER_DB*MAX_DB)을 반환한다.
+
+    Album gain 누적용. 여러 곡의 반환값을 단순 합산하면 앨범 전체를 하나의 긴
+    신호로 취급한 것과 수학적으로 동일하다(곡 길이가 자동으로 가중치가 됨).
+    샘플레이트 검증·필터·RMS 는 _loudness_histogram 이 그대로 수행한다.
+    """
+    return _loudness_histogram(left, right, sample_rate)
+
+
+def gain_from_histograms(hists):
+    """
+    여러 곡의 히스토그램을 누적 합산한 뒤 Album replay gain(dB)을 산출한다.
+
+    hists: track_histogram 이 반환한 np.ndarray 들의 시퀀스.
+    충분한 샘플이 없으면(빈 시퀀스 또는 전체 빈도 0) NOT_ENOUGH_SAMPLES 를 반환.
+    개별 곡의 부족 여부는 따지지 않고 누적 후 한 번만 판정한다.
+    """
+    total = None
+    for h in hists:
+        total = h.copy() if total is None else total + h
+    if total is None:
+        return NOT_ENOUGH_SAMPLES
+    return _gain_from_histogram(total)
+
 
 def db_to_steps(db_change: float) -> int:
     """

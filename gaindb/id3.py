@@ -7,7 +7,7 @@
     ID3v2.2/2.3/2.4 를 모두 내부적으로 2.4 로 통일해 파싱하고,
     RVA2 / TXXX(ReplayGain) / TXXX(MP3GAIN_*) 에서 게인 정보를 추출한다.
 
-게인 정보 구조체는 gaindb.tag.MP3GainTagInfo 를 재사용한다.
+게인 정보 구조체·문자열 파싱 헬퍼는 gaindb.tag 의 것을 재사용한다(snake_case).
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional, List
 
-from gaindb.tag import MP3GainTagInfo
+from gaindb.tag import MP3GainTagInfo, _atof
 
 
 # ---- 오류 코드 (원본 rg_error.h 동등; 음수) -------------------------------
@@ -119,6 +119,60 @@ def _get_unsync_data(src: bytes) -> bytes:
     return bytes(out)
 
 
+# ---- ID3 전용 정수 파싱 (sscanf 엄밀 매칭 재현) --------------------------
+
+def _atoi_or_none(s: str):
+    """C atoi 동등이되, 정수 앞부분이 없으면 None.
+
+    원본 sscanf 의 "변환 성공 개수" 검사를 재현하기 위해, 파싱 실패 시
+    None 을 반환해 해당 필드를 채우지 않도록 한다.
+    """
+    s = s.strip()
+    i = 0
+    n = len(s)
+    if i < n and s[i] in "+-":
+        i += 1
+    j = i
+    while j < n and s[j].isdigit():
+        j += 1
+    if j == i:
+        return None
+    try:
+        return int(s[:j])
+    except ValueError:
+        return None
+
+
+def _scan_two_ints(s: str):
+    """sscanf(s, "%d,%d") 동등. 둘 다 파싱되면 (a,b), 아니면 None."""
+    parts = s.split(",")
+    if len(parts) < 2:
+        return None
+    a = _atoi_or_none(parts[0])
+    b = _atoi_or_none(parts[1])
+    if a is None or b is None:
+        return None
+    return (a, b)
+
+
+def _scan_undo(s: str):
+    """sscanf(s, "%d,%d,%c") 동등. (a,b,char) 또는 None.
+
+    C 의 %c 는 콤마 직후 첫 문자 1개를 공백 스킵 없이 읽는다.
+    """
+    parts = s.split(",")
+    if len(parts) < 3:
+        return None
+    a = _atoi_or_none(parts[0])
+    b = _atoi_or_none(parts[1])
+    if a is None or b is None:
+        return None
+    c = parts[2][:1]
+    if c == "":
+        return None
+    return (a, b, c)
+
+
 # ---- RVA2 / TXXX 디코더 ---------------------------------------------------
 
 def _decode_rva2_frame(frame: Id3Frame, info: Optional[MP3GainTagInfo]) -> int:
@@ -169,15 +223,15 @@ def _decode_rva2_frame(frame: Id3Frame, info: Optional[MP3GainTagInfo]) -> int:
         if channel == 1:  # master volume
             if info is not None:
                 if is_album:
-                    info.haveAlbumGain = True
-                    info.albumGain = gain
-                    info.haveAlbumPeak = (peakbits > 0)
-                    info.albumPeak = peak
+                    info.have_album_gain = True
+                    info.album_gain = gain
+                    info.have_album_peak = (peakbits > 0)
+                    info.album_peak = peak
                 else:
-                    info.haveTrackGain = True
-                    info.trackGain = gain
-                    info.haveTrackPeak = (peakbits > 0)
-                    info.trackPeak = peak
+                    info.have_track_gain = True
+                    info.track_gain = gain
+                    info.have_track_peak = (peakbits > 0)
+                    info.track_peak = peak
     return 1
 
 
@@ -194,6 +248,7 @@ def _txxx_strings(frame: Id3Frame):
     p = frame.hskip
     if p >= length or data[p] not in (0, 3):
         return None
+    enc_byte = data[p]
     p += 1
     # 원본은 최대 62바이트(buf[64])만 복사. 동등하게 자른다.
     raw = data[p:p + 62]
@@ -207,7 +262,7 @@ def _txxx_strings(frame: Id3Frame):
         rest = raw[nul + 1:]
         nul2 = rest.find(b"\0")
         value = rest if nul2 < 0 else rest[:nul2]
-    enc = "utf-8" if data[frame.hskip] == 3 else "latin-1"
+    enc = "utf-8" if enc_byte == 3 else "latin-1"
     try:
         return desc.decode(enc, "replace"), value.decode(enc, "replace")
     except Exception:
@@ -223,23 +278,23 @@ def _decode_txxx_frame(frame: Id3Frame, info: Optional[MP3GainTagInfo]) -> int:
     key = desc.upper()
     if key == "REPLAYGAIN_ALBUM_GAIN":
         if info is not None:
-            info.haveAlbumGain = True
-            info.albumGain = _atof(value)
+            info.have_album_gain = True
+            info.album_gain = _atof(value)
         return 1
     if key == "REPLAYGAIN_TRACK_GAIN":
         if info is not None:
-            info.haveTrackGain = True
-            info.trackGain = _atof(value)
+            info.have_track_gain = True
+            info.track_gain = _atof(value)
         return 1
     if key == "REPLAYGAIN_ALBUM_PEAK":
         if info is not None:
-            info.haveAlbumPeak = True
-            info.albumPeak = _atof(value)
+            info.have_album_peak = True
+            info.album_peak = _atof(value)
         return 1
     if key == "REPLAYGAIN_TRACK_PEAK":
         if info is not None:
-            info.haveTrackPeak = True
-            info.trackPeak = _atof(value)
+            info.have_track_peak = True
+            info.track_peak = _atof(value)
         return 1
     if key == "REPLAYGAIN_REFERENCE_LOUDNESS":
         # 정보는 안 쓰지만 재기록 시 삭제 대상이므로 매칭으로 처리
@@ -257,105 +312,26 @@ def _decode_mp3gain_frame(frame: Id3Frame, info: Optional[MP3GainTagInfo]) -> in
     if key == "MP3GAIN_UNDO":
         f = _scan_undo(value)  # (left, right, char) or None
         if f is not None and info is not None:
-            info.haveUndo = True
-            info.undoLeft = f[0]
-            info.undoRight = f[1]
-            info.undoWrap = f[2] in ("w", "W")
+            info.have_undo = True
+            info.undo_left = f[0]
+            info.undo_right = f[1]
+            info.undo_wrap = f[2] in ("w", "W")
         return 1
     if key == "MP3GAIN_MINMAX":
         f = _scan_two_ints(value)
         if f is not None and info is not None:
-            info.haveMinMaxGain = True
-            info.minGain = f[0]
-            info.maxGain = f[1]
+            info.have_min_max_gain = True
+            info.min_gain = f[0]
+            info.max_gain = f[1]
         return 1
     if key == "MP3GAIN_ALBUM_MINMAX":
         f = _scan_two_ints(value)
         if f is not None and info is not None:
-            info.haveAlbumMinMaxGain = True
-            info.albumMinGain = f[0]
-            info.albumMaxGain = f[1]
+            info.have_album_min_max_gain = True
+            info.album_min_gain = f[0]
+            info.album_max_gain = f[1]
         return 1
     return 0
-
-
-# ---- C 스타일 파싱 헬퍼 (atof / sscanf 동등) -----------------------------
-
-def _atof(s: str) -> float:
-    """C atof 동등: 선행 공백 무시 후 파싱 가능한 만큼만, 실패 시 0.0."""
-    s = s.strip()
-    i = 0
-    n = len(s)
-    if i < n and s[i] in "+-":
-        i += 1
-    seen_dot = False
-    seen_e = False
-    j = i
-    while j < n:
-        c = s[j]
-        if c.isdigit():
-            j += 1
-        elif c == "." and not seen_dot and not seen_e:
-            seen_dot = True
-            j += 1
-        elif c in "eE" and not seen_e and j > i:
-            seen_e = True
-            j += 1
-            if j < n and s[j] in "+-":
-                j += 1
-        else:
-            break
-    try:
-        return float(s[:j]) if s[:j] not in ("", "+", "-", ".") else 0.0
-    except ValueError:
-        return 0.0
-
-
-def _scan_two_ints(s: str):
-    """sscanf(s, "%d,%d") 동등. 둘 다 파싱되면 (a,b), 아니면 None."""
-    parts = s.split(",")
-    if len(parts) < 2:
-        return None
-    a = _atoi(parts[0])
-    b = _atoi(parts[1])
-    if a is None or b is None:
-        return None
-    return (a, b)
-
-
-def _scan_undo(s: str):
-    """sscanf(s, "%d,%d,%c") 동등. (a,b,char) 또는 None."""
-    parts = s.split(",")
-    if len(parts) < 3:
-        return None
-    a = _atoi(parts[0])
-    b = _atoi(parts[1])
-    if a is None or b is None:
-        return None
-    rest = parts[2].lstrip()  # %c 는 공백 후 첫 글자... C %c 는 공백 안 건너뜀
-    # C 의 "%d,%d,%c": 콤마 직후 첫 문자 1개. 공백 미스킵.
-    c = parts[2][:1]
-    if c == "":
-        return None
-    return (a, b, c)
-
-
-def _atoi(s: str):
-    """C atoi 동등: 선행 공백 무시 후 정수 앞부분만. 실패 시 None(엄밀 매칭용)."""
-    s = s.strip()
-    i = 0
-    n = len(s)
-    if i < n and s[i] in "+-":
-        i += 1
-    j = i
-    while j < n and s[j].isdigit():
-        j += 1
-    if j == i:
-        return None
-    try:
-        return int(s[:j])
-    except ValueError:
-        return None
 
 
 # ---- ID3v2 파서 -----------------------------------------------------------

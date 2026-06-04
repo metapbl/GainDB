@@ -5,27 +5,45 @@ mp3gain_cli.py - Gain dB 통합 CLI (원본 mp3gain 옵션 체계 재현)
 
 [묶음 A] 옵션 파서 골격 + 즉시 동작 옵션(-v/-h/-?/-q/-o/-p/-t/-T).
 [묶음 B] 직접 게인 실행 분기: -u(undo) / -l(단일 채널) / -g(전체 게인).
-         태그 읽기 골격 + 파일별 루프. 분석 경로(-r/-a)·태그 모드(-s)는
-         아직 미연결(묶음 C~D).
+[묶음 C-1] 분석 경로 + 제안 출력(-r/-a/-e/-x/-m/-d/-o). 적용·클립 질의는
+           C-2/C-3 에서 연결. 진행률 표시는 디코더 예외(ffmpeg 일괄 디코딩)의
+           귀결로 생략한다(원본 기능 축소 아님 — 디코더 수단 차이의 부수 효과).
 
 [원본 동일 재현 합의 사항 (CLAUDE.md 5.4)]
 - 붙여쓰기 인자 거부: 토큰이 정확히 2글자일 때만 옵션. 인자는 항상 다음 토큰.
 - -l joint stereo/mono 거부: writer.apply_gain 이 mode 1·3 거부(묶음 B 적용).
 - -l whichChannel: 0=왼쪽, 그 외=오른쪽(원본 if(whichChannel) 동등).
-- -c 미지정 시 stdin y/n 클립 질의: 묶음 C 에서 적용.
+- -c 미지정 시 stdin y/n 클립 질의: 묶음 C-3 에서 적용.
 
 [실행 분기 우선순위 (원본 main 5.2)]
   checkTagOnly → undoChanges → directSingleChannelGain → directGain
-  → deleteTag → 분석 경로. 묶음 B 는 undo/-l/-g 만 구현, 나머지는 안내.
+  → deleteTag → 분석 경로. C-1 은 분석·제안 출력까지, 적용은 C-2.
+
+[C-1 의 원본 정합 포인트]
+- dBGainMod(-d)는 양자화 전 dB 에 더하고, mp3GainMod(-m)는 양자화 후 스텝에 더함.
+- Track 클립 경고: maxsample * 2^(steps/4) > 32767.0.
+- Album 곡별 클립 경고: trackPeak * 2^(steps/4) > 1.0 (단위 다름에 유의).
+- maxAmpOnly(-x): dBchange=0 으로 두되 제안 출력 형식은 그대로.
+- Album 조건: 파일 2개 이상 and not apply_track and not analysis_track.
+- NOT_ENOUGH_SAMPLES: 해당 파일 stderr 메시지 후 제안·Album 집계에서 제외.
 
 [배너 조정] mpglib/저작권/프로그램명 배너는 Gain dB(ffmpeg 기반)에 맞게 조정.
 기능 출력(-o, 분석 수치, 태그)은 원본 일치.
 """
 
 import sys
+from math import pow
 
-from gaindb.writer import apply_gain
+from gaindb.writer import apply_gain, scan_gain
 from gaindb.tag import read_mp3gain_tags, change_gain_and_tag
+from gaindb.decode import decode_pcm, DecodeError
+from gaindb.analysis import (
+    track_histogram,
+    gain_from_histograms,
+    track_peak,
+    db_to_steps,
+    NOT_ENOUGH_SAMPLES,
+)
 
 VERSION = "0.5.0-dev"
 PROGNAME = "Gain dB"
@@ -423,6 +441,161 @@ def _run_direct(opt, path):
     return 0
 
 
+# ------------------------------------------------------------------
+# [묶음 C-1] 분석 경로 + 제안 출력
+# ------------------------------------------------------------------
+
+def _quantize_steps(db_change, opt):
+    """원본 main 의 dB→스텝 양자화 순서 동등.
+
+    dBGainMod(-d)는 양자화 전 dB 에 더하고, db_to_steps 로 양자화한 뒤
+    mp3GainMod(-m)를 스텝에 더한다. 반환: (보정된 dBchange, intGainChange).
+    """
+    db_change += opt.db_gain_mod
+    steps = db_to_steps(db_change)
+    steps += opt.mp3_gain_mod
+    return db_change, steps
+
+
+def _analyze_one(opt, path):
+    """한 곡을 분석해 (hist, peak, min_gain, max_gain, raw_db) 를 반환한다.
+
+    원본은 한 디코딩 패스에서 라우드니스·peak·min/max gain 을 모두 뽑지만,
+    여기서는 decode_pcm 으로 PCM 을 한 번 얻어 track_histogram·track_peak 를
+    구하고, PCM 과 무관한 scan_gain(path) 로 min/max global_gain 을 구한다.
+
+    maxAmpOnly(-x)면 라우드니스 히스토그램·게인 산출을 건너뛰고 hist=None,
+    raw_db=0.0 으로 둔다(원본 maxAmpOnly 시 dBchange=0 동등).
+
+    분석 불가(DecodeError)면 None 을 반환한다.
+    """
+    try:
+        left, right, sample_rate = decode_pcm(path)
+    except DecodeError as exc:
+        print(f"{path} 분석 실패: {exc}", file=sys.stderr)
+        return None
+
+    peak = track_peak(left, right)
+    min_gain, max_gain = scan_gain(path)
+    if min_gain is None:
+        min_gain = 0
+    if max_gain is None:
+        max_gain = 0
+
+    if opt.max_amp_only:
+        return (None, peak, min_gain, max_gain, 0.0)
+
+    hist = track_histogram(left, right, sample_rate)
+    raw = gain_from_histograms([hist])  # 단일 곡도 Album 경로와 코드 공유
+    if raw is NOT_ENOUGH_SAMPLES:
+        return (hist, peak, min_gain, max_gain, NOT_ENOUGH_SAMPLES)
+    return (hist, peak, min_gain, max_gain, raw)
+
+
+def _print_track_suggestion(opt, db_change, steps, max_sample, max_gain, min_gain):
+    """원본 비-database Track 제안 출력 동등(stdout, %f=6자리)."""
+    print(f'Recommended "Track" dB change: {db_change:f}')
+    print(f'Recommended "Track" mp3 gain change: {steps}')
+    if max_sample * pow(2.0, steps / 4.0) > 32767.0:
+        print("WARNING: some clipping may occur with this gain change!")
+    print(f"Max PCM sample at current gain: {max_sample:f}")
+    print(f"Max mp3 global gain field: {max_gain}")
+    print(f"Min mp3 global gain field: {min_gain}")
+    print("")
+
+
+def _print_track_database(opt, path, steps, db_change, max_sample, max_gain, min_gain):
+    """원본 database Track 한 줄 동등."""
+    print(f"{path}\t{steps}\t{db_change:f}\t{max_sample:f}\t{max_gain}\t{min_gain}")
+    sys.stdout.flush()
+
+
+def _print_album_suggestion(opt, db_change, steps, results):
+    """원본 비-database Album 제안 출력 동등.
+
+    results: (path, hist, peak, min_gain, max_gain) 의 리스트(분석 성공분).
+    곡별 클립 경고는 trackPeak * 2^(steps/4) > 1.0 기준(원본과 동일 단위).
+    """
+    print("")
+    print(f'Recommended "Album" dB change for all files: {db_change:f}')
+    print(f'Recommended "Album" mp3 gain change for all files: {steps}')
+    for path, _hist, peak, _min_g, _max_g in results:
+        if peak * pow(2.0, steps / 4.0) > 1.0:
+            print(f"WARNING: with this global gain change, "
+                  f"some clipping may occur in file {path}")
+
+
+def _run_analysis(opt):
+    """원본 main 의 분석 경로 동등(C-1: 분석·제안 출력까지).
+
+    파일별로 분석해 Track 제안을 출력하고, Album 조건이면 곡별 결과를 모아
+    마지막에 Album 제안을 출력한다. 적용(-r/-a)·클립 질의는 C-2/C-3 에서.
+    """
+    rc = 0
+    num_files = len(opt.files)
+    # 원본 album 조건: argc-fileStart>1 && !applyTrack && !analysisTrack.
+    do_album = (num_files > 1) and (not opt.apply_track) and (not opt.analysis_track)
+
+    album_results = []  # (path, hist, peak, min_gain, max_gain) — 분석 성공·샘플 충분분
+
+    for path in opt.files:
+        if not opt.database_format:
+            print(path)
+
+        analyzed = _analyze_one(opt, path)
+        if analyzed is None:
+            rc = 1
+            continue
+
+        hist, peak, min_gain, max_gain, raw_db = analyzed
+        max_sample = peak * 32768.0  # 출력 직전 원본 스케일로 환원
+
+        if raw_db is NOT_ENOUGH_SAMPLES:
+            print(f"{path} 에 분석할 샘플이 충분하지 않습니다", file=sys.stderr)
+            rc = 1
+            continue
+
+        db_change, steps = _quantize_steps(raw_db, opt)
+
+        if opt.database_format:
+            _print_track_database(opt, path, steps, db_change,
+                                  max_sample, max_gain, min_gain)
+        elif (not opt.apply_track) and (not opt.apply_album):
+            _print_track_suggestion(opt, db_change, steps,
+                                    max_sample, max_gain, min_gain)
+
+        if do_album:
+            album_results.append((path, hist, peak, min_gain, max_gain))
+
+    # Album 제안 (원본: numFiles>0 && !applyTrack && !analysisTrack)
+    if do_album and album_results:
+        if opt.max_amp_only:
+            album_db = 0.0
+        else:
+            album_db = gain_from_histograms([r[1] for r in album_results])
+        if album_db is NOT_ENOUGH_SAMPLES:
+            print("mp3 파일들에 분석할 샘플이 충분하지 않습니다", file=sys.stderr)
+        else:
+            max_max_sample = max(r[2] for r in album_results)
+            max_max_gain = max(r[4] for r in album_results)
+            min_min_gain = min(r[3] for r in album_results)
+            db_change, steps = _quantize_steps(album_db, opt)
+
+            if opt.database_format:
+                print(f'"Album"\t{steps}\t{db_change:f}\t'
+                      f'{max_max_sample * 32768.0:f}\t{max_max_gain}\t{min_min_gain}')
+                sys.stdout.flush()
+            elif not opt.apply_album:
+                _print_album_suggestion(opt, db_change, steps, album_results)
+
+    # 적용 단계는 C-2 에서 연결.
+    if (opt.apply_track or opt.apply_album) and not opt.quiet_mode:
+        print("[미연결] -r/-a 적용 단계는 묶음 C-2 에서 구현 예정 "
+              "(위 분석·제안 수치는 정상)", file=sys.stderr)
+
+    return rc
+
+
 def main(argv):
     if len(argv) < 2:
         _err_usage()
@@ -435,35 +608,42 @@ def main(argv):
     if not opt.files:
         _err_usage()
 
-    # 실행 분기 우선순위(원본 main 5.2). 묶음 B 는 undo/-l/-g 구현.
-    # checkTagOnly / deleteTag / 분석 경로(-r/-a/제안) 는 묶음 C~D 에서 연결.
+    # 실행 분기 우선순위(원본 main 5.2).
+    # checkTagOnly / deleteTag 는 묶음 D 에서 연결.
     rc = 0
-    for path in opt.files:
-        if opt.check_tag_only:
+
+    # 직접 게인·undo 는 파일별 즉시 처리(묶음 B).
+    if opt.check_tag_only:
+        for path in opt.files:
             if not opt.quiet_mode:
                 print(f"[미연결] -s c (태그 확인) 는 묶음 D 에서 구현 예정: {path}",
                       file=sys.stderr)
-            continue
-        if opt.undo_changes:
+        return rc
+
+    if opt.undo_changes:
+        for path in opt.files:
             rc = _run_undo(opt, path) or rc
-            continue
-        if opt.direct_single_channel_gain:
+        return rc
+
+    if opt.direct_single_channel_gain:
+        for path in opt.files:
             rc = _run_direct_single(opt, path) or rc
-            continue
-        if opt.direct_gain:
+        return rc
+
+    if opt.direct_gain:
+        for path in opt.files:
             rc = _run_direct(opt, path) or rc
-            continue
-        if opt.delete_tag:
+        return rc
+
+    if opt.delete_tag:
+        for path in opt.files:
             if not opt.quiet_mode:
                 print(f"[미연결] -s d (태그 삭제) 는 묶음 D 에서 구현 예정: {path}",
                       file=sys.stderr)
-            continue
-        # 그 외: 분석 경로(-r/-a/제안 출력) — 묶음 C~D.
-        if not opt.quiet_mode:
-            print(f"[미연결] 분석 경로(-r/-a/제안) 는 묶음 C~D 에서 구현 예정: {path}",
-                  file=sys.stderr)
+        return rc
 
-    return rc
+    # 그 외: 분석 경로(-r/-a/-e/-x/제안 출력) — 묶음 C-1.
+    return _run_analysis(opt)
 
 
 if __name__ == "__main__":

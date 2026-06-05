@@ -91,8 +91,8 @@ def _loudness_histogram(
     """
     if sample_rate not in _FILTER_COEFFS:
         raise ValueError(
-            f"지원하지 않는 샘플레이트입니다: {sample_rate} Hz "
-            f"(현재 지원: {sorted(_FILTER_COEFFS)})"
+            f"Unsupported sample rate: {sample_rate} Hz "
+            f"(currently supported: {sorted(_FILTER_COEFFS)})"
         )
 
     yb, ya, bb, ba = _FILTER_COEFFS[sample_rate]

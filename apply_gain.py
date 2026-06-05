@@ -301,7 +301,8 @@ def apply_album_gain(
 def _run_manual(change: int, path: str) -> int:
     count = apply_gain(path, change)
     print(f"{path}")
-    print(f"게인 {change:+d} 스텝 (약 {change * 1.5:+.1f} dB) 적용 완료: {count}개 프레임 수정")
+    print(f"Applied gain {change:+d} steps (about {change * 1.5:+.1f} dB): "
+          f"{count} frames modified")
     return 0
 
 
@@ -309,21 +310,21 @@ def _run_auto(path: str) -> int:
     result = apply_track_gain(path)
     print(f"{path}")
     if result["status"] == "not_enough_samples":
-        print("분석할 샘플이 부족합니다. 적용하지 않았습니다.")
+        print("Not enough samples to analyze. No changes applied.")
         return 1
     if result["status"] == "no_change":
         msg = (
-            f"분석 게인 {result['db_gain']:+.2f} dB → 0 스텝. "
-            "이미 목표 음량 수준이라 변경하지 않았습니다."
+            f"Analysis gain {result['db_gain']:+.2f} dB -> 0 steps. "
+            "Already at target loudness; no change."
         )
         if result["tag_written"]:
-            msg += " (태그만 갱신)"
+            msg += " (tag updated only)"
         print(msg)
         return 0
     steps = result["steps"]
     print(
-        f"분석 게인 {result['db_gain']:+.2f} dB → {steps:+d} 스텝 "
-        f"(약 {steps * 1.5:+.1f} dB) 적용, 태그 갱신 완료."
+        f"Analysis gain {result['db_gain']:+.2f} dB -> {steps:+d} steps "
+        f"(about {steps * 1.5:+.1f} dB) applied, tag updated."
     )
     return 0
 
@@ -331,32 +332,32 @@ def _run_auto(path: str) -> int:
 def _run_album(paths) -> int:
     result = apply_album_gain(paths)
     if result["status"] == "not_enough_samples":
-        print("앨범 전체에서 분석할 샘플이 부족합니다. 적용하지 않았습니다.")
+        print("Not enough samples across the album. No changes applied.")
         return 1
 
     steps = result["steps"]
     if result["status"] == "no_change":
         print(
-            f"앨범 게인 {result['db_gain']:+.2f} dB → 0 스텝. "
-            "게인 변경 없음(필요 시 태그만 갱신). 곡별 결과:"
+            f"Album gain {result['db_gain']:+.2f} dB -> 0 steps. "
+            "No gain change (tag updated if needed). Per-file results:"
         )
     else:
         print(
-            f"앨범 게인 {result['db_gain']:+.2f} dB → {steps:+d} 스텝 "
-            f"(약 {steps * 1.5:+.1f} dB) 적용. 곡별 결과:"
+            f"Album gain {result['db_gain']:+.2f} dB -> {steps:+d} steps "
+            f"(about {steps * 1.5:+.1f} dB) applied. Per-file results:"
         )
     for item in result["per_file"]:
         fc = item.get("frames_changed")
-        fc_str = f"{fc}개 프레임 수정" if fc is not None else "태그 갱신"
+        fc_str = f"{fc} frames modified" if fc is not None else "tag updated"
         print(f"  {item['path']}: {fc_str}")
     return 0
 
 
 def main(argv):
     if len(argv) < 2:
-        print('사용법(수동): python apply_gain.py <게인스텝> "<파일.mp3>"')
-        print('사용법(자동): python apply_gain.py auto "<파일.mp3>"')
-        print('사용법(앨범): python apply_gain.py album "<파일1.mp3>" "<파일2.mp3>" ...')
+        print('Usage (manual): python apply_gain.py <gain_steps> "<file.mp3>"')
+        print('Usage (auto):   python apply_gain.py auto "<file.mp3>"')
+        print('Usage (album):  python apply_gain.py album "<file1.mp3>" "<file2.mp3>" ...')
         return 1
 
     mode_arg = argv[1]
@@ -364,25 +365,25 @@ def main(argv):
     if mode_arg.lower() == "album":
         paths = argv[2:]
         if not paths:
-            print('사용법(앨범): python apply_gain.py album "<파일1.mp3>" "<파일2.mp3>" ...')
+            print('Usage (album): python apply_gain.py album "<file1.mp3>" "<file2.mp3>" ...')
             return 1
         return _run_album(paths)
 
     if mode_arg.lower() == "auto":
         if len(argv) != 3:
-            print('사용법(자동): python apply_gain.py auto "<파일.mp3>"')
+            print('Usage (auto): python apply_gain.py auto "<file.mp3>"')
             return 1
         return _run_auto(argv[2])
 
     # 수동 모드: 첫 인자가 정수 게인스텝.
     if len(argv) != 3:
-        print('사용법(수동): python apply_gain.py <게인스텝> "<파일.mp3>"')
+        print('Usage (manual): python apply_gain.py <gain_steps> "<file.mp3>"')
         return 1
 
     try:
         change = int(mode_arg)
     except ValueError:
-        print("첫 인자는 정수 게인스텝이거나 'auto'/'album' 이어야 합니다.")
+        print("The first argument must be an integer gain step, or 'auto'/'album'.")
         return 1
 
     return _run_manual(change, argv[2])

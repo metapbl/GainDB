@@ -130,7 +130,7 @@ def apply_gain(path: str, left_change: int, right_change: int = None, wrap: bool
         # 원본 changeGain 은 mode 비트 & 0x01 이 참인 joint stereo(1)·mono(3) 를 거부.
         if single_channel and frame.mode in (1, 3):
             raise ValueError(
-                "채널별 게인은 mono 또는 joint stereo 파일에 적용할 수 없습니다"
+                "per-channel gain cannot be applied to mono or joint stereo files"
             )
 
         _change_frame_gain(data, frame, left_change, right_change, wrap)
@@ -144,7 +144,7 @@ def apply_gain(path: str, left_change: int, right_change: int = None, wrap: bool
             pos = scan
 
     if len(data) != original_len:
-        raise RuntimeError("파일 길이가 변경되었습니다 - 무손실 보장 위반")
+        raise RuntimeError("file length changed - lossless guarantee violated")
 
     with open(path, "wb") as f:
         f.write(data)

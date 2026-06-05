@@ -49,19 +49,19 @@ def _probe_sample_rate(path: Path) -> int:
         )
     except FileNotFoundError as exc:
         raise DecodeError(
-            "ffprobe 를 찾을 수 없습니다. ffmpeg(ffprobe 포함)가 "
-            "설치되어 PATH 에 있는지 확인하세요."
+            "ffprobe not found. Make sure ffmpeg (including ffprobe) "
+            "is installed and on PATH."
         ) from exc
     except subprocess.CalledProcessError as exc:
         stderr = exc.stderr.decode("utf-8", "replace").strip()
-        raise DecodeError(f"ffprobe 실패: {stderr}") from exc
+        raise DecodeError(f"ffprobe failed: {stderr}") from exc
 
     try:
         info = json.loads(proc.stdout.decode("utf-8", "replace"))
         rate = int(info["streams"][0]["sample_rate"])
     except (ValueError, KeyError, IndexError) as exc:
         raise DecodeError(
-            f"ffprobe 출력에서 샘플레이트를 읽지 못했습니다: {path}"
+            f"Could not read sample rate from ffprobe output: {path}"
         ) from exc
 
     return rate
@@ -79,13 +79,13 @@ def decode_pcm(path: str | Path) -> tuple[np.ndarray, np.ndarray, int]:
     """
     path = Path(path)
     if not path.is_file():
-        raise DecodeError(f"파일을 찾을 수 없습니다: {path}")
+        raise DecodeError(f"File not found: {path}")
 
     sample_rate = _probe_sample_rate(path)
     if sample_rate not in SUPPORTED_SAMPLE_RATES:
         raise DecodeError(
-            f"지원하지 않는 샘플레이트입니다: {sample_rate} Hz "
-            f"(지원: {sorted(SUPPORTED_SAMPLE_RATES, reverse=True)})"
+            f"Unsupported sample rate: {sample_rate} Hz "
+            f"(supported: {sorted(SUPPORTED_SAMPLE_RATES, reverse=True)})"
         )
 
     # 원본 샘플레이트 유지(-ar 강제 금지), 스테레오 고정, 32비트 float LE.
@@ -104,15 +104,15 @@ def decode_pcm(path: str | Path) -> tuple[np.ndarray, np.ndarray, int]:
         )
     except FileNotFoundError as exc:
         raise DecodeError(
-            "ffmpeg 를 찾을 수 없습니다. 설치되어 PATH 에 있는지 확인하세요."
+            "ffmpeg not found. Make sure it is installed and on PATH."
         ) from exc
     except subprocess.CalledProcessError as exc:
         stderr = exc.stderr.decode("utf-8", "replace").strip()
-        raise DecodeError(f"ffmpeg 디코딩 실패: {stderr}") from exc
+        raise DecodeError(f"ffmpeg decoding failed: {stderr}") from exc
 
     raw = proc.stdout
     if len(raw) == 0:
-        raise DecodeError(f"디코딩 결과가 비어 있습니다: {path}")
+        raise DecodeError(f"Decoding produced no output: {path}")
 
     interleaved = np.frombuffer(raw, dtype="<f4")
     # 2채널 인터리브이므로 짝수 길이여야 한다.

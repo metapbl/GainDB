@@ -871,6 +871,26 @@ def _run_check_tag_only(opt):
 
     return 0
 
+
+def _run_delete_tag(opt, path):
+    """원본 main 의 deleteTag 분기 동등(-s d).
+
+    태그를 읽지 않고(원본 read 단계 (!skipTag)&&(!deleteTag) 조건) 곧바로
+    APE 태그를 제거하고, use_id3 면 ID3v2 태그도 제거한다.
+    비-database 면 stderr 안내, database 면 NA 한 줄.
+    """
+    remove_mp3gain_ape_tag(path, opt.save_time)
+    if opt.use_id3:
+        from gaindb.id3 import remove_mp3gain_id3_tag
+        remove_mp3gain_id3_tag(path, opt.save_time)
+
+    if (not opt.quiet_mode) and (not opt.database_format):
+        print(f"Deleting tag info of {path}...", file=sys.stderr)
+    if opt.database_format:
+        print(f"{path}\tNA\tNA\tNA\tNA\tNA")
+    return 0
+
+
 def main(argv):
     if len(argv) < 2:
         _err_usage()

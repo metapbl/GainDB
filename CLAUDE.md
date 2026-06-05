@@ -110,7 +110,7 @@ GaindB/
 3. **[완료] MP3 디코딩(PCM 추출)**: ffmpeg/ffprobe subprocess. 2단계 입력 공급(`gaindb/decode.py`).
 4. **[완료] 태그 처리** — APEv2 읽기·쓰기·갱신·제거, scanFrameGain(min/max), changeGainAndTag 동등, undo, auto/album 태그 연결까지 완료. otherFields·Lyrics3/ID3v1 꼬리 보존. ID3v2(RVA2/TXXX)는 ⑤로 분리(아래 12.1). 검증 완료.
 5. **[진행 중] CLI / 옵션 / 일괄 처리** — 원본 옵션을 빠짐없이 재현(`-r`/`-a`/`-e`/`-g`/`-l`/`-d`/`-m`/`-k`/`-c`/`-w`/`-s c|d|s|r|u|i|a`/`-u`/`-o`/`-q`/`-p`/`-x`/`-f`/`-t`/`-T` 등), 클리핑 경고·자동 클립(`-k`), database 출력(`-o`) 포함. A~D-2 완료, D-3(개발용 CLI 흡수·통합 테스트 등록) 남음(12.1).
-6. **[착수 전 · 5단계 완료 후] GUI (PySide6, clean-room 재현)** — 원본 MP3GainGUI 의 외관·기능·동작을 PySide6 로 동일 재현하되, VB 코드를 옮기지 않고 공개 동작만 보고 독립 구현한다(1.2·4·1.1 과 동일 원칙). 기존 `gaindb/` 코어 + CLI 위에 얹는 새 프런트엔드(코어 재작성 없음). Windows·macOS 크로스플랫폼. **세부 MVP 설계(어떤 화면·버튼·옵션을 어느 순서로 넣을지)는 5단계 완료 후 사용자와 합의해 정한다**(1.1 — Claude 가 임의로 정하지 않음). 배포 시 PySide6 LGPL·ffmpeg 검토 필요(4).
+6. **[착수 전 · 5단계 완료 후] GUI (PySide6, clean-room 재현)** — 원본 MP3GainGUI 의 외관·기능·동작을 PySide6 로 동일 재현하되, VB 코드를 옮기지 않고 공개 동작만 보고 독립 구현한다(1.2·4·1.1 과 동일 원칙). 기존 `gaindb/` 코어 + CLI 위에 얹는 새 프런트엔드(코어 재작성 없음). Windows·macOS 크로스플랫폼. **세부 MVP 설계(어떤 화면·버튼·옵션을 어느 순서로 넣을지)는 5단계 완료 후 사용자와 합의해 정한다**(1.1 — Claude 가 임의로 정하지 않음). 배포 시 PySide6 LGPL·ffmpeg 검토 필요(4). 원본 GUI 소스는 **VB6** (`mp3gain/mp3gain-win-gui-1_3_4-src/`, `.vbp`/`.frm`/`.frx`/`.bas`/`.cls`). 구성(관찰): 메인 창(`frmMain`)·옵션(`frmOptions`)·게인 입력(`frmGetGain`)·로그(`frmLogs`)·시스템 트레이(`frmSysTray`)·정보/기부/면책 다이얼로그, 경고 모달들(`frmStereoWarning`=단일채널 거부, `frmLayerCheckWarning`=Layer 오인, `frmSkipTagsWarn`/`frmReadOnly`/`frmResetWarn` 등); 모듈 `basLocalizer`(다국어)·`basSaveAnalysis`·`basListViewSort`·`Mp3Info.cls` 등. 다수 경고 폼은 CLI 가 이미 동작으로 재현한 상황의 GUI 대응 — 6단계에서 이 매핑을 PySide6 다이얼로그로 재현한다(화면·동작 관찰만, VB 코드 복붙 금지 — 1.2).
 
 ## 9. 개발 환경 · 작업 흐름
 

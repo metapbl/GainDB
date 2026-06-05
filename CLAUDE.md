@@ -109,8 +109,8 @@ GaindB/
 2. **[완료] ReplayGain 분석기** (numpy/scipy) — equal-loudness 필터 + RMS + 통계, Track/Album gain, dB→스텝 변환. 44.1k·48k 검증 완료(나머지 샘플레이트는 확장 대상, 1.1·12.1).
 3. **[완료] MP3 디코딩(PCM 추출)**: ffmpeg/ffprobe subprocess. 2단계 입력 공급(`gaindb/decode.py`).
 4. **[완료] 태그 처리** — APEv2 읽기·쓰기·갱신·제거, scanFrameGain(min/max), changeGainAndTag 동등, undo, auto/album 태그 연결까지 완료. otherFields·Lyrics3/ID3v1 꼬리 보존. ID3v2(RVA2/TXXX)는 ⑤로 분리(아래 12.1). 검증 완료.
-5. **[진행 중] CLI / 옵션 / 일괄 처리** — 원본 옵션을 빠짐없이 재현(`-r`/`-a`/`-e`/`-g`/`-l`/`-d`/`-m`/`-k`/`-c`/`-w`/`-s c|d|s|r|u|i|a`/`-u`/`-o`/`-q`/`-p`/`-x`/`-f`/`-t`/`-T` 등), 클리핑 경고·자동 클립(`-k`), database 출력(`-o`) 포함. A~D-2 완료, D-3(개발용 CLI 흡수·통합 테스트 등록) 남음(12.1).
-6. **[착수 전 · 5단계 완료 후] GUI (PySide6, clean-room 재현)** — 원본 MP3GainGUI 의 외관·기능·동작을 PySide6 로 동일 재현하되, VB 코드를 옮기지 않고 공개 동작만 보고 독립 구현한다(1.2·4·1.1 과 동일 원칙). 기존 `gaindb/` 코어 + CLI 위에 얹는 새 프런트엔드(코어 재작성 없음). Windows·macOS 크로스플랫폼. **세부 MVP 설계(어떤 화면·버튼·옵션을 어느 순서로 넣을지)는 5단계 완료 후 사용자와 합의해 정한다**(1.1 — Claude 가 임의로 정하지 않음). 배포 시 PySide6 LGPL·ffmpeg 검토 필요(4). 원본 GUI 소스는 **VB6** (`mp3gain/mp3gain-win-gui-1_3_4-src/`, `.vbp`/`.frm`/`.frx`/`.bas`/`.cls`). 구성(관찰): 메인 창(`frmMain`)·옵션(`frmOptions`)·게인 입력(`frmGetGain`)·로그(`frmLogs`)·시스템 트레이(`frmSysTray`)·정보/기부/면책 다이얼로그, 경고 모달들(`frmStereoWarning`=단일채널 거부, `frmLayerCheckWarning`=Layer 오인, `frmSkipTagsWarn`/`frmReadOnly`/`frmResetWarn` 등); 모듈 `basLocalizer`(다국어)·`basSaveAnalysis`·`basListViewSort`·`Mp3Info.cls` 등. 다수 경고 폼은 CLI 가 이미 동작으로 재현한 상황의 GUI 대응 — 6단계에서 이 매핑을 PySide6 다이얼로그로 재현한다(화면·동작 관찰만, VB 코드 복붙 금지 — 1.2).
+5. **[진행 중] CLI / 옵션 / 일괄 처리** — 원본 옵션을 빠짐없이 재현(`-r`/`-a`/`-e`/`-g`/`-l`/`-d`/`-m`/`-k`/`-c`/`-w`/`-s c|d|s|r|u|i|a`/`-u`/`-o`/`-q`/`-p`/`-x`/`-f`/`-t`/`-T` 등), 클리핑 경고·자동 클립(`-k`), database 출력(`-o`) 포함. A~D-2 완료, D-3 첫 갈래(개발용 CLI 흡수·전면 영문화) 수동 검증 완료·자동 회귀 미확인, D-3 둘째·셋째 갈래(통합 테스트 등록·로그 압축) 미착수(12.1).
+6. **[착수 전 · 5단계 완료 후] GUI (PySide6, clean-room 재현)** — 원본 MP3GainGUI 의 외관·기능·동작을 PySide6 로 동일 재현하되, VB 코드를 옮기지 않고 공개 동작만 보고 독립 구현한다(1.2·4·1.1 과 동일 원칙). 기존 `gaindb/` 코어 + CLI 위에 얹는 새 프런트엔드(코어 재작성 없음). Windows·macOS 크로스플랫폼. **세부 MVP 설계(어떤 화면·버튼·옵션을 어느 순서로 넣을지)는 5단계 완료 후 사용자와 합의해 정한다**(1.1 — Claude 가 임의로 정하지 않음). 배포 시 PySide6 LGPL·ffmpeg 검토 필요(4). 원본 GUI 소스는 **VB6** (`mp3gain/mp3gain-win-gui-1_3_4-src/`, `.vbp`/`.frm`/`.frx`/`.bas`/`.cls`). 구성(관찰): 메인 창(`frmMain`)·옵션(`frmOptions`)·게인 입력(`frmGetGain`)·로그(`frmLogs`)·시스템 트레이(`frmSysTray`)·정보/기부/면책 다이얼로그, 경고 모달들(`frmStereoWarning`=단일채널 거부, `frmLayerCheckWarning`=Layer 오인, `frmSkipTagsWarn`/`frmReadOnly`/`frmResetWarn` 등); 모듈 `basLocalizer`(다국어)·`basSaveAnalysis`·`basListViewSort`·`Mp3Info.cls` 등. 다수 경고 폼은 CLI 가 이미 동작으로 재현한 상황의 GUI 대응 — 6단계에서 이 매핑을 PySide6 다이얼로그로 재현한다(화면·동작 관찰만, VB 코드 복붙 금지 — 1.2). **다국어(한국어·영어)는 GUI 계층의 책임이다(합의됨, D-3): CLI(코어+진입점)는 영문만 출력하고, 화면 표기의 다국어화는 PySide6 의 tr()/번역 파일로 GUI 에서 처리한다.** (원본 GUI 의 basLocalizer 대응.)
 
 ## 9. 개발 환경 · 작업 흐름
 
@@ -161,6 +161,8 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 - **0-gain 프레임은 ±N 으로 안 바뀜**: `gain==0` 이면 그대로 둠(원본 동작). round-trip 완전복원은 0-gain 프레임이 없는 파일에서만 보장. (적용된 파일을 재계산하면 적용분이 반영된 "현재 상태"의 min/max·dB 가 나오는 것이 정상 — D-2 검증 관찰.)
 - **타 포맷 적용 불가**(10.1) / **원본 코드 직접 번역 금지**(1.2·4·10.2) / **원본 기능 임의 축소 금지**(1.1·10.2).
 - **이 미러의 `.c` 는 크롤 불가**: `application/octet-stream` MIME. 그래서 C·VB 소스는 로컬 보관 + 사용자가 붙여넣어 제공(6 참조). Claude 가 크롤로 가져오려 시도하지 말 것.
+- **테스트는 원본 음원을 절대 건드리지 않는다(영구 제약, D-3 오염 사고 교훈)**: 모든 검증·테스트는 tempfile 사본에서만 동작하고 끝나면 정리한다. 각 테스트는 깨끗한 fixture(또는 `-s d` 로 태그 제거한 상태)에서 시작한다. 이번 세션에서 옛 verify_*.py 가 원본 두 음원에 mp3gain 태그를 남겨, round-trip 해시가 어긋나 보이는 사고가 있었다(코드 결함 아님, 원본 오염 탓). 두 음원은 세션 끝에 순수 상태로 복구함.
+- **undo 0 태그는 남는다(원본 동일 동작)**: 깨끗한 파일에 `-g N` 적용 후 `-u` 하면 오디오 본문은 비트 동일로 복원되지만 `MP3GAIN_UNDO 0,0` APE 태그가 남아 파일 전체 해시는 달라진다(원본 changeGainAndTag 의 "don't remove it" 동작). 무손실 검증은 전체 해시가 아니라 tag_offset 까지의 오디오 본문 해시로 판정한다.
 
 ## 12. 새 세션 시작 방법
 
@@ -215,7 +217,20 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 - **구조 변경**: `main` 이 check/delete 제외 경로에서 `_read_all_tags`(선행 읽기)+`_compute_recalc` 후 undo/direct/분석 헬퍼에 `(info, file_tags)` 를 넘김(헬퍼는 더 이상 내부에서 태그를 읽지 않음). `_run_undo`/`_run_direct_single`/`_run_direct`/`_analyze_one`/`_run_analysis` 시그니처에 info·file_tags(또는 tags·album_recalc) 추가.
 - 검증(verify_cli_d2.py, git 제외): 17 PASS / 0 FAIL — 회귀(-g/-l/-r round-trip·undo 복원), 1차 분석 decode 호출+태그 완비, 2차 분석(태그 완비) decode_pcm 미호출, -s u decode 미호출+태그 보존, -s r decode 호출+재기록+undo 보존, update file tags. 관찰: -r -4 적용 후 -s r 재스캔 시 min/max=(0,0)·dB -0.79→-0.03 — 적용된 게인이 0-gain 클램프·음량에 반영된 "현재 상태"의 정확한 재계산(원본 동작 일치, 결함 아님; 11 항목에도 반영).
 
-**다음 = 5단계 묶음 D-3 (개발용 CLI 흡수 + 5단계 통합 테스트 정식 등록).** D-2 까지 `-s` 전 서브옵션(c/d/s/r/u/i/a)·원본 main 옵션·실행 분기 전부 재현됨. D-3 에서 정리할 것: ⑥ 개발용 검증 CLI(`scan_gain.py`/`inspect_tag.py`)를 통합 CLI(`mp3gain_cli.py`)로 흡수(2 트리 주석의 "흡수 예정" 해소), verify_*.py fixture 생성부를 5단계 통합 테스트로 정식 등록(검토). 그 뒤 5단계 전체(A~D) 마감 점검 → 원본 동일 재현 최종 대조. **D-3 와 함께 진척 로그 압축도 일괄 수행**(완료된 것의 how 압축, 합의·미완·제약의 what 보존 — 3 항목·1.1·1.2 준수).
+**5단계 묶음 D-3 첫 갈래 완료(수동 검증)·자동 회귀 미확인** (개발용 CLI 흡수 + 전면 영문화 + CLI I/O 사양). 결과물·정합:
+
+- **개발용 CLI 흡수**: `scan_gain.py`·`inspect_tag.py` 를 삭제하고 `mp3gain_cli.py` 의 `--debug-scan`/`--debug-tag` 서브커맨드로 흡수(`_run_debug_scan`/`_run_debug_tag`). main 진입부에서 2글자 옵션 파서 전에 가로챈다(긴 `--` 플래그라 원본 옵션 체계와 충돌 없음). 출력은 영문(개발용 진단, 원본 재현 대상 아님). 2 트리의 "흡수 예정" 해소.
+- **전면 영문화**: CLI 의 한국어 안내·상태·오류 문구를 모두 영문으로. 원본 대응 원문(errUsage/fullUsage/wrapExplanation, undo/direct/delete 메시지, "Applying gain change of N to CHANNEL...", "done" 등)은 원본 영문 verbatim. 원본에 대응 없는 우리 측 메시지(ffmpeg 디코드 실패)는 영문 신규: `"Failed to analyze {path}: {exc}"`. directSingle 문구는 원본 순서(게인 먼저, CHANNEL 대문자)로 정정.
+- **fullUsage 에 `-s u` 줄 추가**(원본 누락 보정, 합의됨): 원본 fullUsage 는 `-s u` 를 코드엔 두고 도움말엔 누락. 우리는 구현·노출했으므로 도움말에도 추가.
+- **CLI I/O 사양 docstring**: `mp3gain_cli.py` 상단에 입력(옵션 표)·출력 채널(stdout=원본 기능 출력, stderr=상태/배너)·종료 코드·디버그 서브커맨드·localization 방침을 명문화. 다른 세션에서 CLAUDE.md + mp3gain_cli.py 만 봐도 I/O 계약 파악 가능.
+- **수동 검증 완료**: `--debug-scan`/`--debug-tag`(frame.py/tag.py 속성 가정 전부 적중), `-h`(영문·`-s u` 줄 확인)/`-v`/`-? wrap`, round-trip 무손실(`-g 3`→`-u` 후 오디오 본문 비트 동일). 커밋 7b0a392.
+- **자동 회귀 미확인(미완)**: 기존 verify_*.py 6개는 옛 함수 시그니처(`_run_direct` 등 D-2 에서 info/file_tags 인자 추가됨)·옛 한국어 문자열 기대·stdin 질의 멈춤·원본 음원 오염 때문에 깨진 상태. A~D-2 전체 기능 회귀가 영문화·흡수 후 코드에서 통과하는지는 통합 테스트 등록(D-3 둘째 갈래) 때 확인한다.
+
+**다음 = 5단계 묶음 D-3 둘째 갈래 (통합 테스트 정식 등록) → 셋째 갈래 (진척 로그 압축).**
+- **둘째 갈래(통합 테스트)**: `tests/`(unittest 기반, 외부 의존 없음)에 정식 등록. 합의된 방향 — ① 공통 인프라(tempfile 사본 fixture·자동 정리·CLI 호출 헬퍼·stdin 주입)부터, 그다음 ② round-trip+옵션 파싱, ③ 분석·태그·클립을 단계 분할로 옮긴다(한 응답에 다 넣지 않음). 모든 테스트는 원본 음원 불간섭·깨끗한 fixture 시작(11 항목 영구 제약). 옛 verify_*.py 6개는 통합 테스트가 항목을 커버함을 확인한 뒤 삭제(지금은 안전망으로 보존, git 제외 유지). `python -m unittest` 일괄 실행 → 이후 6단계·확장의 회귀 자산.
+- **셋째 갈래(로그 압축)**: 완료된 것의 how 압축, 합의·미완·제약의 what 보존(3 항목·1.1·1.2 준수).
+
+**테스트 음원 상태(세션 끝 기준)**: Debussy(44.1k)·10cm(48k) 두 원본 모두 mp3gain 태그 없는 순수 상태로 복구 완료(128바이트 ID3v1 꼬리만 보존). 다음 세션 통합 테스트는 이 깨끗한 원본의 tempfile 사본에서 시작.
 
 **5단계 이후 = 6단계 GUI (PySide6, clean-room 재현, 5단계 완료 후 착수).** 세부 MVP 설계는 5단계 완료 후 사용자와 합의해 정한다(8 항목 6단계 참조).
 

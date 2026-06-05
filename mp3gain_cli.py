@@ -47,6 +47,7 @@ from gaindb.tag import (
     read_mp3gain_tags,
     change_gain_and_tag,
     _write_mp3gain_tag,
+    remove_mp3gain_ape_tag,
 )
 from gaindb.decode import decode_pcm, DecodeError
 from gaindb.analysis import (
@@ -784,6 +785,92 @@ def _run_analysis(opt):
     return rc
 
 
+def _run_check_tag_only(opt):
+    """원본 main 의 checkTagOnly 분기 동등(-s c).
+
+    태그만 읽어 Track/Album 제안·peak·min/max 를 출력한다. 디코딩 없음.
+    intGainChange/intAlbumGainChange 는 보정 없이 순수
+    trackGain/(5*log10 2) round-half-away (db_to_steps 직접 사용).
+    클립 경고는 원본 그대로 track_peak * 2^(steps/4) > 1.0 (Album 쪽도
+    원본대로 track_peak 참조 — albumPeak 아님, 원본 동일 재현).
+    출력 문구는 원본 영어 그대로, peak 는 출력 직전 ×32768 환원.
+    """
+    for path in opt.files:
+        info, _file_tags = _read_tags(opt, path)
+        if info is None:
+            # checkTagOnly 경로에서는 _read_tags 가 None 을 줄 일이 없으나 방어.
+            continue
+
+        int_gain_change = db_to_steps(info.track_gain) if info.have_track_gain else 0
+        int_album_gain_change = (
+            db_to_steps(info.album_gain) if info.have_album_gain else 0
+        )
+
+        if not opt.database_format:
+            print(path)
+            if info.have_track_gain:
+                print(f'Recommended "Track" dB change: {info.track_gain:f}')
+                print(f'Recommended "Track" mp3 gain change: {int_gain_change}')
+                if info.have_track_peak:
+                    if info.track_peak * pow(2.0, int_gain_change / 4.0) > 1.0:
+                        print("WARNING: some clipping may occur with this gain change!")
+            if info.have_track_peak:
+                print(f"Max PCM sample at current gain: {info.track_peak * 32768.0:f}")
+            if info.have_min_max_gain:
+                print(f"Max mp3 global gain field: {info.max_gain}")
+                print(f"Min mp3 global gain field: {info.min_gain}")
+            if info.have_album_gain:
+                print(f'Recommended "Album" dB change: {info.album_gain:f}')
+                print(f'Recommended "Album" mp3 gain change: {int_album_gain_change}')
+                if info.have_track_peak:
+                    if info.track_peak * pow(2.0, int_album_gain_change / 4.0) > 1.0:
+                        print("WARNING: some clipping may occur with this gain change!")
+            if info.have_album_peak:
+                print(f"Max Album PCM sample at current gain: {info.album_peak * 32768.0:f}")
+            if info.have_album_min_max_gain:
+                print(f"Max Album mp3 global gain field: {info.album_max_gain}")
+                print(f"Min Album mp3 global gain field: {info.album_min_gain}")
+            print("")
+        else:
+            # database 양식: 각 그룹이 없으면 NA 로 채움(원본과 칸 수 일치).
+            row = [path]
+            if info.have_track_gain:
+                row.append(str(int_gain_change))
+                row.append(f"{info.track_gain:f}")
+            else:
+                row.append("NA")
+                row.append("NA")
+            if info.have_track_peak:
+                row.append(f"{info.track_peak * 32768.0:f}")
+            else:
+                row.append("NA")
+            if info.have_min_max_gain:
+                row.append(str(info.max_gain))
+                row.append(str(info.min_gain))
+            else:
+                row.append("NA")
+                row.append("NA")
+            if info.have_album_gain:
+                row.append(str(int_album_gain_change))
+                row.append(f"{info.album_gain:f}")
+            else:
+                row.append("NA")
+                row.append("NA")
+            if info.have_album_peak:
+                row.append(f"{info.album_peak * 32768.0:f}")
+            else:
+                row.append("NA")
+            if info.have_album_min_max_gain:
+                row.append(str(info.album_max_gain))
+                row.append(str(info.album_min_gain))
+            else:
+                row.append("NA")
+                row.append("NA")
+            print("\t".join(row))
+            sys.stdout.flush()
+
+    return 0
+
 def main(argv):
     if len(argv) < 2:
         _err_usage()
@@ -802,11 +889,7 @@ def main(argv):
 
     # 직접 게인·undo 는 파일별 즉시 처리(묶음 B).
     if opt.check_tag_only:
-        for path in opt.files:
-            if not opt.quiet_mode:
-                print(f"[미연결] -s c (태그 확인) 는 묶음 D 에서 구현 예정: {path}",
-                      file=sys.stderr)
-        return rc
+        return _run_check_tag_only(opt)
 
     if opt.undo_changes:
         for path in opt.files:
@@ -825,9 +908,7 @@ def main(argv):
 
     if opt.delete_tag:
         for path in opt.files:
-            if not opt.quiet_mode:
-                print(f"[미연결] -s d (태그 삭제) 는 묶음 D 에서 구현 예정: {path}",
-                      file=sys.stderr)
+            rc = _run_delete_tag(opt, path) or rc
         return rc
 
     # 그 외: 분석 경로(-r/-a/-e/-x/제안 출력/적용/클립) — 묶음 C-1/C-2/C-3.

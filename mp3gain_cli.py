@@ -14,6 +14,28 @@ mp3gain_cli.py - Gain dB 통합 CLI (원본 mp3gain 옵션 체계 재현)
            루프 밖에서 단일 스텝에 한 번만(원본 /*MAA*/ 위치). 클립 질의 문구는
            원본 영어 그대로. 입력은 input() 기반 등가(첫 글자 Y/N, EOF→N).
 
+[묶음 D-1] -s c(checkTagOnly) + -s d(deleteTag).
+[묶음 D-2] -s r(forceRecalculateTag)/-s u(forceUpdateTag) + recalc 비트마스크
+           디코딩 스킵 + "update file tags" 블록.
+  - forceUpdateTag: 전 파일 태그를 읽기 전 dirty 로 초기화(원본 tagInfo[].dirty
+    = forceUpdateTag). 읽은 뒤에도 dirty 유지.
+  - forceRecalculateTag: 태그 읽은 뒤 album/track gain·peak·minmax 의 have_* 를
+    끄고 각각 dirty. undo 는 보존(원본 "NOT Undo information!").
+  - recalc 비트마스크(FULL=1/AMP=2/MIN_MAX=4): 전 파일 태그 선행 읽기 후,
+    album_recalc = (force_recalc or skip_tag) ? FULL : 0. force_recalc/skip/
+    delete 가 아니면 첫 파일 album 값을 기준으로 곡별 track recalc(have_track_*
+    없으면 비트 켬)와 album_recalc(have_album_* 없거나 첫 파일과 != 면 비트 켬)를
+    채운다. maxAmpOnly 면 gain 검사 스킵. 마지막에 각 곡 recalc |= album_recalc.
+  - 디코딩 스킵(ffmpeg 디코더 예외의 귀결, 1.1·7 합의): recalc==0 → ffmpeg·
+    scan_gain 모두 스킵(태그값 사용). recalc&(FULL|AMP) → ffmpeg 1회(FULL 이면
+    라우드니스, 아니면 trackGain 유지; peak 은 AMP/FULL 이면 ffmpeg 결과, 아니면
+    태그값). recalc&MIN_MAX 만 → ffmpeg 없이 scan_gain 만. 결과 수치는 원본 동일,
+    디코딩 횟수만 다름(decode_pcm 전부-아니면-전무).
+  - Album recalc 의 curAlbum* 비교는 원본 그대로 부동소수 정확 일치(!=) 사용
+    (clean-room 재현, epsilon 미도입).
+  - "update file tags": 순수 분석 경로(적용/직접/삭제/skip/check 모두 아님)에서
+    dirty 곡의 태그만 기록(원본 끝 블록).
+
 [원본 동일 재현 합의 사항 (CLAUDE.md 5.4)]
 - 붙여쓰기 인자 거부: 토큰이 정확히 2글자일 때만 옵션. 인자는 항상 다음 토큰.
 - -l joint stereo/mono 거부: writer.apply_gain 이 mode 1·3 거부(묶음 B 적용).
@@ -61,6 +83,11 @@ from apply_gain import _fill_track_info, _fill_album_info
 
 VERSION = "0.5.0-dev"
 PROGNAME = "Gain dB"
+
+# 원본 recalc 비트마스크 (mp3gain.c).
+FULL_RECALC = 1
+AMP_RECALC = 2
+MIN_MAX_GAIN_RECALC = 4
 
 # 원본 SWITCH_CHAR: Windows 는 '/' 와 '-' 둘 다, 그 외는 '-'.
 # 우리는 양쪽을 모두 옵션 접두로 허용한다(원본 WIN32 분기 동등).
@@ -193,6 +220,7 @@ def _full_usage():
     print("\t-s d - 저장된 태그 정보 삭제(다른 처리 없음)", file=e)
     print("\t-s s - 저장된 태그 정보 무시(읽지도 쓰지도 않음)", file=e)
     print("\t-s r - 강제 재계산(태그 정보를 읽지 않음)", file=e)
+    print("\t-s u - 강제 업데이트(태그를 dirty 로 표시해 갱신)", file=e)
     print("\t-s i - MP3 게인 정보에 ID3v2 태그 사용", file=e)
     print("\t-s a - MP3 게인 정보에 APE 태그 사용(기본)", file=e)
     print("\t-u - 변경 되돌리기(저장된 태그 정보 기반)", file=e)
@@ -363,28 +391,126 @@ def _print_database_header(opt):
     sys.stdout.flush()
 
 
-def _read_tags(opt, path):
-    """태그 읽기 골격(원본 main 의 전 파일 태그 선행 읽기 동등).
+def _clear_for_recalc(info):
+    """원본 forceRecalculateTag 처리 동등.
 
-    skip_tag/delete_tag 면 읽지 않는다. force_recalculate_tag 의 분석값
-    무효화는 분석 경로(묶음 D)에서 처리하므로 여기선 읽기만 한다.
-    반환: (info, file_tags) 또는 (None, None).
+    album/track 의 gain·peak·minmax 중 켜진 게 있으면 그것마다 dirty 를 켜고 끈다.
+    undo 정보는 보존한다(원본 주석 "NOT Undo information!").
     """
-    if opt.skip_tag or opt.delete_tag:
-        return None, None
-    info, file_tags = read_mp3gain_tags(path, opt.use_id3)
-    if opt.force_update_tag:
+    if info.have_album_gain:
         info.dirty = True
-    return info, file_tags
+        info.have_album_gain = False
+    if info.have_album_peak:
+        info.dirty = True
+        info.have_album_peak = False
+    if info.have_track_gain:
+        info.dirty = True
+        info.have_track_gain = False
+    if info.have_track_peak:
+        info.dirty = True
+        info.have_track_peak = False
+    if info.have_min_max_gain:
+        info.dirty = True
+        info.have_min_max_gain = False
+    if info.have_album_min_max_gain:
+        info.dirty = True
+        info.have_album_min_max_gain = False
 
 
-def _run_undo(opt, path):
+def _read_all_tags(opt):
+    """원본 main 의 '전 파일 태그 선행 읽기' 동등.
+
+    각 파일의 (info, file_tags) 를 미리 읽어둔다(recalc 비트마스크 계산과 곡별
+    스킵 판정에 필요). 원본 순서:
+      - dirty 를 forceUpdateTag 로 초기화(태그 읽기 전).
+      - (not skip_tag and not delete_tag) 일 때만 실제로 읽는다. 그 외엔 빈 info.
+      - forceRecalculateTag 면 읽은 뒤 _clear_for_recalc.
+
+    반환: {path: (info, file_tags)} (입력 순서 보존을 위해 리스트로도 들고 다님).
+    """
+    from gaindb.tag import MP3GainTagInfo, FileTags
+
+    tags = {}
+    for path in opt.files:
+        if opt.skip_tag or opt.delete_tag:
+            # 태그를 읽지 않음. 빈 info(원본 calloc 동등)에 dirty 만 force_update 반영.
+            info = MP3GainTagInfo()
+            info.dirty = opt.force_update_tag
+            tags[path] = (info, FileTags())
+            continue
+
+        info, file_tags = read_mp3gain_tags(path, opt.use_id3)
+        info.dirty = info.dirty or opt.force_update_tag
+        if opt.force_recalculate_tag:
+            _clear_for_recalc(info)
+        tags[path] = (info, file_tags)
+    return tags
+
+
+def _compute_recalc(opt, tags):
+    """원본 main 의 recalc 비트마스크 계산 동등.
+
+    album_recalc = (force_recalc or skip_tag) ? FULL : 0.
+    not skip_tag and not delete_tag and not force_recalc 일 때만 '이미 가진 정보로
+    충분한지' 검사: 곡별 info.recalc(track 쪽)와 album_recalc(album 쪽)에 비트를 켠다.
+    Album 검사는 '파일 2개 이상 and not apply_track and not analysis_track' 일 때만.
+    curAlbum* 비교는 원본 그대로 부동소수 정확 일치(!=). 마지막에 각 곡
+    info.recalc |= album_recalc.
+
+    반환: album_recalc (전 곡 info.recalc 에는 이미 반영해 둠).
+    """
+    files = opt.files
+    multi = len(files) > 1
+    album_check = multi and (not opt.apply_track) and (not opt.analysis_track)
+
+    album_recalc = FULL_RECALC if (opt.force_recalculate_tag or opt.skip_tag) else 0
+
+    if (not opt.skip_tag) and (not opt.delete_tag) and (not opt.force_recalculate_tag):
+        # 첫 파일 album 값 기준(원본: tagInfo[fileStart].album*).
+        first_info = tags[files[0]][0]
+        cur_album_gain = first_info.album_gain
+        cur_album_peak = first_info.album_peak
+        cur_album_min = first_info.album_min_gain
+        cur_album_max = first_info.album_max_gain
+
+        for path in files:
+            info = tags[path][0]
+            if not opt.max_amp_only:
+                # gain 관련 검사 (maxAmpOnly 면 스킵).
+                if album_check:
+                    if (not info.have_album_gain) or (info.album_gain != cur_album_gain):
+                        album_recalc |= FULL_RECALC
+                if not info.have_track_gain:
+                    info.recalc |= FULL_RECALC
+            if album_check:
+                if (not info.have_album_peak) or (info.album_peak != cur_album_peak):
+                    album_recalc |= AMP_RECALC
+                if (not info.have_album_min_max_gain) or \
+                        (info.album_max_gain != cur_album_max) or \
+                        (info.album_min_gain != cur_album_min):
+                    album_recalc |= MIN_MAX_GAIN_RECALC
+            if not info.have_track_peak:
+                info.recalc |= AMP_RECALC
+            if not info.have_min_max_gain:
+                info.recalc |= MIN_MAX_GAIN_RECALC
+
+    # album recalc 를 각 곡에 전파(원본: tagInfo[].recalc |= albumRecalc).
+    for path in files:
+        tags[path][0].recalc |= album_recalc
+
+    return album_recalc
+
+
+# ------------------------------------------------------------------
+# [묶음 B] 직접 게인 / undo
+# ------------------------------------------------------------------
+
+def _run_undo(opt, path, info, file_tags):
     """원본 undoChanges 분기 동등.
 
     태그의 undo 정보로 역방향 게인을 적용한다. 원본은 directGain 을 켜서
     이중 태그 기록을 막지만, 우리는 change_gain_and_tag 가 한 번에 적용+기록.
     """
-    info, file_tags = _read_tags(opt, path)
     have_undo = info is not None and info.have_undo
     nonzero = have_undo and (info.undo_left or info.undo_right)
 
@@ -409,7 +535,7 @@ def _run_undo(opt, path):
         return 1
 
 
-def _run_direct_single(opt, path):
+def _run_direct_single(opt, path, info, file_tags):
     """원본 directSingleChannelGain 분기 동등(-l).
 
     whichChannel: 0=왼쪽, 그 외=오른쪽. stereo/dual 채널에서만 허용
@@ -428,7 +554,6 @@ def _run_direct_single(opt, path):
     if opt.skip_tag:
         apply_gain(path, left, right, wrap=opt.wrap_gain)
     else:
-        info, file_tags = _read_tags(opt, path)
         change_gain_and_tag(path, left, right, info, file_tags,
                             wrap=opt.wrap_gain, use_id3=opt.use_id3)
 
@@ -437,7 +562,7 @@ def _run_direct_single(opt, path):
     return 0
 
 
-def _run_direct(opt, path):
+def _run_direct(opt, path, info, file_tags):
     """원본 directGain 분기 동등(-g). 양 채널에 동일 게인."""
     val = opt.direct_gain_val
     if not opt.quiet_mode:
@@ -446,7 +571,6 @@ def _run_direct(opt, path):
     if opt.skip_tag:
         apply_gain(path, val, val, wrap=opt.wrap_gain)
     else:
-        info, file_tags = _read_tags(opt, path)
         change_gain_and_tag(path, val, val, info, file_tags,
                             wrap=opt.wrap_gain, use_id3=opt.use_id3)
 
@@ -528,49 +652,70 @@ def _auto_clip_album(steps, max_max_sample):
     return steps, False
 
 
-def _analyze_one(opt, path):
+def _analyze_one(opt, path, info, file_tags):
     """한 곡을 분석해 분석 수치 + 태그(info/file_tags)를 반환한다.
 
-    반환: (hist, peak, min_gain, max_gain, raw_db, info, file_tags)
-      - hist: 라우드니스 히스토그램(maxAmpOnly 면 None).
-      - peak: 정규화 peak(0~1, 1.0 초과 가능).
-      - min_gain, max_gain: 프레임 global_gain min/max(scan_gain).
-      - raw_db: 89dB 기준 Track dB. maxAmpOnly 면 0.0,
-                샘플 부족이면 NOT_ENOUGH_SAMPLES.
-      - info, file_tags: 태그 읽기 결과(skip_tag/delete_tag 면 None).
-        분석 성공 시(raw_db 유효 & not maxAmpOnly) info 에 89dB 기준 track
-        값(_fill_track_info)을 채워둔다 — 원본 main 의 적용 전 curTag 갱신 동등.
+    info.recalc 비트에 따라 디코딩(ffmpeg)·scan_gain 호출을 스킵한다(D-2,
+    ffmpeg 디코더 예외의 귀결 — 1.1·7 합의). 결과 수치는 원본과 동일.
 
-    원본은 한 디코딩 패스에서 라우드니스·peak·min/max gain 을 모두 뽑지만,
-    여기서는 decode_pcm 으로 PCM 을 한 번 얻어 track_histogram·track_peak 를
-    구하고, PCM 과 무관한 scan_gain(path) 로 min/max global_gain 을 구한다.
+    반환: (hist, peak, min_gain, max_gain, raw_db, info, file_tags)
+      - hist: 라우드니스 히스토그램(FULL 재계산이 아니면 None).
+      - peak: 정규화 peak(0~1, 1.0 초과 가능).
+      - min_gain, max_gain: 프레임 global_gain min/max.
+      - raw_db: 89dB 기준 Track dB. maxAmpOnly 면 0.0, FULL 아니면 태그값,
+                샘플 부족이면 NOT_ENOUGH_SAMPLES.
+
+    recalc 별 동작:
+      - recalc == 0: ffmpeg·scan_gain 모두 스킵. 전부 태그값
+        (track_gain, track_peak, min/max). hist=None.
+      - recalc & (FULL|AMP): ffmpeg 1회. peak 는 ffmpeg 결과.
+        FULL 이면 라우드니스(hist) 계산해 raw_db 산출, 아니면 태그 track_gain.
+      - recalc & MIN_MAX 만 (FULL/AMP 아님): ffmpeg 없이 scan_gain 만.
+        peak·raw_db 는 태그값.
 
     분석 불가(DecodeError)면 None 을 반환한다.
     """
-    try:
-        left, right, sample_rate = decode_pcm(path)
-    except DecodeError as exc:
-        print(f"{path} 분석 실패: {exc}", file=sys.stderr)
-        return None
+    recalc = info.recalc if info is not None else FULL_RECALC
+    need_decode = bool(recalc & (FULL_RECALC | AMP_RECALC))
+    need_scan = bool(recalc & MIN_MAX_GAIN_RECALC)
 
-    peak = track_peak(left, right)
-    min_gain, max_gain = scan_gain(path)
-    if min_gain is None:
-        min_gain = 0
-    if max_gain is None:
-        max_gain = 0
+    # --- peak: 디코딩하면 ffmpeg 결과, 아니면 태그값 ---
+    left = right = sample_rate = None
+    if need_decode:
+        try:
+            left, right, sample_rate = decode_pcm(path)
+        except DecodeError as exc:
+            print(f"{path} 분석 실패: {exc}", file=sys.stderr)
+            return None
+        peak = track_peak(left, right)
+    else:
+        peak = info.track_peak if (info is not None and info.have_track_peak) else 0.0
 
-    # 태그 읽기(원본 main 의 적용 전 선행 읽기 동등). skip/delete 면 None.
-    info, file_tags = _read_tags(opt, path)
+    # --- min/max global_gain: 스캔하면 scan_gain, 아니면 태그값 ---
+    if need_scan:
+        min_gain, max_gain = scan_gain(path)
+        if min_gain is None:
+            min_gain = 0
+        if max_gain is None:
+            max_gain = 0
+    else:
+        min_gain = info.min_gain if (info is not None and info.have_min_max_gain) else 0
+        max_gain = info.max_gain if (info is not None and info.have_min_max_gain) else 0
 
+    # --- maxAmpOnly: dB 분석 안 함 ---
     if opt.max_amp_only:
         return (None, peak, min_gain, max_gain, 0.0, info, file_tags)
 
-    hist = track_histogram(left, right, sample_rate)
-    raw = gain_from_histograms([hist])  # 단일 곡도 Album 경로와 코드 공유
-    if raw is NOT_ENOUGH_SAMPLES:
-        return (hist, peak, min_gain, max_gain, NOT_ENOUGH_SAMPLES,
-                info, file_tags)
+    # --- raw_db: FULL 이면 라우드니스 계산, 아니면 태그 track_gain ---
+    if recalc & FULL_RECALC:
+        hist = track_histogram(left, right, sample_rate)
+        raw = gain_from_histograms([hist])  # 단일 곡도 Album 경로와 코드 공유
+        if raw is NOT_ENOUGH_SAMPLES:
+            return (hist, peak, min_gain, max_gain, NOT_ENOUGH_SAMPLES,
+                    info, file_tags)
+    else:
+        hist = None
+        raw = info.track_gain if (info is not None and info.have_track_gain) else 0.0
 
     # 분석 성공 → info 에 89dB 기준 track 값 채우기(원본 curTag 갱신 동등).
     if info is not None:
@@ -691,26 +836,33 @@ def _apply_album_one(opt, path, steps, peak, info, file_tags):
         _write_tag_only(opt, path, info, file_tags)
 
 
-def _run_analysis(opt):
-    """원본 main 의 분석 경로 동등(C-3: 분석·제안·-r/-a 적용·클립까지).
+def _run_analysis(opt, tags, album_recalc):
+    """원본 main 의 분석 경로 동등(C-3 + D-2).
+
+    tags: {path: (info, file_tags)} (선행 읽기 + recalc 비트마스크 반영 완료).
+    album_recalc: 앨범 recalc 비트마스크(GetAlbumGain vs 태그 album 값 선택용).
 
     파일별로 분석해 Track 제안을 출력하고(또는 -r 면 적용), Album 조건이면 곡별
     결과를 모아 마지막에 Album 제안을 출력한다(또는 -a 면 적용). 클립(-k/-c stdin
-    질의)은 적용 헬퍼가 처리한다.
+    질의)은 적용 헬퍼가 처리한다. 마지막에 순수 분석 경로면 dirty 곡 태그를 기록.
     """
     rc = 0
     num_files = len(opt.files)
     # 원본 album 조건: argc-fileStart>1 && !applyTrack && !analysisTrack.
     do_album = (num_files > 1) and (not opt.apply_track) and (not opt.analysis_track)
 
-    # (path, hist, peak, min_gain, max_gain, info, file_tags) — 분석 성공·샘플 충분분
+    # (path, hist, peak, min_gain, max_gain, info, file_tags) — 분석 성공·샘플 충분
     album_results = []
+    # 분석에 성공한(fileok) 모든 파일 — update file tags 블록용.
+    ok_files = []
 
     for path in opt.files:
+        info, file_tags = tags[path]
+
         if not opt.database_format:
             print(path)
 
-        analyzed = _analyze_one(opt, path)
+        analyzed = _analyze_one(opt, path, info, file_tags)
         if analyzed is None:
             rc = 1
             continue
@@ -722,6 +874,8 @@ def _run_analysis(opt):
             print(f"{path} 에 분석할 샘플이 충분하지 않습니다", file=sys.stderr)
             rc = 1
             continue
+
+        ok_files.append(path)
 
         db_change, steps = _quantize_steps(raw_db, opt)
 
@@ -742,10 +896,18 @@ def _run_analysis(opt):
 
     # Album 집계·제안·적용 (원본: numFiles>0 && !applyTrack && !analysisTrack)
     if do_album and album_results:
+        # album dB: FULL recalc 면 누적 재계산, 아니면 첫 파일 태그 album/track 값.
         if opt.max_amp_only:
             album_db = 0.0
-        else:
+        elif album_recalc & FULL_RECALC:
             album_db = gain_from_histograms([r[1] for r in album_results])
+        else:
+            first_info = tags[opt.files[0]][0]
+            if first_info.have_album_gain:
+                album_db = first_info.album_gain
+            else:
+                album_db = first_info.track_gain
+
         if album_db is NOT_ENOUGH_SAMPLES:
             print("mp3 파일들에 분석할 샘플이 충분하지 않습니다", file=sys.stderr)
         else:
@@ -782,6 +944,17 @@ def _run_analysis(opt):
                 for path, _h, peak, _mn, _mx, info, file_tags in album_results:
                     _apply_album_one(opt, path, steps, peak, info, file_tags)
 
+    # update file tags (원본 끝 블록): 순수 분석 경로에서만 dirty 곡 태그 기록.
+    if (not opt.apply_track) and (not opt.apply_album) and \
+            (not opt.direct_gain) and (not opt.direct_single_channel_gain) and \
+            (not opt.delete_tag) and (not opt.skip_tag) and (not opt.check_tag_only):
+        for path in ok_files:
+            info, file_tags = tags[path]
+            if info is not None and info.dirty:
+                _write_mp3gain_tag(path, info, file_tags,
+                                   save_timestamp=opt.save_time,
+                                   use_id3=opt.use_id3)
+
     return rc
 
 
@@ -796,9 +969,8 @@ def _run_check_tag_only(opt):
     출력 문구는 원본 영어 그대로, peak 는 출력 직전 ×32768 환원.
     """
     for path in opt.files:
-        info, _file_tags = _read_tags(opt, path)
+        info, _file_tags = read_mp3gain_tags(path, opt.use_id3)
         if info is None:
-            # checkTagOnly 경로에서는 _read_tags 가 None 을 줄 일이 없으나 방어.
             continue
 
         int_gain_change = db_to_steps(info.track_gain) if info.have_track_gain else 0
@@ -832,7 +1004,6 @@ def _run_check_tag_only(opt):
                 print(f"Min Album mp3 global gain field: {info.album_min_gain}")
             print("")
         else:
-            # database 양식: 각 그룹이 없으면 NA 로 채움(원본과 칸 수 일치).
             row = [path]
             if info.have_track_gain:
                 row.append(str(int_gain_change))
@@ -903,36 +1074,42 @@ def main(argv):
     if not opt.files:
         _err_usage()
 
-    # 실행 분기 우선순위(원본 main 5.2).
-    # checkTagOnly / deleteTag 는 묶음 D 에서 연결.
     rc = 0
 
-    # 직접 게인·undo 는 파일별 즉시 처리(묶음 B).
+    # checkTagOnly / deleteTag 는 태그를 선행 읽지 않는다(원본 read 조건).
     if opt.check_tag_only:
         return _run_check_tag_only(opt)
-
-    if opt.undo_changes:
-        for path in opt.files:
-            rc = _run_undo(opt, path) or rc
-        return rc
-
-    if opt.direct_single_channel_gain:
-        for path in opt.files:
-            rc = _run_direct_single(opt, path) or rc
-        return rc
-
-    if opt.direct_gain:
-        for path in opt.files:
-            rc = _run_direct(opt, path) or rc
-        return rc
 
     if opt.delete_tag:
         for path in opt.files:
             rc = _run_delete_tag(opt, path) or rc
         return rc
 
-    # 그 외: 분석 경로(-r/-a/-e/-x/제안 출력/적용/클립) — 묶음 C-1/C-2/C-3.
-    return _run_analysis(opt)
+    # 그 외 경로(undo/직접게인/분석)는 전 파일 태그 선행 읽기 + recalc 계산(D-2).
+    tags = _read_all_tags(opt)
+    album_recalc = _compute_recalc(opt, tags)
+
+    # 실행 분기 우선순위(원본 main 5.2).
+    if opt.undo_changes:
+        for path in opt.files:
+            info, file_tags = tags[path]
+            rc = _run_undo(opt, path, info, file_tags) or rc
+        return rc
+
+    if opt.direct_single_channel_gain:
+        for path in opt.files:
+            info, file_tags = tags[path]
+            rc = _run_direct_single(opt, path, info, file_tags) or rc
+        return rc
+
+    if opt.direct_gain:
+        for path in opt.files:
+            info, file_tags = tags[path]
+            rc = _run_direct(opt, path, info, file_tags) or rc
+        return rc
+
+    # 분석 경로(-r/-a/-e/-x/제안 출력/적용/클립) — C-1/C-2/C-3 + D-2 recalc 스킵.
+    return _run_analysis(opt, tags, album_recalc)
 
 
 if __name__ == "__main__":

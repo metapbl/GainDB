@@ -52,6 +52,7 @@ GaindB/
 │  │  ├─ apetag.c / .h         # [참고 완료] APEv2 태그(전 필드 + undo)
 │  │  ├─ id3tag.c / .h         # [참고 완료] ID3v2 태그(RVA2 + TXXX)
 │  │  ├─ rg_error.c / .h       # 오류 처리(보조)
+│  │  ├─ mp3gain.exe            # [검증 기준] MSYS2+MinGW 로 빌드한 원본 1.6.2 CLI. git 제외
 │  │  └─ (replaygaindll.*, *.dsp/.dsw/.sln/.vcproj/.rc, resource.h, Makefile — 빌드·래퍼, 무시)
 │  └─ mp3gain-win-gui-1_3_4-src/  # 원본 Windows GUI(VB) 소스. 6단계 외관·동작 참고용(clean-room, 복붙 금지)
 ├─ CLAUDE.md               # 이 컨텍스트 파일
@@ -61,7 +62,7 @@ GaindB/
 └─ Debussy - Arabesque No.1.mp3       # 테스트 음원(git 제외, 44.1k)
 ```
 
-(구조가 바뀌면 이 트리와 12.1 진척 로그를 함께 갱신한다. `mp3gain/` 하위 전체는 git 제외 — 원본 C·GUI 소스 모두 LGPL 분리 대상.)
+(구조가 바뀌면 이 트리와 12.1 진척 로그를 함께 갱신한다. `mp3gain/` 하위 전체는 git 제외 — 원본 C·GUI 소스, 그리고 빌드 산출물 `mp3gain.exe` 모두 LGPL 분리 대상. exe 는 코드가 아니라 실행 결과만 검증 기준으로 쓰므로 clean-room 위반이 아니다(1.1·1.2 의 "관찰된 동작 차용").)
 
 ## 3. 협업 모델
 
@@ -190,5 +191,9 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 **테스트 fixture(ffmpeg 변형, git 제외·합의됨 1.1)**: Debussy(44.1k)에서 채널 모드 커버리지용 생성 — mono(mode 3) `ffmpeg -i "Debussy - Arabesque No.1.mp3" -ac 1 -c:a libmp3lame -q:a 4 test_mono_44k.mp3`, stereo(mode 0) `... -ac 2 -joint_stereo 0 ... test_stereo_44k.mp3`. 둘 다 MPEG1·44100·CRC=no, max global_gain=255 포함(R 채널). MPEG2/2.5 변형은 샘플레이트 확장(6단계) 때 함께 추가 예정.
 
 **테스트 음원 상태**: Debussy(44.1k)·10cm(48k) 원본은 mp3gain 태그 없는 순수 상태(128바이트 ID3v1 꼬리만). 변형 fixture(test_mono_44k·test_stereo_44k)는 git 제외 생성물. 통합 테스트는 전부 tempfile 사본에서 시작.
+
+**검증 기준 exe 확보 + min/max 스캔 버그 수정 (이번 세션).** 6단계 계수 검증의 정답지로 쓸 원본 mp3gain 1.6.2 CLI 를 MSYS2+MinGW-w64(UCRT64) 로 직접 빌드했다. 빌드 절차: MSYS2 설치 → `pacman -S mingw-w64-ucrt-x86_64-{gcc,make,mpg123,pkgconf}` → UCRT64 창에서 `mp3gain/src` 로 이동해 `gcc -O2 -include windows.h -o mp3gain.exe mp3gain.c gain_analysis.c apetag.c id3tag.c rg_error.c -lmpg123 -lm`. (`-include windows.h` 는 원본이 MSVC 전제라 `<windows.h>` 자동 포함에 의존한 것을 MinGW 에서 보완. rg_error.h 의 MMSYSERR 중복정의 경고는 무해.) 검증 정답은 사본에 대해 `./mp3gain.exe -o -s s <사본>` 으로 뽑는다 — 원본 오염 방지 위해 반드시 사본·`-s s`. 대조 결과 Debussy(44.1k): 원본 exe dB=0.69 / GaindB dB=0.71 (0.02dB 이내, 디코더 차이로 정상 — 12.1 허용오차) → 같은 기준으로 계산함을 확인, 6단계 정답지로 신뢰 가능.
+
+**이 대조에서 GaindB 버그 발견·수정(커밋 d8b44cc).** 원본 exe 는 `-s s` 에서도 min/max global_gain(209/35)을 정상 출력하는데 GaindB 는 0/0 이었다. 원인: `_analyze_one` 의 min/max scan 이 `MIN_MAX_GAIN_RECALC` 비트에만 묶여, 그 비트 없는 recalc 경로(-s s 는 FULL 만, -x 는 AMP 만)에서 스캔이 누락됨. 원본은 scanFrameGain 을 어느 recalc 경로에서든 실행하므로 min/max 는 항상 나온다. 수정: `need_scan = recalc & (FULL|AMP|MIN_MAX)` 로 확장(recalc 0 이면 여전히 스킵 — D-2 최적화 유지). 회귀 테스트 추가(커밋 ce18b53): `tests/test_cli_misc.py::MinMaxScanRegressionTest` — stereo·mono fixture 에 `-s s`/`-x` 로 CLI 실행, Max/Min 칸이 `scan_gain` 정답과 일치 + 0/0 아님 확인. 통합 스위트 62건(기존 60+2) 전부 PASS.
 
 **다음 = 6단계 샘플레이트 확장 (원본 동일 재현 완결).** 5단계 완료. 44.1k·48k 외 나머지 샘플레이트(32k 및 MPEG2/2.5 계열 등)를 코어(`analysis.py` 계수 테이블·`frame.py` global_gain 위치 계산)에 추가·검증하고 MPEG2/2.5 fixture 를 tests/ 에 추가(1.1 미완 해소, clean-room 유지). 그다음 7단계 배포 라이선스 준비·검토(AI 교차검증 1차 + 전문가 최종 확인), 8단계 GUI(PySide6, clean-room 재현) 순(8항목).

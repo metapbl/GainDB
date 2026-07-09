@@ -76,6 +76,7 @@ GaindB/
 - **clean-room 방식(1.2 전면 적용)**: 원본 C·VB 코드를 직접 번역(복붙)하지 않고, 공개된 사양(ReplayGain 알고리즘, MPEG 오디오 프레임 구조, 태그 포맷, GUI 화면 구성·동작)과 관찰된 동작만 보고 독립 구현한다. 알고리즘·파일 포맷·태그 포맷·UI 동작은 저작권 대상이 아니므로 LGPL 구속을 피할 수 있음.
 - 원본 코드를 그대로 번역하면 결과물에 LGPL 이 따라옴. 다른 언어로 옮겨도 2차적 저작물로 간주됨. 그러므로 **결과(동작·포맷·출력·외관)는 원본과 일치시키되, 코드는 독립 작성**한다(1.1·1.2 참조).
 - 개인 로컬 사용 중에는 "배포"가 없으므로 LGPL 의무는 사실상 발생하지 않음. 원본 소스(`mp3gain/`)를 git 에서 제외하는 것도 이 분리를 위함. 배포 계획이 생기면 그때 변호사 검토 필요 (PySide6 자체도 LGPL, ffmpeg 동봉 여부 등 포함. Claude 는 변호사가 아님).
+- 배포 계획이 생기면 GPT·Claude 최신 모델 교차검증으로 1차 법적 검토(쟁점·조항·리스크 정리)를 수행하되, 실제 공개 배포 직전의 최종 확인은 자격 있는 전문가(변호사) 검토를 남겨둔다 (PySide6 자체도 LGPL, ffmpeg 동봉 여부 등 포함. AI 는 성능·교차 여부와 무관하게 법적 책임·자격을 대체하지 못함).
 
 ## 5. 핵심 기술 원리
 
@@ -104,11 +105,13 @@ GaindB/
 > 아래 단계는 작업을 나누기 위한 구획일 뿐이며, **어느 단계도 원본 기능을 축소·생략하지 않는다**(1.1). 분량 추정은 참고용이다.
 
 1. **[완료] MP3 프레임 파서 + `global_gain` 읽기/쓰기** — 순수 Python. 읽기·쓰기·무손실 round-trip 검증 끝(상세는 12.1).
-2. **[완료] ReplayGain 분석기** (numpy/scipy) — equal-loudness 필터 + RMS + 통계, Track/Album gain, dB→스텝 변환. 44.1k·48k 검증 완료(나머지 샘플레이트는 확장 대상, 1.1·12.1).
+2. **[완료] ReplayGain 분석기** (numpy/scipy) — equal-loudness 필터 + RMS + 통계, Track/Album gain, dB→스텝 변환. 44.1k·48k 검증 완료(나머지 샘플레이트는 6단계 확장, 1.1·12.1).
 3. **[완료] MP3 디코딩(PCM 추출)**: ffmpeg/ffprobe subprocess. 2단계 입력 공급(`gaindb/decode.py`).
-4. **[완료] 태그 처리** — APEv2 읽기·쓰기·갱신·제거, scanFrameGain(min/max), changeGainAndTag 동등, undo, auto/album 태그 연결까지 완료. otherFields·Lyrics3/ID3v1 꼬리 보존. ID3v2(RVA2/TXXX)는 ⑤로 분리(아래 12.1). 검증 완료.
-5. **[진행 중] CLI / 옵션 / 일괄 처리** — 원본 옵션을 빠짐없이 재현(`-r`/`-a`/`-e`/`-g`/`-l`/`-d`/`-m`/`-k`/`-c`/`-w`/`-s c|d|s|r|u|i|a`/`-u`/`-o`/`-q`/`-p`/`-x`/`-f`/`-t`/`-T` 등), 클리핑 경고·자동 클립(`-k`), database 출력(`-o`) 포함. A~D-2 완료, D-3 첫 갈래(개발용 CLI 흡수·전면 영문화) 수동 검증 완료·자동 회귀 미확인, D-3 둘째·셋째 갈래(통합 테스트 등록·로그 압축) 미착수(12.1).
-6. **[착수 전 · 5단계 완료 후] GUI (PySide6, clean-room 재현)** — 원본 MP3GainGUI 의 외관·기능·동작을 PySide6 로 동일 재현하되, VB 코드를 옮기지 않고 공개 동작만 보고 독립 구현한다(1.2·4·1.1 과 동일 원칙). 기존 `gaindb/` 코어 + CLI 위에 얹는 새 프런트엔드(코어 재작성 없음). Windows·macOS 크로스플랫폼. **세부 MVP 설계(어떤 화면·버튼·옵션을 어느 순서로 넣을지)는 5단계 완료 후 사용자와 합의해 정한다**(1.1 — Claude 가 임의로 정하지 않음). 배포 시 PySide6 LGPL·ffmpeg 검토 필요(4). 원본 GUI 소스는 **VB6** (`mp3gain/mp3gain-win-gui-1_3_4-src/`, `.vbp`/`.frm`/`.frx`/`.bas`/`.cls`). 구성(관찰): 메인 창(`frmMain`)·옵션(`frmOptions`)·게인 입력(`frmGetGain`)·로그(`frmLogs`)·시스템 트레이(`frmSysTray`)·정보/기부/면책 다이얼로그, 경고 모달들(`frmStereoWarning`=단일채널 거부, `frmLayerCheckWarning`=Layer 오인, `frmSkipTagsWarn`/`frmReadOnly`/`frmResetWarn` 등); 모듈 `basLocalizer`(다국어)·`basSaveAnalysis`·`basListViewSort`·`Mp3Info.cls` 등. 다수 경고 폼은 CLI 가 이미 동작으로 재현한 상황의 GUI 대응 — 6단계에서 이 매핑을 PySide6 다이얼로그로 재현한다(화면·동작 관찰만, VB 코드 복붙 금지 — 1.2). **다국어(한국어·영어)는 GUI 계층의 책임이다(합의됨, D-3): CLI(코어+진입점)는 영문만 출력하고, 화면 표기의 다국어화는 PySide6 의 tr()/번역 파일로 GUI 에서 처리한다.** (원본 GUI 의 basLocalizer 대응.)
+4. **[완료] 태그 처리** — APEv2 읽기·쓰기·갱신·제거, scanFrameGain(min/max), changeGainAndTag 동등, undo, auto/album 태그 연결까지 완료. otherFields·Lyrics3/ID3v1 꼬리 보존. ID3v2(RVA2/TXXX) 포함. 검증 완료.
+5. **[완료] CLI / 옵션 / 일괄 처리** — 원본 옵션을 빠짐없이 재현(`-r`/`-a`/`-e`/`-g`/`-l`/`-d`/`-m`/`-k`/`-c`/`-w`/`-s c|d|s|r|u|i|a`/`-u`/`-o`/`-q`/`-p`/`-x`/`-f`/`-t`/`-T` 등), 클리핑 경고·자동 클립(`-k`), database 출력(`-o`) 포함. 통합 테스트 스위트(tests/, 60건)로 검증 완료, 옛 verify_* 대체(12.1).
+6. **[다음 · 착수 전] 샘플레이트 확장 (원본 동일 재현 완결)** — 현재 44.1k·48k만 구현·검증(1.1 합의된 미완). 원본이 지원하는 ReplayGain 사양의 나머지 샘플레이트(32k 및 MPEG2/2.5 계열 등)를 코어에 추가한다. `gaindb/analysis.py` 필터 계수 테이블을 사양대로 완비하고, `gaindb/frame.py` 의 global_gain 위치 계산을 MPEG2/2.5 사이드 정보 구조까지 확장·재검증한다(11항목 — 1단계 핵심 난점이 MPEG2 에서 재검증돼야 함). MPEG2/2.5 fixture 를 tests/ 통합 스위트에 추가. clean-room 유지(원본 gain_analysis.c·mp3gain.c 는 사양·동작 대조용 참고만, 코드 복붙 금지 — 1.2). 이 단계가 끝나야 코어의 원본 재현이 완결된다.
+7. **[6단계 후] 배포 라이선스 정합성 준비·검토** — 배포 가능성에 대비해 LGPL 구속 회피 근거를 정리·점검한다. (a) clean-room 자체 점검: 코어·CLI·GUI 어디에도 원본 C·VB 코드가 옮겨지지 않았고 결과 일치·코드 독립임을 확인(1.1·1.2·4). (b) 배포 시 검토 항목: PySide6(LGPL) 링크 방식, ffmpeg 동봉 여부(GPL), 원본 소스 git 제외 상태 등. GPT·Claude 최신 모델을 이용한 교차검증으로 쟁점 정리·조항 해석·리스크 목록화·질문 준비를 1차 수행한다. **단, 실제 공개 배포 직전의 최종 확인은 자격 있는 전문가(변호사) 검토를 남겨둔다 — AI 교차검증은 1차 검토 수단일 뿐, 성능·교차 여부와 무관하게 법적 책임·자격을 대체하지 못한다(4항목). 로컬 개인 사용 단계에서는 이 검토가 불필요.**
+8. **[7단계 후] GUI (PySide6, clean-room 재현)** — 원본 MP3GainGUI 의 외관·기능·동작을 PySide6 로 동일 재현하되, VB 코드를 옮기지 않고 공개 동작만 보고 독립 구현한다(1.2·4·1.1 과 동일 원칙). 기존 `gaindb/` 코어 + CLI 위에 얹는 새 프런트엔드(코어 재작성 없음). Windows·macOS 크로스플랫폼. **세부 MVP 설계(어떤 화면·버튼·옵션을 어느 순서로 넣을지)는 착수 전 사용자와 합의해 정한다**(1.1 — Claude 가 임의로 정하지 않음). 배포 시 PySide6 LGPL·ffmpeg 검토 필요(4·7단계). 원본 GUI 소스는 **VB6** (`mp3gain/mp3gain-win-gui-1_3_4-src/`, `.vbp`/`.frm`/`.frx`/`.bas`/`.cls`). 구성(관찰): 메인 창(`frmMain`)·옵션(`frmOptions`)·게인 입력(`frmGetGain`)·로그(`frmLogs`)·시스템 트레이(`frmSysTray`)·정보/기부/면책 다이얼로그, 경고 모달들(`frmStereoWarning`=단일채널 거부, `frmLayerCheckWarning`=Layer 오인, `frmSkipTagsWarn`/`frmReadOnly`/`frmResetWarn` 등); 모듈 `basLocalizer`(다국어)·`basSaveAnalysis`·`basListViewSort`·`Mp3Info.cls` 등. 다수 경고 폼은 CLI 가 이미 동작으로 재현한 상황의 GUI 대응 — 이 매핑을 PySide6 다이얼로그로 재현한다(화면·동작 관찰만, VB 코드 복붙 금지 — 1.2). **다국어(한국어·영어)는 GUI 계층의 책임이다(합의됨): CLI(코어+진입점)는 영문만 출력하고, 화면 표기의 다국어화는 PySide6 의 tr()/번역 파일로 GUI 에서 처리한다.** (원본 GUI 의 basLocalizer 대응.)
 
 ## 9. 개발 환경 · 작업 흐름
 
@@ -172,10 +175,10 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 
 **1~4단계 완료·검증 완료.** 1) 프레임 파서 + `global_gain` 읽기/쓰기(`gaindb/frame.py`·`writer.py`, round-trip 바이트 동일). 2) ReplayGain 분석기(`gaindb/analysis.py` — equal-loudness 필터+RMS+히스토그램+95퍼센타일−PINK_REF, `db_to_steps`; Track은 ffmpeg replaygain과 0.02dB 이내, Album은 44.1k+48k 혼합 검증). 3) MP3 디코딩(`gaindb/decode.py` — ffmpeg/ffprobe subprocess, ±32768 스케일). 4) 태그(`gaindb/tag.py` APE·`gaindb/id3.py` ID3v2 — read/write/remove/round-trip, scan_gain, change_gain_and_tag[undo 누적·gain 차감·peak ×2^(N/4)·minmax], auto/album 연결, otherFields·Lyrics3/ID3v1 꼬리 보존, useId3 분기).
 
-- **샘플레이트(합의된 미완, 1.1)**: 44.1k·48k 우선 구현·검증. 나머지 ReplayGain 계수는 확장 대상(축소 아님).
+- **샘플레이트(합의된 미완, 1.1)**: 44.1k·48k 우선 구현·검증. 나머지 ReplayGain 계수는 확장 대상(축소 아님). → 6단계에서 완결(8항목).
 - **48k 관찰**: 한 테스트 곡 `track_peak>1.0`(1.033) — 클립 방지(-k)에서 의미, 게인 산출엔 무영향.
 
-**5단계 완료·검증 완료** (CLI / 옵션 / 일괄 처리). `mp3gain_cli.py` — 원본 옵션을 빠짐없이 재현(직접 게인 `-g`/`-l`/`-u`, 분석·적용 `-r`/`-a`/`-e`/`-x`/`-m`/`-d`, 클립 `-k`/`-c`, database `-o`, 태그 `-s c|d|s|r|u|i|a`, 출력·동작 `-t`/`-T`/`-q`/`-p`/`-f`/`-w`/`-v`/`-h`/`-?`). recalc 비트마스크(FULL/AMP/MIN_MAX)로 디코딩 스킵(ffmpeg 디코더 예외 1.1의 귀결) — 결과 수치는 원본 동일, 디코딩 횟수만 다름. curAlbum 비교는 원본대로 부동소수 정확 일치(epsilon 미도입, 합의됨). 개발용 CLI는 `--debug-scan`/`--debug-tag`로 흡수. CLI I/O는 영문만 출력(다국어는 6단계 GUI tr() 책임 — 합의됨); docstring·주석만 한국어.
+**5단계 완료·검증 완료** (CLI / 옵션 / 일괄 처리). `mp3gain_cli.py` — 원본 옵션을 빠짐없이 재현(직접 게인 `-g`/`-l`/`-u`, 분석·적용 `-r`/`-a`/`-e`/`-x`/`-m`/`-d`, 클립 `-k`/`-c`, database `-o`, 태그 `-s c|d|s|r|u|i|a`, 출력·동작 `-t`/`-T`/`-q`/`-p`/`-f`/`-w`/`-v`/`-h`/`-?`). recalc 비트마스크(FULL/AMP/MIN_MAX)로 디코딩 스킵(ffmpeg 디코더 예외 1.1의 귀결) — 결과 수치는 원본 동일, 디코딩 횟수만 다름. curAlbum 비교는 원본대로 부동소수 정확 일치(epsilon 미도입, 합의됨). 개발용 CLI는 `--debug-scan`/`--debug-tag`로 흡수. CLI I/O는 영문만 출력(다국어는 GUI tr() 책임 — 합의됨); docstring·주석만 한국어.
 
 **통합 테스트 스위트 완성 (tests/, unittest, 외부 의존 없음).** `python -m unittest discover -s tests` 로 60건 실행·전부 PASS. 옛 verify_*.py 8개를 대체·흡수하고 삭제(아래 매핑). 모든 테스트는 원본 음원 불간섭 — tempfile 사본에서만 동작, `FixtureGuard`가 원본 해시로 오염 감시, 무결성 판정은 `audio_body_sha256`(프레임 구간; 태그 생성·undo 0 잔존과 무관). 구성:
 
@@ -184,8 +187,8 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 - **verify_* → 통합 스위트 매핑**: cli_ab→options_parsing+roundtrip/tag, c1→analysis+cli_misc, c2→analysis/tag+cli_misc, c3→clip+cli_misc, d1→tag+cli_misc, d2→recalc_decode_skip, 5c→useid3_migration.
 - **mutagen 상호운용은 통합 스위트 밖(합의됨)**: `verify_id3_read.py`·`verify_id3_write.py`는 원본 mp3gain 동작이 아니라 외부 도구(mutagen) 상호운용 검증이라, mutagen 부재 환경 skip 오염을 피해 `manual_checks/`(git 제외, `.gitignore` 등록)에 로컬 보존·수동 실행.
 
-**테스트 fixture(ffmpeg 변형, git 제외·합의됨 1.1)**: Debussy(44.1k)에서 채널 모드 커버리지용 생성 — mono(mode 3) `ffmpeg -i "Debussy - Arabesque No.1.mp3" -ac 1 -c:a libmp3lame -q:a 4 test_mono_44k.mp3`, stereo(mode 0) `... -ac 2 -joint_stereo 0 ... test_stereo_44k.mp3`. 둘 다 MPEG1·44100·CRC=no, max global_gain=255 포함(R 채널). MPEG2/2.5 변형은 샘플레이트 확장(1.1 미완) 때 함께 추가 예정.
+**테스트 fixture(ffmpeg 변형, git 제외·합의됨 1.1)**: Debussy(44.1k)에서 채널 모드 커버리지용 생성 — mono(mode 3) `ffmpeg -i "Debussy - Arabesque No.1.mp3" -ac 1 -c:a libmp3lame -q:a 4 test_mono_44k.mp3`, stereo(mode 0) `... -ac 2 -joint_stereo 0 ... test_stereo_44k.mp3`. 둘 다 MPEG1·44100·CRC=no, max global_gain=255 포함(R 채널). MPEG2/2.5 변형은 샘플레이트 확장(6단계) 때 함께 추가 예정.
 
 **테스트 음원 상태**: Debussy(44.1k)·10cm(48k) 원본은 mp3gain 태그 없는 순수 상태(128바이트 ID3v1 꼬리만). 변형 fixture(test_mono_44k·test_stereo_44k)는 git 제외 생성물. 통합 테스트는 전부 tempfile 사본에서 시작.
 
-**다음 = 6단계 GUI (PySide6, clean-room 재현).** 5단계 완료. 세부 MVP 설계(화면·버튼·옵션 순서, 다국어 tr())는 착수 전 사용자와 합의(8항목 6단계). 코어 재작성 없이 `gaindb/`+CLI 위에 얹는 프런트엔드.
+**다음 = 6단계 샘플레이트 확장 (원본 동일 재현 완결).** 5단계 완료. 44.1k·48k 외 나머지 샘플레이트(32k 및 MPEG2/2.5 계열 등)를 코어(`analysis.py` 계수 테이블·`frame.py` global_gain 위치 계산)에 추가·검증하고 MPEG2/2.5 fixture 를 tests/ 에 추가(1.1 미완 해소, clean-room 유지). 그다음 7단계 배포 라이선스 준비·검토(AI 교차검증 1차 + 전문가 최종 확인), 8단계 GUI(PySide6, clean-room 재현) 순(8항목).

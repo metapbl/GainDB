@@ -741,7 +741,12 @@ def _analyze_one(opt, path, info, file_tags):
     """
     recalc = info.recalc if info is not None else FULL_RECALC
     need_decode = bool(recalc & (FULL_RECALC | AMP_RECALC))
-    need_scan = bool(recalc & MIN_MAX_GAIN_RECALC)
+    # min/max global_gain is a frame-side value (no decoding needed). The original
+    # scanFrameGain runs on ANY recalc path (FULL/AMP/MIN_MAX), so min/max is
+    # always produced whenever any recalc is requested -- e.g. under -s s (FULL
+    # only) or -x (AMP only). Binding it to MIN_MAX_GAIN_RECALC alone dropped
+    # min/max to 0/0 in those cases; widen to match the original.
+    need_scan = bool(recalc & (FULL_RECALC | AMP_RECALC | MIN_MAX_GAIN_RECALC))
 
     # --- peak: ffmpeg result if decoding, else tag value ---
     left = right = sample_rate = None

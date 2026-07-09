@@ -23,3 +23,4 @@ verify_*.py
 
 test_mono_44k.mp3
 test_stereo_44k.mp3
+manual_checks/

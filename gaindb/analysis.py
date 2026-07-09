@@ -1,19 +1,24 @@
 """
 gaindb/analysis.py
 
-ReplayGain 분석기 (Track gain).
+ReplayGain 분석기 (Track gain / Album gain).
 
-clean-room 구현: 필터 계수는 원본 mp3gain C 코드를 옮긴 것이 아니라, 널리
-공개·표준화된 ReplayGain 필터 계수 수치를 사양 데이터로 간주해 전사한 것이다.
-44.1kHz·48kHz 계수는 Hydrogenaudio "Original ReplayGain specification"의
-Tables 1·2에 명시된 값이다. 나머지 샘플레이트(32k / 24k·22.05k·16k /
-12k·11.025k·8k) 계수는 공식 사양 문서에 수치 표가 없고("coefficients must be
-transformed"라고만 기술), 그 값을 원본과 동일하게 재설계하려면 비공개인
-equal-loudness target 응답 곡선이 필요해 원리적으로 불가능하다. 따라서 여러
-독립 ReplayGain 구현에 사실상 사양처럼 공유되는 표준 계수 수치를 전사했다.
-이 결정은 사용자와 합의된 것이며(1.1 최우선 원칙 하에서, clean-room 재설계
-경로가 막힌 데 따른 것), 저작권 대상이 아닌 필터 계수 수치만 차용한다(코드는
-독립 작성). 상세 경위는 CLAUDE.md 12.1 진척 로그 참조.
+clean-room 구현: 필터 계수는 원본 C 코드를 옮긴 것이 아니라, 저작권 대상이
+아닌 필터 계수 수치(사실 데이터)만 전사한 것이다. 코드는 독립 작성했다.
+
+계수 출처(정직한 기재): 이 프로젝트가 쓰는 전 샘플레이트(44.1k·48k·32k /
+24k·22.05k·16k / 12k·11.025k·8k)의 yulewalk·Butterworth 계수는, 원본
+mp3gain 에 포함된 David Robinson·Glen Sawyer 의 LGPL 파일 gain_analysis.c
+의 ABYule / ABButter 상수표에 전 샘플레이트가 수치로 실려 있으며, 그 수치를
+scipy lfilter 규약(b/a 분리, a[0]=1.0)에 맞게 재배치해 전사한 것이다.
+(원본 표는 한 배열에 b·a 계수를 교차 저장하므로, 같은 수치를 lfilter 형식으로
+옮겼을 뿐 값은 동일하다.) 이들 계수는 David Robinson 의 ReplayGain 사양으로
+공개되어 여러 독립 구현에 사실상 사양처럼 공유되는 값이며, 필터 계수라는
+수치 데이터는 저작권 대상이 아니다. 원본과 동일한 응답을 자체 재설계하려면
+비공개인 equal-loudness target 곡선이 필요하고 scipy 에 MATLAB yulewalk
+등가도 없어(조사로 확인) 재설계 경로가 원리적으로 막혀 있으므로, 2.1(원본
+동일 재현) 최우선 원칙 하에 계수 수치만 차용하기로 사용자와 합의했다. 상세
+경위는 CLAUDE.md 10 진척 로그(6단계) 참조.
 
 알고리즘 사양:
   1) 입력 PCM 을 10차 yulewalk IIR → 2차 Butterworth(150Hz HPF) 캐스케이드로 필터.
@@ -21,8 +26,8 @@ equal-loudness target 응답 곡선이 필요해 원리적으로 불가능하다
   3) dB 값을 0.01dB 해상도 히스토그램(0..120dB)에 누적.
   4) 누적분포 상위 95퍼센타일 지점의 음량을 구해 PINK_REF 에서 빼 게인 산출.
 
-dB 산출식은 원본과 동일한 등가식(10*log10(meanSquare))을 따른다 —
-표준 mp3gain 결과와 일치시켜 1단계 apply_gain 과 정합하기 위함.
+dB 산출식은 원본과 같은 등가식(10*log10(meanSquare))을 따른다 — 표준 mp3gain
+결과와 수치를 일치시켜 apply_gain 과 정합하기 위함이다.
 """
 
 from __future__ import annotations

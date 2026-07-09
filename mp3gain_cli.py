@@ -188,116 +188,114 @@ def _err_usage():
 
 
 def _wrap_explanation():
-    """Equivalent of the original wrapExplanation (verbatim English) + exit."""
+    """Explanation of the -w "wrap" behaviour (Gain dB independent wording) + exit.
+
+    Conveys the same information as the original wrap explanation, but the prose
+    is written independently (clean-room). The option (-w) and its behaviour are
+    unchanged.
+    """
     e = sys.stderr
-    print("Here's the problem:", file=e)
-    print('The "global gain" field that mp3gain adjusts is an 8-bit unsigned '
-          "integer, so", file=e)
-    print("the possible values are 0 to 255.", file=e)
+    print("About the -w \"wrap\" option:", file=e)
     print("", file=e)
-    print("MOST mp3 files (in fact, ALL the mp3 files I've examined so far) "
-          "don't go", file=e)
-    print("over 230. So there's plenty of headroom on top-- you can increase "
-          "the gain", file=e)
-    print("by 37dB (multiplying the amplitude by 76) without a problem.", file=e)
-    print("", file=e)
-    print("The problem is at the bottom of the range. Some encoders create "
-          "frames with", file=e)
-    print("0 as the global gain for silent frames.", file=e)
-    print("What happens when you _lower_ the global gain by 1?", file=e)
-    print("Well, in the past, mp3gain always simply wrapped the result up to 255.",
+    print("The MP3 \"global gain\" field this tool adjusts is an 8-bit unsigned",
           file=e)
-    print("That way, if you lowered the gain by any amount and then raised it "
-          "by the", file=e)
-    print("same amount, the mp3 would always be _exactly_ the same.", file=e)
+    print("value, so it can only hold 0 through 255.", file=e)
     print("", file=e)
-    print("There are a few encoders out there, unfortunately, that create "
-          "0-gain frames", file=e)
-    print("with other audio data in the frame.", file=e)
-    print("As long as the global gain is 0, you'll never hear the data.", file=e)
-    print("But if you lower the gain on such a file, the global gain is "
-          "suddenly _huge_.", file=e)
-    print("If you play this modified file, there might be a brief, very loud blip.",
+    print("At the top of that range there is normally plenty of room: typical mp3",
+          file=e)
+    print("files keep the field well below the ceiling, so raising the gain by a",
+          file=e)
+    print("large amount rarely hits 255.", file=e)
+    print("", file=e)
+    print("The awkward end is the bottom. Some encoders emit silent frames whose",
+          file=e)
+    print("global gain field is 0. If you subtract from a field that is already 0",
+          file=e)
+    print("and let it \"wrap\", it jumps to a very high value instead of staying",
+          file=e)
+    print("low. Historically the tool always wrapped, so that lowering the gain",
+          file=e)
+    print("and then raising it by the same amount reproduced the file exactly.",
           file=e)
     print("", file=e)
-    print("So now the default behavior of mp3gain is to _not_ wrap gain changes.",
+    print("The catch: a few encoders put real audio data inside those 0-gain",
           file=e)
-    print("In other words,", file=e)
-    print("1) If the gain change would make a frame's global gain drop below 0,",
+    print("frames. While the field stays 0 the data is inaudible, but if wrapping",
           file=e)
-    print("   then the global gain is set to 0.", file=e)
-    print("2) If the gain change would make a frame's global gain grow above 255,",
+    print("turns the field into a large number, playback may produce a short, very",
           file=e)
-    print("   then the global gain is set to 255.", file=e)
-    print("3) If a frame's global gain field is already 0, it is not changed, "
-          "even if", file=e)
-    print("   the gain change is a positive number", file=e)
+    print("loud burst.", file=e)
     print("", file=e)
-    print('To use the original "wrapping" behavior, use the "-w" switch.', file=e)
+    print("For that reason the default is NOT to wrap. Instead:", file=e)
+    print("  1) A change that would push a frame's global gain below 0 clamps it",
+          file=e)
+    print("     to 0.", file=e)
+    print("  2) A change that would push it above 255 clamps it to 255.", file=e)
+    print("  3) A frame whose global gain is already 0 is left untouched, even for",
+          file=e)
+    print("     a positive change.", file=e)
+    print("", file=e)
+    print("Pass -w if you want the original exact-reversible wrapping behaviour.",
+          file=e)
     sys.exit(0)
 
 
 def _full_usage():
-    """Equivalent of the original fullUsage (verbatim English) + exit.
+    """Full option listing (Gain dB independent wording) + exit.
 
-    Note: the original fullUsage omits the "-s u" line (present in code, missing
-    in help). We add it here as an agreed correction of the original's omission
-    (CLAUDE.md D-3).
+    Option tokens and argument forms are the original interface (reproduced), but
+    each option's description text is written independently (clean-room). The
+    original fullUsage omits the "-s u" line; we include it (agreed correction,
+    CLAUDE.md D-3).
     """
     _show_version()
     e = sys.stderr
-    print("copyright(c) 2001-2009 by Glen Sawyer", file=e)
+    print("copyright(c) 2001-2009 by Glen Sawyer (original mp3gain)", file=e)
     print("Gain dB is a clean-room re-implementation; PCM decoding uses ffmpeg",
           file=e)
     print(f"Usage: {PROGNAME} [options] <infile> [<infile 2> ...]", file=e)
     print("options:", file=e)
-    print("\t-v - show version number", file=e)
-    print("\t-g <i>  - apply gain i without doing any analysis", file=e)
-    print("\t-l 0 <i> - apply gain i to channel 0 (left channel)", file=e)
-    print("\t          without doing any analysis (ONLY works for STEREO files,",
+    print("\t-v - print the version number", file=e)
+    print("\t-g <i>  - apply gain i directly, with no analysis", file=e)
+    print("\t-l 0 <i> - apply gain i to the left channel (channel 0) only,", file=e)
+    print("\t          with no analysis (STEREO files only, not Joint Stereo)",
           file=e)
-    print("\t          not Joint Stereo)", file=e)
-    print("\t-l 1 <i> - apply gain i to channel 1 (right channel)", file=e)
-    print("\t-e - skip Album analysis, even if multiple files listed", file=e)
-    print("\t-r - apply Track gain automatically (all files set to equal loudness)",
+    print("\t-l 1 <i> - apply gain i to the right channel (channel 1) only", file=e)
+    print("\t-e - treat each file on its own; do not compute an Album gain", file=e)
+    print("\t-r - apply Track gain so every file ends up at equal loudness", file=e)
+    print("\t-k - lower the Track/Album gain as needed to avoid clipping", file=e)
+    print("\t-a - apply one shared Album gain to every file, so the files keep",
           file=e)
-    print("\t-k - automatically lower Track/Album gain to not clip audio", file=e)
-    print("\t-a - apply Album gain automatically (files are all from the same",
+    print("\t     their loudness relative to each other while the album's average",
           file=e)
-    print("\t              album: a single gain change is applied to all files, so",
-          file=e)
-    print("\t              their loudness relative to each other remains unchanged,",
-          file=e)
-    print("\t              but the average album loudness is normalized)", file=e)
-    print("\t-m <i> - modify suggested MP3 gain by integer i", file=e)
-    print("\t-d <n> - modify suggested dB gain by floating-point n", file=e)
-    print("\t-c - ignore clipping warning when applying gain", file=e)
-    print("\t-o - output is a database-friendly tab-delimited list", file=e)
-    print("\t-t - write modified mp3 to temp file, then delete original", file=e)
-    print("\t     instead of modifying bytes in original file (default)", file=e)
-    print("\t-T - directly modify mp3 file (opposite of -t)", file=e)
-    print("\t-q - Quiet mode: no status messages", file=e)
-    print("\t-p - Preserve original file timestamp", file=e)
-    print("\t-x - Only find max. amplitude of file", file=e)
-    print("\t-f - Assume input file is an MPEG 2 Layer III file", file=e)
-    print("\t     (i.e. don't check for mis-named Layer I or Layer II files)",
-          file=e)
-    print("\t-? or -h - show this message", file=e)
-    print("\t-s c - only check stored tag info (no other processing)", file=e)
-    print("\t-s d - delete stored tag info (no other processing)", file=e)
-    print("\t-s s - skip (ignore) stored tag info (do not read or write tags)",
-          file=e)
-    print("\t-s r - force re-calculation (do not read tag info)", file=e)
+    print("\t     loudness is normalized", file=e)
+    print("\t-m <i> - shift the suggested MP3 gain by integer i", file=e)
+    print("\t-d <n> - shift the suggested dB gain by floating-point n", file=e)
+    print("\t-c - do not prompt on a possible clip; apply the change anyway", file=e)
+    print("\t-o - print a tab-delimited, database-friendly listing", file=e)
+    print("\t-t - write the modified mp3 to a temp file, then replace the", file=e)
+    print("\t     original with it (default)", file=e)
+    print("\t-T - modify the mp3 in place instead (opposite of -t)", file=e)
+    print("\t-q - quiet mode: suppress status messages", file=e)
+    print("\t-p - keep the original file's timestamp", file=e)
+    print("\t-x - only measure the file's maximum amplitude", file=e)
+    print("\t-f - treat the input as MPEG 2 Layer III without the Layer I/II", file=e)
+    print("\t     mis-name check", file=e)
+    print("\t-? or -h - print this message", file=e)
+    print("\t-s c - only report the stored tag info (nothing else)", file=e)
+    print("\t-s d - only delete the stored tag info (nothing else)", file=e)
+    print("\t-s s - ignore stored tag info (neither read nor write tags)", file=e)
+    print("\t-s r - force recalculation (do not read stored tag info)", file=e)
     print("\t-s u - force update (mark tags dirty so they are rewritten)", file=e)
-    print("\t-s i - use ID3v2 tag for MP3 gain info", file=e)
-    print("\t-s a - use APE tag for MP3 gain info (default)", file=e)
-    print("\t-u - undo changes made (based on stored tag info)", file=e)
-    print('\t-w - "wrap" gain change if gain+change > 255 or gain+change < 0',
+    print("\t-s i - store gain info in an ID3v2 tag", file=e)
+    print("\t-s a - store gain info in an APE tag (default)", file=e)
+    print("\t-u - undo previous changes, using the stored tag info", file=e)
+    print('\t-w - "wrap" the gain change when gain+change goes above 255 or', file=e)
+    print('\t     below 0 (see "-? wrap" for the full explanation)', file=e)
+    print("If both -r and -a are given, only the second one takes effect", file=e)
+    print("Without -c, the tool stops to ask before changing a file that might",
           file=e)
-    print('\t      (use "-? wrap" switch for a complete explanation)', file=e)
-    print("If you specify -r and -a, only the second one will work", file=e)
-    print("If you do not specify -c, the program will stop and ask before", file=e)
-    print("     applying gain change to a file that might clip", file=e)
+    print("clip", file=e)
     sys.exit(0)
 
 

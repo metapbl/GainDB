@@ -1,4 +1,5 @@
-"""ID3v2 (RVA2 + TXXX) 태그 읽기/쓰기 — 원본 mp3gain id3tag.c 동등 재구현 (clean-room).
+"""ID3v2 (RVA2 + TXXX) 태그 읽기/쓰기 — 원본 mp3gain id3tag.c 와 동일한 결과·
+포맷을 산출하는 clean-room 독립 구현. 공개 사양(ID3v2.4·RVA2·TXXX)만 차용.
 
 이 모듈은 ⑤-A(읽기) + ⑤-B(쓰기)를 담당한다. 결선(⑤-C)은 이어서 추가한다.
 

@@ -53,7 +53,7 @@ class FrameInfo:
 class _BitReader:
     """바이트열의 특정 시작점부터 비트 단위로 진행하는 리더/라이터."""
 
-    # 원본 set8Bits의 마스킹 상수(두 바이트에 걸친 8비트 덮어쓰기용)
+    # 두 바이트에 걸친 8비트 덮어쓰기용 마스킹 상수(비트오프셋별 자명한 값)
     _MASK_LEFT = (0x00, 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE)
     _MASK_RIGHT = (0xFF, 0x7F, 0x3F, 0x1F, 0x0F, 0x07, 0x03, 0x01)
 

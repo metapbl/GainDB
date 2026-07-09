@@ -1,6 +1,7 @@
 """gaindb/tag.py — 태그 처리 (4단계).
 
-원본 mp3gain 의 apetag.c 동작을 공개 사양·관찰된 동작으로 독립 재구현(clean-room).
+원본 mp3gain apetag.c 와 동일한 결과·포맷을 산출하는 clean-room 독립 구현.
+공개 사양(APEv2 포맷·필드명)과 관찰된 동작만 차용하고 코드는 독립 작성한다.
 이 파일 단계 ①: APEv2 읽기 파서 (전 필드 + otherFields 보존 + Lyrics3/ID3v1 꼬리 감지).
 
 원본 대응:
@@ -282,9 +283,9 @@ def _read_ape_tag(
 
 def _store_ape_field(name: str, value: str, info: MP3GainTagInfo) -> bool:
     """APE 필드 하나를 info 에 반영. 인식했으면 True, 아니면 False(=otherFields 행).
-
-    원본 ReadMP3APETag 의 if/else 사슬 대응. 매칭은 대소문자 무시(_stricmp).
-    UNDO/MINMAX 는 원본 APE 경로처럼 고정 오프셋 슬라이싱으로 파싱.
+    APEv2 게인 필드를 인식해 info 에 반영한다. 매칭은 대소문자 무시.
+    UNDO/MINMAX 의 고정 오프셋 슬라이싱은 태그 값 포맷("+003,+003,W" ·
+    "001,153")에서 도출된 것이며, 원본과 동일한 결과를 낸다.
     """
     upper = name.upper()
 
@@ -301,13 +302,13 @@ def _store_ape_field(name: str, value: str, info: MP3GainTagInfo) -> bool:
         info.have_album_peak = True
         info.album_peak = _atof(value)
     elif upper == "MP3GAIN_UNDO":
-        # value 형식: "+003,+003,W" — 원본은 [0:4],[5:9],[10] 슬라이싱.
+        # value 형식: "+003,+003,W" — 포맷상 [0:4],[5:9],[10] 슬라이싱.
         info.have_undo = True
         info.undo_left = _atoi(value[0:4])
         info.undo_right = _atoi(value[5:9])
         info.undo_wrap = value[10:11] in ("w", "W")
     elif upper == "MP3GAIN_MINMAX":
-        # value 형식: "001,153" — 원본은 [0:3],[4:7] 슬라이싱.
+        # value 형식: "001,153" — 포맷상 [0:3],[4:7] 슬라이싱.
         info.have_min_max_gain = True
         info.min_gain = _atoi(value[0:3])
         info.max_gain = _atoi(value[4:7])
@@ -716,7 +717,8 @@ def change_gain_and_tag(
     태그를 다시 쓴다. undo 는 항상 누적, gain/peak/minmax 는 좌우 변화량이
     같을 때만 갱신(좌우 다르면 채널 분리라 의미가 깨지므로 건드리지 않음).
 
-    dB 차감 상수는 원본 근사값 1.505 (= 5*log10(2) 근사) 를 그대로 사용한다.
+    dB 차감 상수 1.505 는 5*log10(2)(1스텝당 dB)의 소수 3자리 근사값이며,
+    표준 mp3gain 과 수치를 일치시키기 위해 같은 값을 쓴다.
     태그 쓰기는 _write_mp3gain_tag 래퍼로 분기(use_id3 에 따라 ID3/APE).
 
     반환: 게인을 적용하고 태그를 갱신했으면 True, 변화량이 0이면 False.
@@ -742,7 +744,7 @@ def change_gain_and_tag(
 
     # --- 좌우가 같을 때만 나머지 필드 갱신 ---
     if left_change == right_change:
-        dbl_gain_change = left_change * 1.505  # 원본 근사 상수
+        dbl_gain_change = left_change * 1.505  # 5*log10(2) 의 3자리 근사
 
         if info.have_track_gain:
             info.track_gain -= dbl_gain_change

@@ -115,7 +115,7 @@ GaindB/
 - **OS**: Windows. 셸은 VS Code 통합 터미널(PowerShell). cwd=워크스페이스 루트 가정, `cd` 는 필요할 때만. (GUI 6단계는 macOS 동작도 목표 — 크로스플랫폼.)
 - **에디터**: VS Code.
 - **커밋**: 의미 단위가 끝날 때마다 즉시 커밋. Conventional Commits (`feat:`/`fix:`/`chore:`/`docs:`/`refactor:`).
-- **PowerShell 함정**: `>` 리다이렉션은 UTF-16 LE BOM 으로 씀. 대안 `... | Out-File -Encoding utf8 <파일>`.
+- **PowerShell 함정**: 셸은 PowerShell 7.6.3. `>` 리다이렉션은 UTF-16 LE BOM 으로 씀. 파일 쓰기는 `... | Out-File -Encoding utf8NoBOM <파일>` 로 BOM 없는 UTF-8 을 명시한다(7.x 는 `utf8` 도 기본 BOM 없음이지만 `utf8NoBOM` 으로 통일).
 
 ## 10. Claude 응답 규칙
 
@@ -141,6 +141,8 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 ### 10.5. 터미널 명령 동봉
 
 파일을 수정·추가·삭제하는 코드를 제시할 때는 디스크 반영·커밋 명령을 같은 응답에 함께 제시. 기본 흐름 ① `git add <파일>` ② `git status` ③ `git commit -m "..."`. (원격 저장소 없으므로 `git push` 생략.) 환경은 PowerShell, cwd=루트. 신규 파일·디렉터리는 `New-Item -ItemType {Directory|File} -Force` 로 만든 뒤 본문은 VS Code 에 붙여 넣음 — `-Force` 는 기존 파일을 빈 파일로 덮으므로 한 줄 경고.
+- **파일 전체 제시 시 터미널 붙여넣기 방식(합의됨)**: `.py` 등 파일 **전체를 새로 쓰거나 통째로 교체**할 때는, 사용자가 파일을 직접 열지 않고 VS Code 통합 터미널에 명령 한 덩어리를 붙여넣어 엔터만 치면 저장되도록 제시한다. 형식: 코드 전체를 `@'` … `'@` 리터럴 here-string 으로 감싸 `| Out-File -FilePath <경로> -Encoding utf8NoBOM` 로 파이프. (리터럴 here-string 이라 백틱·`$`·따옴표가 안전. 단, 코드에 줄 맨 앞이 `'@` 인 줄이 없어야 함 — 제시 전 확인.) 이 편의를 위해 코드는 **가급적 파일 전체 단위로 제시**한다(10.3 의 함수 발췌보다 전체 파일을 우선). 부분 발췌가 꼭 필요한 극소수 경우만 VS Code 직접 편집.
+
 
 ### 10.6. 마크다운 파일 전송
 

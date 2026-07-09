@@ -23,7 +23,7 @@
 - "동일 재현"은 **결과(동작·태그 포맷·출력·수치)의 일치**를 뜻한다. 그 구현은 원본 C 코드를 옮기지 않고 공개 사양·관찰된 동작으로 독립 작성한다 — 즉 동일 재현과 clean-room(1.2·4)은 모순되지 않는다(결과는 일치, 코드는 독립).
 - 아래는 사용자와 **이미 합의된 예외/우선 구현**이다. 이는 기능 축소가 아니다.
   - **디코더(항구적 예외)**: PCM 추출은 원본의 `mpglibDBL` 디코더를 포팅하지 않고 외부 도구(ffmpeg)를 호출한다. LGPL 분리·실용성 때문이며, 구현 수단만 다를 뿐 **분석 결과(라우드니스 dB)는 원본과 일치**시킨다(7 참조).
-  - **샘플레이트(우선 구현·확장 대상)**: 실제 음원의 절대다수가 44.1k·48k 이므로 이 둘을 먼저 구현·검증했다. 원본은 ReplayGain 사양의 모든 샘플레이트 계수를 지원하므로, 나머지 샘플레이트도 원칙상 추가 대상이다(축소가 아니라 미완. 상세는 12.1).
+  - **샘플레이트(확장 완료)**: 실제 음원 다수인 44.1k·48k 를 먼저 구현·검증한 뒤, 6단계에서 ReplayGain 사양의 나머지 샘플레이트(32k 및 MPEG2/2.5 계열)까지 확장·검증 완료했다. 계수는 공개 표준값 전사(clean-room 판단·재설계 불가 사유는 12.1). 1.1 의 합의된 미완이 이로써 해소됨.
 
 ## 1.2. clean-room 전면 적용 (프로젝트 전체 원칙)
 
@@ -110,7 +110,7 @@ GaindB/
 3. **[완료] MP3 디코딩(PCM 추출)**: ffmpeg/ffprobe subprocess. 2단계 입력 공급(`gaindb/decode.py`).
 4. **[완료] 태그 처리** — APEv2 읽기·쓰기·갱신·제거, scanFrameGain(min/max), changeGainAndTag 동등, undo, auto/album 태그 연결까지 완료. otherFields·Lyrics3/ID3v1 꼬리 보존. ID3v2(RVA2/TXXX) 포함. 검증 완료.
 5. **[완료] CLI / 옵션 / 일괄 처리** — 원본 옵션을 빠짐없이 재현(`-r`/`-a`/`-e`/`-g`/`-l`/`-d`/`-m`/`-k`/`-c`/`-w`/`-s c|d|s|r|u|i|a`/`-u`/`-o`/`-q`/`-p`/`-x`/`-f`/`-t`/`-T` 등), 클리핑 경고·자동 클립(`-k`), database 출력(`-o`) 포함. 통합 테스트 스위트(tests/, 60건)로 검증 완료, 옛 verify_* 대체(12.1).
-6. **[다음 · 착수 전] 샘플레이트 확장 (원본 동일 재현 완결)** — 현재 44.1k·48k만 구현·검증(1.1 합의된 미완). 원본이 지원하는 ReplayGain 사양의 나머지 샘플레이트(32k 및 MPEG2/2.5 계열 등)를 코어에 추가한다. `gaindb/analysis.py` 필터 계수 테이블을 사양대로 완비하고, `gaindb/frame.py` 의 global_gain 위치 계산을 MPEG2/2.5 사이드 정보 구조까지 확장·재검증한다(11항목 — 1단계 핵심 난점이 MPEG2 에서 재검증돼야 함). MPEG2/2.5 fixture 를 tests/ 통합 스위트에 추가. clean-room 유지(원본 gain_analysis.c·mp3gain.c 는 사양·동작 대조용 참고만, 코드 복붙 금지 — 1.2). 이 단계가 끝나야 코어의 원본 재현이 완결된다.
+6. **[완료] 샘플레이트 확장 (원본 동일 재현 완결)** — 44.1k·48k 외 ReplayGain 사양 전 샘플레이트(32k / MPEG2·MPEG2.5 계열)를 코어에 추가·검증 완료. 계수는 공개 표준값 전사(자체 재설계는 비공개 target 곡선으로 불가 — 합의·상세 12.1), frame.py MPEG2/2.5 파싱 실측 재검증(수정 불필요), mono 분석 3dB 버그 발견·수정, MPEG2/2.5 fixture·테스트 tests/ 편입. 상세는 12.1.
 7. **[6단계 후] 배포 라이선스 정합성 준비·검토** — 배포 가능성에 대비해 LGPL 구속 회피 근거를 정리·점검한다. (a) clean-room 자체 점검: 코어·CLI·GUI 어디에도 원본 C·VB 코드가 옮겨지지 않았고 결과 일치·코드 독립임을 확인(1.1·1.2·4). (b) 배포 시 검토 항목: PySide6(LGPL) 링크 방식, ffmpeg 동봉 여부(GPL), 원본 소스 git 제외 상태 등. GPT·Claude 최신 모델을 이용한 교차검증으로 쟁점 정리·조항 해석·리스크 목록화·질문 준비를 1차 수행한다. **단, 실제 공개 배포 직전의 최종 확인은 자격 있는 전문가(변호사) 검토를 남겨둔다 — AI 교차검증은 1차 검토 수단일 뿐, 성능·교차 여부와 무관하게 법적 책임·자격을 대체하지 못한다(4항목). 로컬 개인 사용 단계에서는 이 검토가 불필요.**
 8. **[7단계 후] GUI (PySide6, clean-room 재현)** — 원본 MP3GainGUI 의 외관·기능·동작을 PySide6 로 동일 재현하되, VB 코드를 옮기지 않고 공개 동작만 보고 독립 구현한다(1.2·4·1.1 과 동일 원칙). 기존 `gaindb/` 코어 + CLI 위에 얹는 새 프런트엔드(코어 재작성 없음). Windows·macOS 크로스플랫폼. **세부 MVP 설계(어떤 화면·버튼·옵션을 어느 순서로 넣을지)는 착수 전 사용자와 합의해 정한다**(1.1 — Claude 가 임의로 정하지 않음). 배포 시 PySide6 LGPL·ffmpeg 검토 필요(4·7단계). 원본 GUI 소스는 **VB6** (`mp3gain/mp3gain-win-gui-1_3_4-src/`, `.vbp`/`.frm`/`.frx`/`.bas`/`.cls`). 구성(관찰): 메인 창(`frmMain`)·옵션(`frmOptions`)·게인 입력(`frmGetGain`)·로그(`frmLogs`)·시스템 트레이(`frmSysTray`)·정보/기부/면책 다이얼로그, 경고 모달들(`frmStereoWarning`=단일채널 거부, `frmLayerCheckWarning`=Layer 오인, `frmSkipTagsWarn`/`frmReadOnly`/`frmResetWarn` 등); 모듈 `basLocalizer`(다국어)·`basSaveAnalysis`·`basListViewSort`·`Mp3Info.cls` 등. 다수 경고 폼은 CLI 가 이미 동작으로 재현한 상황의 GUI 대응 — 이 매핑을 PySide6 다이얼로그로 재현한다(화면·동작 관찰만, VB 코드 복붙 금지 — 1.2). **다국어(한국어·영어)는 GUI 계층의 책임이다(합의됨): CLI(코어+진입점)는 영문만 출력하고, 화면 표기의 다국어화는 PySide6 의 tr()/번역 파일로 GUI 에서 처리한다.** (원본 GUI 의 basLocalizer 대응.)
 
@@ -146,7 +146,7 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 
 파일을 수정·추가·삭제하는 코드를 제시할 때는 디스크 반영·커밋 명령을 같은 응답에 함께 제시. 기본 흐름 ① `git add <파일>` ② `git status` ③ `git commit -m "..."`. (원격 저장소 없으므로 `git push` 생략.) 환경은 PowerShell, cwd=루트. 신규 파일·디렉터리는 `New-Item -ItemType {Directory|File} -Force` 로 만든 뒤 본문은 VS Code 에 붙여 넣음 — `-Force` 는 기존 파일을 빈 파일로 덮으므로 한 줄 경고.
 - **파일 전체 제시 시 터미널 붙여넣기 방식(합의됨)**: `.py` 등 파일 **전체를 새로 쓰거나 통째로 교체**할 때는, 사용자가 파일을 직접 열지 않고 VS Code 통합 터미널에 명령 한 덩어리를 붙여넣어 엔터만 치면 저장되도록 제시한다. 형식: 코드 전체를 `@'` … `'@` 리터럴 here-string 으로 감싸 `| Out-File -FilePath <경로> -Encoding utf8NoBOM` 로 파이프. (리터럴 here-string 이라 백틱·`$`·따옴표가 안전. 단, 코드에 줄 맨 앞이 `'@` 인 줄이 없어야 함 — 제시 전 확인.) 이 편의를 위해 코드는 **가급적 파일 전체 단위로 제시**한다(10.3 의 함수 발췌보다 전체 파일을 우선). 부분 발췌가 꼭 필요한 극소수 경우만 VS Code 직접 편집.
-
+- **파일 반영 내용은 반드시 코드블록 또는 터미널 명령으로(합의됨)**: 파일(`.py`·`.md`·`.gitignore` 등)에 반영할 내용을 제시할 때는 맨몸 텍스트로 흘려보내지 않고 둘 중 하나로 감싼다 — ① 위의 here-string `| Out-File` 터미널 명령(파일 전체 신규·교체), 또는 ② 코드 펜스로 감싼 발췌(국소 수정·삽입/교체 조각). 마크다운 파일의 발췌를 코드블록으로 감쌀 때는 10.6 규칙(안쪽 펜스보다 백틱 하나 더)을 따른다. 국소 수정은 통짜 교체보다 조각 발췌를 우선한다(Claude 가 파일 전체 최신본을 정확히 보유하지 못하면 통짜 교체가 다른 부분을 훼손할 수 있음).
 
 ### 10.6. 마크다운 파일 전송
 
@@ -196,4 +196,12 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 
 **이 대조에서 GaindB 버그 발견·수정(커밋 d8b44cc).** 원본 exe 는 `-s s` 에서도 min/max global_gain(209/35)을 정상 출력하는데 GaindB 는 0/0 이었다. 원인: `_analyze_one` 의 min/max scan 이 `MIN_MAX_GAIN_RECALC` 비트에만 묶여, 그 비트 없는 recalc 경로(-s s 는 FULL 만, -x 는 AMP 만)에서 스캔이 누락됨. 원본은 scanFrameGain 을 어느 recalc 경로에서든 실행하므로 min/max 는 항상 나온다. 수정: `need_scan = recalc & (FULL|AMP|MIN_MAX)` 로 확장(recalc 0 이면 여전히 스킵 — D-2 최적화 유지). 회귀 테스트 추가(커밋 ce18b53): `tests/test_cli_misc.py::MinMaxScanRegressionTest` — stereo·mono fixture 에 `-s s`/`-x` 로 CLI 실행, Max/Min 칸이 `scan_gain` 정답과 일치 + 0/0 아님 확인. 통합 스위트 62건(기존 60+2) 전부 PASS.
 
-**다음 = 6단계 샘플레이트 확장 (원본 동일 재현 완결).** 5단계 완료. 44.1k·48k 외 나머지 샘플레이트(32k 및 MPEG2/2.5 계열 등)를 코어(`analysis.py` 계수 테이블·`frame.py` global_gain 위치 계산)에 추가·검증하고 MPEG2/2.5 fixture 를 tests/ 에 추가(1.1 미완 해소, clean-room 유지). 그다음 7단계 배포 라이선스 준비·검토(AI 교차검증 1차 + 전문가 최종 확인), 8단계 GUI(PySide6, clean-room 재현) 순(8항목).
+**6단계 완료·검증 완료 (샘플레이트 확장 — 원본 동일 재현 완결).** 44.1k·48k 외 ReplayGain 사양 전 샘플레이트(32k / 24k·22.05k·16k / 12k·11.025k·8k)를 코어에 추가·검증했다. 1.1 의 "샘플레이트 합의된 미완"이 이로써 해소됨.
+
+- **계수 전사 결정(합의됨, clean-room 판단 명시).** 저샘플레이트 필터 계수는 자체 재설계가 아니라 공개 표준 계수를 사양 데이터로 전사했다. 사유: 공식 사양(Hydrogenaudio)은 44.1k·48k 계수만 수치로 제공하고 그 외는 "coefficients must be transformed"라고만 기술한다. 원본과 동일 응답을 재설계하려면 비공개인 equal-loudness target 곡선이 필요하고, scipy 에 MATLAB yulewalk 등가도 없어 재설계 경로가 원리적으로 막힘(조사로 확인). 1.1(원본 동일 재현) 최우선이므로, 여러 독립 구현에 사실상 사양처럼 공유되는 표준 계수 수치만 차용(코드는 독립, 저작권 대상 아닌 수치 데이터). 실질 1차 출처가 David Robinson gain_analysis.c 상수라는 점은 44.1k·48k(위키 표)와 다르므로 `analysis.py` docstring 과 여기에 병기. 44.1k·48k 를 같은 분해 규칙으로 재생성해 기존 검증값과 일치함을 확인(자기검증), 7개 전부 표준값과 자릿수 대조 통과.
+- **frame.py MPEG2/2.5 실측 재검증 완료(11항목의 1단계 난점 해소).** `_read_global_gains` 의 MPEG2/2.5 분기(granule 1, private bits 1/2)는 코드로만 있고 실측이 없었는데, 9개 fixture 로 parse_file 을 돌려 버전·샘플레이트·nchan·gains 개수(frames×granule×nchan)·정상 분포를 검증했고, exe 대조에서 min/max global_gain 이 9개 전부 정확히 일치. frame.py 는 수정 불필요로 확정(코드가 이미 정확했음).
+- **mono 분석 3dB 버그 발견·수정(커밋 68493a9).** exe 대조에서 mono fixture 만 정확히 3.05dB(≈10·log10 2) 어긋남을 발견. 원인은 계수가 아니라 `decode.py`: ffmpeg `-ac 2` up-mix 가 mono 를 stereo 로 펼치며 각 채널을 1/√2 감쇠(ratio=√2 실측) → `(lsum+rsum)*0.5` 가 원본의 절반. 수정: ffprobe 로 채널 수도 조회해 mono 는 `-ac 1` 로 원진폭 디코딩 후 코드에서 좌우 복제. 6단계가 발견한 기존 mono 분석 경로의 잠재 버그(기존 검증이 stereo 위주라 사각지대). 수정 후 mono diff 3.05→0.04.
+- **허용오차 0.1dB 로 상향(합의됨).** 기존 "0.02dB 이내"를 0.1dB 로 조정. 사유: 저샘플레이트에서 디코더 차이(mpg123 vs ffmpeg)가 히스토그램 0.01dB 경계 양자화와 맞물려 실측 최대 0.06dB(32k 0.03, 24k 0.06). 1.1 "결과 일치" 완화가 아니라, 디코더가 항구적 예외(1.1)인 프로젝트에서 디코더 차이로 인한 불가피 편차의 실측 상한을 정한 것. 계수 오류(수 dB)는 이 기준으로 확실히 걸러짐.
+- **검증 인프라.** 새 fixture 9개(`test_{32k,24k,22k,16k,12k,11k,8k}.mp3`, `test_mono_{24k,12k}.mp3` — Debussy 에서 ffmpeg 변형, git 제외, `.gitignore`·`KNOWN_FIXTURES` 등록). 통합 스위트에 `test_samplerate_expansion.py` 추가(24건: FrameParse 9 / RoundTrip 6 / Analysis 9) → 전체 86건 PASS(커밋 04b9818). exe dB 정답 대조는 `manual_checks/compare_exe_lowrate.py`(git 제외, 로컬 수동 — mutagen 사례와 동일 방침). exe 실행은 VS Code 터미널에서 `$env:PATH="C:\msys64\ucrt64\bin;"+$env:PATH` 후 가능(MinGW DLL 경로).
+
+**다음 = 7단계 배포 라이선스 정합성 준비·검토.** 1~6단계 완료(코어의 원본 재현 완결). 7단계: 배포 대비 clean-room 자체 점검(코어·CLI·GUI 어디에도 원본 C·VB 코드가 옮겨지지 않음 확인) + LGPL 구속 회피 근거 정리(PySide6 링크 방식, ffmpeg 동봉 여부, 원본 소스 git 제외 상태), AI 교차검증 1차 + 전문가 최종 확인. 로컬 개인 사용 단계에서는 불필요(7항목). 그다음 8단계 GUI(PySide6, clean-room 재현, MVP 설계는 착수 전 합의).

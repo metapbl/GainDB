@@ -40,11 +40,25 @@ MP3_DIR = Path(_env_dir).resolve() if _env_dir else REPO_ROOT
 #   stereo (mode 0): ffmpeg -i "Debussy - Arabesque No.1.mp3" -ac 2 \
 #                      -joint_stereo 0 -c:a libmp3lame -q:a 4 "test_stereo_44k.mp3"
 # 생성 후 gaindb.frame.parse_file 로 mode 확인: mono={3}, stereo={0}.
+#
+# test_{32k,24k,22k,16k,12k,11k,8k}.mp3 및 test_mono_{24k,12k}.mp3 는 6단계
+# 샘플레이트 확장 검증용 변형 fixture(git 제외). Debussy 원본에서 ffmpeg 로
+# -ar <rate> [-ac 1] -c:a libmp3lame -q:a 4 로 생성. libmp3lame 이 rate 에 따라
+# MPEG 버전을 자동 결정: 32k→MPEG1, 24k/22.05k/16k→MPEG2, 12k/11.025k/8k→MPEG2.5.
 KNOWN_FIXTURES = {
     "Debussy - Arabesque No.1.mp3": "44.1k joint stereo (MPEG1, mode 1)",
     "10cm - 사랑은 은하수 다방에서.mp3": "48k joint stereo (MPEG1, mode 1)",
     "test_mono_44k.mp3": "44.1k mono (MPEG1, mode 3) — ffmpeg 변형",
     "test_stereo_44k.mp3": "44.1k stereo (MPEG1, mode 0) — ffmpeg 변형",
+    "test_32k.mp3": "32k stereo (MPEG1) — ffmpeg 변형(6단계)",
+    "test_24k.mp3": "24k stereo (MPEG2) — ffmpeg 변형(6단계)",
+    "test_22k.mp3": "22.05k stereo (MPEG2) — ffmpeg 변형(6단계)",
+    "test_16k.mp3": "16k stereo (MPEG2) — ffmpeg 변형(6단계)",
+    "test_12k.mp3": "12k stereo (MPEG2.5) — ffmpeg 변형(6단계)",
+    "test_11k.mp3": "11.025k stereo (MPEG2.5) — ffmpeg 변형(6단계)",
+    "test_8k.mp3": "8k stereo (MPEG2.5) — ffmpeg 변형(6단계)",
+    "test_mono_24k.mp3": "24k mono (MPEG2, mode 3) — ffmpeg 변형(6단계)",
+    "test_mono_12k.mp3": "12k mono (MPEG2.5, mode 3) — ffmpeg 변형(6단계)",
 }
 
 

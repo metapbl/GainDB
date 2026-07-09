@@ -24,3 +24,14 @@ manual_checks/
 .vscode/
 Thumbs.db
 .DS_Store
+
+# 6단계 샘플레이트 확장 fixture (ffmpeg 변형, git 제외)
+test_32k.mp3
+test_24k.mp3
+test_22k.mp3
+test_16k.mp3
+test_12k.mp3
+test_11k.mp3
+test_8k.mp3
+test_mono_24k.mp3
+test_mono_12k.mp3

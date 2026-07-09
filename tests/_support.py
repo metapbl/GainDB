@@ -32,9 +32,19 @@ MP3_DIR = Path(_env_dir).resolve() if _env_dir else REPO_ROOT
 
 # 알려진 테스트 음원(파일명 → 설명). git 제외라 부재 가능.
 # 새 음원을 추가하면 여기에 등록하면 자동으로 가드·헬퍼가 인식한다.
+#
+# test_mono_44k.mp3 / test_stereo_44k.mp3 는 Debussy 원본에서 ffmpeg 로 생성한
+# 변형 fixture(git 제외). 채널 mode 커버리지용:
+#   mono   (mode 3): ffmpeg -i "Debussy - Arabesque No.1.mp3" -ac 1 \
+#                      -c:a libmp3lame -q:a 4 "test_mono_44k.mp3"
+#   stereo (mode 0): ffmpeg -i "Debussy - Arabesque No.1.mp3" -ac 2 \
+#                      -joint_stereo 0 -c:a libmp3lame -q:a 4 "test_stereo_44k.mp3"
+# 생성 후 gaindb.frame.parse_file 로 mode 확인: mono={3}, stereo={0}.
 KNOWN_FIXTURES = {
-    "Debussy - Arabesque No.1.mp3": "44.1k joint stereo (MPEG1)",
-    "10cm - 사랑은 은하수 다방에서.mp3": "48k joint stereo (MPEG1)",
+    "Debussy - Arabesque No.1.mp3": "44.1k joint stereo (MPEG1, mode 1)",
+    "10cm - 사랑은 은하수 다방에서.mp3": "48k joint stereo (MPEG1, mode 1)",
+    "test_mono_44k.mp3": "44.1k mono (MPEG1, mode 3) — ffmpeg 변형",
+    "test_stereo_44k.mp3": "44.1k stereo (MPEG1, mode 0) — ffmpeg 변형",
 }
 
 
@@ -133,15 +143,21 @@ class BaseGainTest(unittest.TestCase):
         )
 
     def audio_body_sha256(self, path: str) -> str:
-        """오디오 본문(태그 제외) 해시.
+        """오디오 프레임 구간만 해시(무손실 판정용).
 
-        무손실 검증은 전체 해시가 아니라 tag_offset 까지의 본문 해시로 한다
-        (11항목: undo 0 태그가 남아 전체 해시는 달라질 수 있음).
+        무손실 = MPEG 프레임의 global_gain 필드가 복원됨. 따라서 앞쪽 ID3v2
+        (표지 등)·끝쪽 APE/Lyrics3/ID3v1 꼬리를 배제하고, parse_file 이 짚는
+        각 프레임의 [offset, offset+frame_len) 바이트만 순서대로 해시한다.
+
+        이렇게 하면 게인 적용으로 파일 끝에 APE 태그가 새로 생기거나
+        undo 0 태그가 남아도(11항목) 해시 구간이 흔들리지 않는다.
+        Xing/Info 정보 프레임은 parse_file 이 건너뛰므로 자연히 제외된다
+        (그 프레임의 게인은 애초에 건드리지 않으므로 무손실 판정에 무관).
         """
-        from gaindb.tag import read_mp3gain_ape_tag
-        _info, file_tags = read_mp3gain_ape_tag(path)
-        offset = file_tags.tag_offset
-        h = hashlib.sha256()
+        from gaindb.frame import parse_file
         with open(path, "rb") as f:
-            h.update(f.read(offset))
+            data = f.read()
+        h = hashlib.sha256()
+        for frame in parse_file(path):
+            h.update(data[frame.offset:frame.offset + frame.frame_len])
         return h.hexdigest()

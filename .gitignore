@@ -20,3 +20,6 @@ Thumbs.db
 
 # 검증 스크립트 (저장소에 포함하지 않음)
 verify_*.py
+
+test_mono_44k.mp3
+test_stereo_44k.mp3

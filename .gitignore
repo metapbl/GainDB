@@ -7,20 +7,20 @@ __pycache__/
 venv/
 .venv/
 
-# 테스트용 오디오 (저장소에 포함하지 않음)
+# 테스트용 오디오 (원본·변형 fixture 모두 저장소에 포함하지 않음)
+# test_mono_44k.mp3 / test_stereo_44k.mp3 도 이 패턴에 포함됨.
 *.mp3
 
-# 원본 mp3gain C 소스 (LGPL, 사양 참고용 로컬 보관 - 저장소 제외)
+# 원본 mp3gain C·GUI 소스 (LGPL, 사양 참고용 로컬 보관 - 저장소 제외)
 mp3gain/
+
+# 검증 스크립트 (통합 테스트로 대체됨; 로컬 잔여분 제외)
+verify_*.py
+
+# mutagen 의존 수동 검증 (통합 테스트 밖 로컬 보존)
+manual_checks/
 
 # OS / 에디터
 .vscode/
 Thumbs.db
 .DS_Store
-
-# 검증 스크립트 (저장소에 포함하지 않음)
-verify_*.py
-
-test_mono_44k.mp3
-test_stereo_44k.mp3
-manual_checks/

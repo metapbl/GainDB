@@ -168,68 +168,54 @@ MP3 전용이다. 타 포맷 지원 제안은 하지 않는다. 무손실 게인
 
 ### 12.1. 진척 로그 / 다음 세션 시작점
 
-**1단계 완료** (프레임 파서 + `global_gain` 읽기/쓰기). 결과물: `gaindb/frame.py`(읽기 파서), `gaindb/writer.py`(±N 무손실 적용 + CRC 재계산), `scan_gain.py`/`apply_gain.py`(CLI). Debussy 파일로 round-trip 바이트 동일 검증 완료.
+**1단계 완료** (프레임 파서 + `global_gain` 읽기/쓰기). 결과물: `gaindb/frame.py`(읽기 파서), `gaindb/writer.py`(±N 무손실 적용 + CRC 재계산), `apply_gain.py`(CLI). Debussy 파일로 round-trip 바이트 동일 검증 완료. (개발용 `scan_gain.py`·`inspect_tag.py` 는 D-3 에서 `mp3gain_cli.py --debug-scan`/`--debug-tag` 로 흡수·삭제됨.)
 
 **2단계 완료** (ReplayGain 분석기 + 디코딩 + dB→스텝 + Track/Album). 결과물:
 
 - `gaindb/decode.py` — ffmpeg/ffprobe subprocess 로 MP3→PCM. (left, right, sample_rate) 반환, 원본 사양 스케일(±32768)로 정규화. ffmpeg 는 PATH 호출.
-- `gaindb/analysis.py` — ReplayGain. 필터 계수는 공식 사양(Hydrogenaudio "Original ReplayGain specification" Tables 1·2)에서 옮김(clean-room). yulewalk→Butterworth 캐스케이드(scipy.signal.lfilter) → 50ms RMS → 0.01dB 히스토그램 → 95퍼센타일 → PINK_REF(64.82) 차감. `track_histogram`(곡별 히스토그램)·`gain_from_histograms`(누적 합산 후 단일 dB)·`db_to_steps`(원본 round-half-away-from-zero, 제수 5*log10(2)).
-- `apply_gain.py` — `apply_track_gain`, `apply_album_gain`(decode→히스토그램만 보관·PCM 해제→누적→단일 스텝→전 곡 동일 적용), CLI 수동/`auto`/`album` 모드(main 은 모드 우선 판별).
-- 검증: Track 은 3곡에서 ffmpeg `replaygain` 필터와 0.02 dB 이내 일치(-0.79/-0.77, -3.60/-3.58, -6.05/-6.03). Album 은 44.1k+48k 혼합에서 -5.05 dB → -3 스텝(개별 -0.79/-6.05 사이·산술평균 아님) 확인. 혼합 샘플레이트 누적 정상.
-- **샘플레이트**: 현재 44.1k·48k 구현·검증 완료. 원본은 ReplayGain 사양 전 샘플레이트를 지원하므로 나머지도 추가 대상(1.1 — 축소가 아니라 미완. 실제 음원 절대다수가 44.1k/48k 라 우선 구현에 사용자 합의).
-- 미해결 관찰: 48k 곡에서 `track_peak > 1.0`(1.033) 확인 — 클리핑 방지(peak 메타데이터·`-k`) 다룰 때(5단계) 의미. 게인 산출엔 영향 없음.
+- `gaindb/analysis.py` — ReplayGain. 필터 계수는 공식 사양(Hydrogenaudio "Original ReplayGain specification" Tables 1·2)에서 옮김(clean-room). yulewalk→Butterworth 캐스케이드 → 50ms RMS → 0.01dB 히스토그램 → 95퍼센타일 → PINK_REF(64.82) 차감. `track_histogram`·`gain_from_histograms`·`db_to_steps`(round-half-away-from-zero, 제수 5*log10(2)).
+- `apply_gain.py` — `apply_track_gain`, `apply_album_gain`, CLI 수동/`auto`/`album` 모드.
+- 검증: Track 은 ffmpeg `replaygain` 필터와 0.02dB 이내 일치. Album 은 44.1k+48k 혼합에서 -5.05dB → -3스텝 확인.
+- **샘플레이트**: 44.1k·48k 구현·검증 완료. 나머지는 확장 대상(1.1 — 축소 아니라 미완).
+- 미해결 관찰: 48k 곡 `track_peak>1.0`(1.033) — 클립 방지(-k)에서 의미, 게인 산출엔 영향 없음.
 
-**3단계 완료** (MP3 디코딩, PCM 추출). `gaindb/decode.py` — ffmpeg/ffprobe subprocess 로 MP3→PCM, (left, right, sample_rate) 반환, 원본 사양 스케일(±32768). 2단계 입력 공급. (1단계에서 CLI 로 언급된 `apply_gain.py` 는 2~4단계에서 확장됨.)
+**3단계 완료** (MP3 디코딩, PCM 추출). `gaindb/decode.py` — ffmpeg/ffprobe subprocess, (left, right, sample_rate) 반환, ±32768 스케일. 2단계 입력 공급.
 
-**4단계 완료·검증 완료** (태그 처리 — APE + ID3v2, 원본 전 기능 재현). 원본 사양 정리 완료(apetag.c/.h, id3tag.c/.h, mp3gain.c 의 changeGainAndTag/WriteMP3GainTag 검토 끝). 모듈: `gaindb/tag.py`(APE), `gaindb/id3.py`(ID3v2, tag.py 와 대칭 배치). 구현·검증 요약:
+**4단계 완료·검증 완료** (태그 처리 — APE + ID3v2, 원본 전 기능 재현). 모듈: `gaindb/tag.py`(APE), `gaindb/id3.py`(ID3v2). 요약:
 
-- **APE 읽기/쓰기/제거** (`tag.py`): `read_mp3gain_ape_tag`(파일 끝에서 APE/Lyrics3v2/ID3v1 꼬리 반복 감지·tag_offset 산출, 비-mp3gain 필드는 otherFields 원본 바이트로 보존; UNDO/MINMAX 고정 오프셋 슬라이싱; APE 푸터 오프셋 TagCount=16/Flags=20), `write_mp3gain_ape_tag`(헤더+푸터 재구성, otherFields 선배치 + mp3gain 필드 고정순서[MINMAX→ALBUM_MINMAX→UNDO→TRACK_GAIN→PEAK→ALBUM_GAIN→PEAK], Length/TagCount/Flags 갱신, 짧아지면 truncate, Lyrics3/ID3v1 꼬리 재기록, save_timestamp=os.utime), `remove_mp3gain_ape_tag`. 값 포맷 `%-+9.6f dB`/`%-8.6f`/`%03d,%03d`/`%+04d,%+04d,%c`. 검증: round-trip + mutagen 상호운용 + ID3v1 꼬리 보존.
-- **scan_gain + change_gain_and_tag** (`writer.scan_gain` / `tag.change_gain_and_tag`): scan_gain 은 전 프레임 global_gain min/max(0 포함, 디코딩 없음 — MP3GAIN_MINMAX 원천). change_gain_and_tag 는 apply_gain 후 undo 누적[항상] + 좌우 동일 시 gain/peak/minmax 갱신(dB 차감 상수 1.505, peak ×2^(N/4), minmax 가감·wrap 시 정보폐기·비wrap 시 minGain 0-유지 클램프). 검증: scan (36,210), +3 적용 시 track_gain -8.095·peak 1.737·min/max 39/213·undo -3/-3, undo 원복 정확.
-- **track_peak + auto/album 연결** (`analysis.track_peak` / `apply_gain.py`): track_peak 은 원본 find_maxsample 동등(좌우 abs max / 32768; 48k 곡 1.0335 재현). apply_gain.py 는 원본 main 순서로 분석(89dB raw)+track_peak+scan_gain → read 로 info 채우기[허용오차: gain 0.01dB, track peak 3.3, album peak 0.0001, min/max 불일치] → 스텝 양자화 → change_gain_and_tag 가 적용분 재차감. skip_tag 면 apply_gain 직접(원본 changeGain 분기). album 은 곡별 track 값 + album 값(누적·peak=곡별 max·minmax=곡별 min/max 의 min/max) 둘 다 채움. 검증: auto(-0.79→-1스텝, track_gain 0.715, min/max 35/209, undo 1,1; 원복 정확), album 2곡 44.1k+48k(-5.05→-3스텝, 두 곡 album 값 -0.535 공유, undo 3,3).
-- **ID3v2 읽기/쓰기/제거** (`id3.py`): `read_mp3gain_id3_tag`(앞 ID3v2 → 끝 ID3v2.4 footer `3DI` → 끝 ID3v1; 끝 탐색 시 ID3v1/Lyrics3v2/APE 꼬리 스킵; 2.2/2.3/2.4 를 내부 2.4 로 통일 파싱: 업그레이드 테이블·unsync·ext header 스킵·프레임 드롭·2.3→2.4 DLEN 재정렬·2.2 PIC→APIC·TYER→TDRC; RVA2/TXXX/MP3GAIN 디코더, info=None 이면 매칭 판정만), `write_mp3gain_id3_tag`(항상 앞 단일 ID3v2.4·전체 unsync·ext header 없음·2KB 패딩·footer 없음; 기존 RG 프레임 제거 후 고정순서 append[ref_loudness "89.0 dB" → RVA2 track+TXXX track_gain → TXXX track_peak → RVA2 album+TXXX album_gain → TXXX album_peak → MINMAX → ALBUM_MINMAX → UNDO; TXXX desc 소문자, 인코딩 0/latin-1]; need_update 없으면 0 반환·무수정; 임시파일.TMP[version==0 이면 원본 전체 복사, 아니면 앞 ID3v2 만 들어내고 복사] → os.replace), `remove_mp3gain_id3_tag`(빈 info 로 write). 반환 규약: 1=기록, 0=변경불필요, 음수=에러. 값 포맷·게인 구조체·`_atof` 는 tag.py 재사용. 검증: read 5종(v2.4 full·RVA2-only·TXXX-only·v2.3·v1-only) + write 5종(round-trip·mutagen 상호운용·need_update=0·비-RG 프레임 보존·remove) 전부 PASS.
-- **useId3 분기 래핑(⑤-C)** (`tag._write_mp3gain_tag` / `tag.read_mp3gain_tags`): 원본 WriteMP3GainTag 동등(use_id3 면 write_mp3gain_id3_tag 후 반환 >=0 이면 stale APE 제거; 아니면 APE 만 — 원본 비대칭 유지) + main 의 태그 읽기 분기 동등(APE 먼저 → use_id3 이고 APE 에 mp3gain 정보 있으면 dirty 로 업그레이드 강제 → ID3 로 덮어쓰기). change_gain_and_tag·apply_track_gain·apply_album_gain 에 use_id3 인자 추가, steps==0 분기도 래퍼 경유. id3 import 는 순환 회피 위해 함수 내부 지연. 검증(verify_5c.py): 11건 PASS.
+- **APE 읽기/쓰기/제거** (`tag.py`): 파일 끝 APE/Lyrics3v2/ID3v1 꼬리 감지·tag_offset 산출, 비-mp3gain 필드 otherFields 보존, mp3gain 필드 고정순서 기록, Lyrics3/ID3v1 꼬리 재기록. 값 포맷 `%-+9.6f dB`/`%-8.6f`/`%03d,%03d`/`%+04d,%+04d,%c`. 검증: round-trip + mutagen 상호운용 + ID3v1 꼬리 보존.
+- **scan_gain + change_gain_and_tag**: scan_gain 은 전 프레임 min/max(디코딩 없음). change_gain_and_tag 는 apply 후 undo 누적 + 좌우 동일 시 gain/peak/minmax 갱신(dB 차감 1.505, peak ×2^(N/4)). 검증 완료.
+- **track_peak + auto/album 연결**: 원본 main 순서로 분석+track_peak+scan_gain → read 로 info 채우기(허용오차) → 스텝 양자화 → change_gain_and_tag 재차감. album 은 track+album 값 둘 다 채움. 검증 완료.
+- **ID3v2 읽기/쓰기/제거** (`id3.py`): 앞 ID3v2 → 끝 ID3v2.4 footer → 끝 ID3v1; 2.2/2.3/2.4 를 2.4 로 통일 파싱; RVA2/TXXX/MP3GAIN 디코더. write 는 항상 앞 단일 ID3v2.4·전체 unsync·2KB 패딩·footer 없음, 고정순서 append, 임시파일→os.replace. 검증 read 5종·write 5종 PASS.
+- **useId3 분기 래핑(⑤-C)** (`tag._write_mp3gain_tag`/`read_mp3gain_tags`): 원본 WriteMP3GainTag·main 태그 읽기 분기 동등. 검증 11건 PASS.
 
-검증 보조 스크립트/CLI: `inspect_tag.py`(APE 덤프), `verify_id3_read.py`/`verify_id3_write.py`/`verify_5c.py`/`verify_cli_*.py`(전부 git 제외·로컬 보존; fixture 생성부는 D-3 통합 테스트로 정식 등록 검토).
+**5단계 묶음 A·B 완료·검증 완료** (옵션 파서 + 직접 게인). `mp3gain_cli.py`. A: argv 순회 파서, `-v`/`-h`/`-?`/`-q`/`-o`/`-p`/`-t`/`-T` 즉시 동작, `Options`(`__slots__`). B: `-g`/`-l`(채널 0=왼쪽/그외 오른쪽)/`-u`. 부수: `FrameInfo.mode` 추가, 단일채널 거부 mode 1·3. 검증 37 PASS.
 
-**4단계 → 5단계로 미룬 항목(축소 아님, 1.1 합의됨)**: 클리핑 경고·자동 클립(-k)·클립 질의(-c 미지정), directGain/directSingleChannelGain 의 태그 연동, recalc 비트마스크(FULL/AMP/MIN_MAX) 디코딩 스킵 최적화, CLI 진입점의 use_id3 노출(원본 -s i). → **C-1~D-2 에서 모두 해소됨.**
+**5단계 묶음 C-1~C-3 완료·검증 완료**. C-1: 분석 경로 + 제안 출력(dBGainMod/-d 양자화 전, mp3GainMod/-m 양자화 후; Track/Album 클립 조건; 진행률 생략). C-2: `-r`/`-a` 적용(분석 수치 재사용, 단일 디코딩 패스). C-3: 클립 처리(autoClip `-k` 상한·`-c` 미지정 stdin y/n 질의; Album autoClip 하향은 루프 밖 1회). 각 39/27/27 PASS.
 
-**4단계 1.1 미합의 메모(추후 합의)**: ① writer.apply_gain 의 single-channel 거부 — **5단계 묶음 A·B 에서 mode 1·3 거부로 해소.** ② MP3GainTagInfo 동적 속성 할당 오타 위험 — Options 는 `__slots__` 적용, MP3GainTagInfo 는 dataclass(recalc 필드 포함)로 정의. ③ UTF-16(인코딩 1) TXXX 미인식은 원본 동일(원본도 인코딩 0/3 만 처리). ④ 48k 곡 track_peak>1.0(1.033) — 클립 방지(-k)에서 의미, 게인 산출엔 영향 없음(C-3 에서 처리). ⑤ ID3 round-trip gain 정밀도는 RVA2 격자가 아닌 TXXX 6자리로 결정 — 원본 동일.
+**5단계 묶음 D-1·D-2 완료·검증 완료**. D-1: `-s c` checkTagOnly + `-s d` deleteTag. D-2: `-s r`/`-s u` force recalc/update + recalc 비트마스크(FULL/AMP/MIN_MAX) 디코딩 스킵 + "update file tags" 블록. curAlbum 비교는 원본 그대로 부동소수 정확 일치(epsilon 미도입, 합의됨). 결과 수치 원본 동일, 디코딩 횟수만 다름. 검증 35/17 PASS.
 
-**5단계 묶음 A·B 완료·검증 완료** (옵션 파서 + 직접 게인 분기). `mp3gain_cli.py`. A: argv 순회 파서(2글자 토큰만 옵션·인자는 다음 토큰), `-v`/`-h`/`-?`/`-q`/`-o`/`-p`/`-t`/`-T` 즉시 동작, `Options`(`__slots__`). B: `-g`/`-l`(0=왼쪽/그외=오른쪽)/`-u`. 부수: `frame.FrameInfo.mode` 추가, `writer.apply_gain` 단일채널 거부를 mode 1·3 으로 확대(미합의 메모 ① 해소). 검증(verify_cli_ab.py): 37 PASS. 미검증 메모: 두 음원 모두 joint stereo(mode=1)라 `-l` 정상 적용 경로(stereo/dual)는 거부만 확인 — stereo/dual 음원 확보 시 정상 경로 추가 검증 필요(코드 결함 아님).
+**5단계 묶음 D-3 첫 갈래 완료(수동 검증)·자동 회귀는 통합 테스트로 대체 중** (커밋 7b0a392). 개발용 CLI 흡수(`scan_gain.py`·`inspect_tag.py` 삭제 → `mp3gain_cli.py --debug-scan`/`--debug-tag`), CLI 전면 영문화(errUsage/fullUsage/undo/direct/delete 등 원본 영문 verbatim, ffmpeg 실패는 영문 신규), fullUsage 에 `-s u` 줄 추가, CLI I/O 사양 docstring. 수동 검증 완료.
 
-**5단계 묶음 C-1 완료·검증 완료** (분석 경로 + 제안 출력). `_run_analysis`/`_analyze_one`/`_quantize_steps`/`_print_*`. dBGainMod(-d)는 양자화 전 dB, mp3GainMod(-m)는 양자화 후 스텝; Track 클립 `maxsample*2^(steps/4)>32767.0`, Album 곡별 `peak*2^(steps/4)>1.0`; maxAmpOnly(-x) dBchange=0; Album 조건 files>1&&!applyTrack&&!analysisTrack; NOT_ENOUGH_SAMPLES 제외; `-r/-a` 시 비-database 제안 억제. **진행률 표시 생략**(ffmpeg 일괄 디코딩의 부수 효과 — 1.1·7 디코더 예외). 검증(verify_cli_c1.py): 39 PASS. ffmpeg replaygain 실측과 0.02dB 이내 대조.
+**5단계 묶음 D-3 영문화 종결 완료·검증 완료** (커밋 d7ade1a). 코어·보조 CLI 의 사용자 대면 문자열을 전부 영문화(docstring·주석은 한국어 유지 — 합의됨). 대상: `apply_gain.py` CLI 출력 전체(`_run_manual`/`_run_auto`/`_run_album`/`main`), `gaindb/writer.py` 의 `apply_gain` 예외 2곳(단일채널 거부 ValueError·무손실 위반 RuntimeError), `gaindb/decode.py` DecodeError 8곳(ffprobe/ffmpeg 미발견·실패·미지원 샘플레이트·빈 출력 등), `gaindb/analysis.py` `_loudness_histogram` 의 ValueError 1곳. 원칙: 8항목 6단계 "다국어는 GUI(tr) 책임, CLI(코어+진입점)는 영문만". `frame.py`/`tag.py`/`id3.py` 는 사용자 대면 한국어 문자열 없음(주석·docstring만).
 
-**5단계 묶음 C-2 완료·검증 완료** (`-r`/`-a` 적용). C-1 분석 수치 재사용(단일 디코딩 패스). `_analyze_one` 이 `_fill_track_info` 로 info 채워 7-튜플 반환. `_apply_track`/`_apply_album_one` 헬퍼가 원본 분기·영어 문구 재현. Album 은 `_fill_album_info` 후 전 곡 동일 스텝. 검증(verify_cli_c2.py): 27 PASS — round-trip·no-change·skip_tag·Album 동일 스텝·`-m` 보정.
+**5단계 묶음 D-3 둘째 갈래 진행 중** (통합 테스트 정식 등록). `tests/`(unittest, 외부 의존 없음)에 단계 분할로 등록 중.
 
-**5단계 묶음 C-3 완료·검증 완료** (클립 처리 — autoClip `-k` + `-c` 미지정 stdin y/n 질의). `_query_user_for_clipping`·`_auto_clip_track`·`_auto_clip_album`·`_do_apply`/`_write_tag_only`. Track autoClip 상한 `floor(4*log10(32767/maxsample)/log10(2))`, Album 상한 `floor(-4*log10(maxmaxsample)/log10(2))`; autoClip 은 제안>상한일 때만 하향; **Album autoClip 하향은 전 곡 루프 밖에서 한 번만**(원본 `/*MAA*/`). 질의/문구 원본 영어 그대로(input() 등가·EOF→N). 검증(verify_cli_c3.py): 27 PASS.
+- **① 공통 인프라 완료**: `tests/__init__.py`·`tests/_support.py`·`tests/test_support_smoke.py`. `_support.py`: REPO_ROOT/MP3_DIR(환경변수 `GAINDB_TEST_MP3_DIR` 우선, 없으면 리포 루트)·`KNOWN_FIXTURES`·`fixture_path`/`available_fixtures`(음원 부재 시 SkipTest)·`FixtureGuard`(원본 해시 스냅샷/verify — D-3 오염 사고 재발 방지)·`BaseGainTest`(setUp 가드 스냅샷 + tempfile 사본, tearDown 정리 + 원본 무결성 verify, `copy_fixture`·`run_cli`[subprocess, UTF-8 고정]·`audio_body_sha256`). **`audio_body_sha256` 은 프레임 구간 해시**(parse_file 로 각 프레임 [offset,offset+frame_len) 만; 앞 ID3v2·끝 APE/ID3v1/Lyrics3 배제 → 게인 적용으로 태그가 생겨도 판정 안정). smoke 3건 PASS.
+- **② round-trip + 옵션 파싱 + 채널모드별 -l 완료** (커밋 5a5d74f): `tests/test_roundtrip_options.py`, 9건 PASS(smoke 포함 12). round-trip(joint/mono/stereo: `-g -3`→`-u` 프레임 비트동일), `-l <채널> <스텝>` 정상 경로(순수 stereo mode 0: 좌 0·우 1 각각 `-3`→`+3`)·거부(mono mode 3·joint stereo mode 1: returncode≠0 & 미수정), 옵션(`-v`/`-h` returncode 0·영문 확인). **round-trip 은 음수 스텝 먼저**(255 상한 클램프 회피 — 11항목 실증, 아래 fixture).
 
-**5단계 묶음 D-1 완료·검증 완료** (`-s c` checkTagOnly + `-s d` deleteTag). `_run_check_tag_only`(태그만 읽어 제안·peak·min/max 출력, 디코딩 없음; intGainChange=`db_to_steps(track/album_gain)` 보정 없음; database 11칸 NA; peak ×32768), `_run_delete_tag`(`remove_mp3gain_ape_tag` + use_id3 면 ID3 제거; deleteTag 는 태그 안 읽음). 검증(verify_cli_d1.py): 35 PASS. 원본 동일 메모: checkTagOnly 의 Album 클립 경고는 원본 그대로 `track_peak * 2^(steps/4) > 1.0` 참조(albumPeak 아님).
+**테스트 fixture 추가(ffmpeg 변형, git 제외·합의됨 1.1)**: 채널 모드 커버리지 구멍(순수 stereo·mono 경로 미검증)을 메우려 Debussy(44.1k) 원본에서 두 변형 생성. 생성 명령(재현용):
 
-**5단계 묶음 D-2 완료·검증 완료** (`-s r`/`-s u` force recalc/update + recalc 비트마스크 디코딩 스킵 + "update file tags" 블록). `mp3gain_cli.py` 변경(244+/67-). 정합:
+- mono(mode 3): `ffmpeg -i "Debussy - Arabesque No.1.mp3" -ac 1 -c:a libmp3lame -q:a 4 "test_mono_44k.mp3"`
+- stereo(mode 0): `ffmpeg -i "Debussy - Arabesque No.1.mp3" -ac 2 -joint_stereo 0 -c:a libmp3lame -q:a 4 "test_stereo_44k.mp3"`
 
-- **force update (`-s u`)**: 전 파일 태그를 읽기 전 `dirty = force_update_tag` 로 초기화(원본 `tagInfo[].dirty = forceUpdateTag`). 읽은 뒤에도 dirty 유지 → 변화 없어도 태그 기록. have_* 는 안 건드리므로 recalc==0(디코딩 스킵).
-- **force recalc (`-s r`)** (`_clear_for_recalc`): 태그 읽은 뒤 album/track 의 gain·peak·minmax 중 켜진 것마다 dirty 켜고 끔. **undo 보존**(원본 "NOT Undo information!").
-- **recalc 비트마스크**(FULL=1/AMP=2/MIN_MAX=4): 전 파일 태그 선행 읽기(`_read_all_tags`) 후 `_compute_recalc` — `album_recalc = (force_recalc or skip_tag) ? FULL : 0`; force_recalc/skip/delete 가 아니면 첫 파일 album 값 기준으로 곡별 track recalc(have_track_* 없으면 비트)와 album_recalc(have_album_* 없거나 첫 파일과 `!=` 면 비트) 채움. maxAmpOnly 면 gain 검사 스킵. 끝에 각 곡 `recalc |= album_recalc`. curAlbum* 비교는 **원본 그대로 부동소수 정확 일치(`!=`)** — clean-room 재현, epsilon 미도입(사용자 합의).
-- **디코딩 스킵**(`_analyze_one`, **ffmpeg 디코더 예외의 귀결 — 1.1·7 합의**): recalc==0 → ffmpeg·scan_gain 모두 스킵(태그값); recalc&(FULL|AMP) → ffmpeg 1회(FULL 이면 라우드니스 hist, 아니면 태그 track_gain 유지; peak 은 ffmpeg 결과); recalc&MIN_MAX 만 → ffmpeg 없이 scan_gain 만. **결과 수치는 원본 동일, 디코딩 횟수만 다름**(decode_pcm 전부-아니면-전무). album dB 도 `album_recalc & FULL` 이면 누적 재계산, 아니면 첫 파일 태그 album(없으면 track) 값.
-- **"update file tags" 블록**: 순수 분석 경로(applyTrack·applyAlbum·directGain·directSingleChannelGain·deleteTag·skipTag·checkTagOnly 모두 아님)에서 fileok 인 dirty 곡 태그만 `_write_mp3gain_tag` 로 기록(원본 끝 블록).
-- **구조 변경**: `main` 이 check/delete 제외 경로에서 `_read_all_tags`(선행 읽기)+`_compute_recalc` 후 undo/direct/분석 헬퍼에 `(info, file_tags)` 를 넘김(헬퍼는 더 이상 내부에서 태그를 읽지 않음). `_run_undo`/`_run_direct_single`/`_run_direct`/`_analyze_one`/`_run_analysis` 시그니처에 info·file_tags(또는 tags·album_recalc) 추가.
-- 검증(verify_cli_d2.py, git 제외): 17 PASS / 0 FAIL — 회귀(-g/-l/-r round-trip·undo 복원), 1차 분석 decode 호출+태그 완비, 2차 분석(태그 완비) decode_pcm 미호출, -s u decode 미호출+태그 보존, -s r decode 호출+재기록+undo 보존, update file tags. 관찰: -r -4 적용 후 -s r 재스캔 시 min/max=(0,0)·dB -0.79→-0.03 — 적용된 게인이 0-gain 클램프·음량에 반영된 "현재 상태"의 정확한 재계산(원본 동작 일치, 결함 아님; 11 항목에도 반영).
+mode 확인(gaindb.frame.parse_file): mono={3:10218}, stereo={0:10218}. 둘 다 MPEG1·44100Hz·CRC=no, min/max global_gain=141/255(stereo 채널별: L 141~252, R 142~255). `.gitignore`·`KNOWN_FIXTURES` 등록, 음원 부재 시 skip. MPEG2/2.5 변형은 샘플레이트 확장(1.1 미완) 때 함께 추가 예정(지금은 44.1k/48k 범위 유지 — 합의됨).
 
-**5단계 묶음 D-3 첫 갈래 완료(수동 검증)·자동 회귀 미확인** (개발용 CLI 흡수 + 전면 영문화 + CLI I/O 사양). 결과물·정합:
+**다음 = 5단계 묶음 D-3 둘째 갈래 계속 → ③ 분석·태그·클립 통합 테스트.** ①공통 인프라·②round-trip/옵션/채널모드 완료(위). 남은 것: ③ 분석(89dB·peak·track/album)·태그(APE/ID3 read·write·remove·round-trip·mutagen 상호운용)·클립(`-k` autoClip·`-c` stdin 질의) 검증을 단계 분할로 등록. 그다음 옛 verify_*.py 6개가 커버됨을 확인 후 삭제, 이어 셋째 갈래(로그 압축: 완료된 것의 how 압축, 합의·미완·제약의 what 보존). 모든 테스트는 원본 음원 불간섭·깨끗한 fixture 시작(11항목).
 
-- **개발용 CLI 흡수**: `scan_gain.py`·`inspect_tag.py` 를 삭제하고 `mp3gain_cli.py` 의 `--debug-scan`/`--debug-tag` 서브커맨드로 흡수(`_run_debug_scan`/`_run_debug_tag`). main 진입부에서 2글자 옵션 파서 전에 가로챈다(긴 `--` 플래그라 원본 옵션 체계와 충돌 없음). 출력은 영문(개발용 진단, 원본 재현 대상 아님). 2 트리의 "흡수 예정" 해소.
-- **전면 영문화**: CLI 의 한국어 안내·상태·오류 문구를 모두 영문으로. 원본 대응 원문(errUsage/fullUsage/wrapExplanation, undo/direct/delete 메시지, "Applying gain change of N to CHANNEL...", "done" 등)은 원본 영문 verbatim. 원본에 대응 없는 우리 측 메시지(ffmpeg 디코드 실패)는 영문 신규: `"Failed to analyze {path}: {exc}"`. directSingle 문구는 원본 순서(게인 먼저, CHANNEL 대문자)로 정정.
-- **fullUsage 에 `-s u` 줄 추가**(원본 누락 보정, 합의됨): 원본 fullUsage 는 `-s u` 를 코드엔 두고 도움말엔 누락. 우리는 구현·노출했으므로 도움말에도 추가.
-- **CLI I/O 사양 docstring**: `mp3gain_cli.py` 상단에 입력(옵션 표)·출력 채널(stdout=원본 기능 출력, stderr=상태/배너)·종료 코드·디버그 서브커맨드·localization 방침을 명문화. 다른 세션에서 CLAUDE.md + mp3gain_cli.py 만 봐도 I/O 계약 파악 가능.
-- **수동 검증 완료**: `--debug-scan`/`--debug-tag`(frame.py/tag.py 속성 가정 전부 적중), `-h`(영문·`-s u` 줄 확인)/`-v`/`-? wrap`, round-trip 무손실(`-g 3`→`-u` 후 오디오 본문 비트 동일). 커밋 7b0a392.
-- **자동 회귀 미확인(미완)**: 기존 verify_*.py 6개는 옛 함수 시그니처(`_run_direct` 등 D-2 에서 info/file_tags 인자 추가됨)·옛 한국어 문자열 기대·stdin 질의 멈춤·원본 음원 오염 때문에 깨진 상태. A~D-2 전체 기능 회귀가 영문화·흡수 후 코드에서 통과하는지는 통합 테스트 등록(D-3 둘째 갈래) 때 확인한다.
+**5단계 이후 = 6단계 GUI (PySide6, clean-room 재현, 5단계 완료 후 착수).** 세부 MVP 설계는 5단계 완료 후 사용자와 합의(8항목 6단계 참조).
 
-**다음 = 5단계 묶음 D-3 둘째 갈래 (통합 테스트 정식 등록) → 셋째 갈래 (진척 로그 압축).**
-- **둘째 갈래(통합 테스트)**: `tests/`(unittest 기반, 외부 의존 없음)에 정식 등록. 합의된 방향 — ① 공통 인프라(tempfile 사본 fixture·자동 정리·CLI 호출 헬퍼·stdin 주입)부터, 그다음 ② round-trip+옵션 파싱, ③ 분석·태그·클립을 단계 분할로 옮긴다(한 응답에 다 넣지 않음). 모든 테스트는 원본 음원 불간섭·깨끗한 fixture 시작(11 항목 영구 제약). 옛 verify_*.py 6개는 통합 테스트가 항목을 커버함을 확인한 뒤 삭제(지금은 안전망으로 보존, git 제외 유지). `python -m unittest` 일괄 실행 → 이후 6단계·확장의 회귀 자산.
-- **셋째 갈래(로그 압축)**: 완료된 것의 how 압축, 합의·미완·제약의 what 보존(3 항목·1.1·1.2 준수).
+**테스트 음원 상태**: Debussy(44.1k)·10cm(48k) 원본은 mp3gain 태그 없는 순수 상태(128바이트 ID3v1 꼬리만). 변형 fixture(test_mono_44k·test_stereo_44k)는 git 제외 생성물. 통합 테스트는 전부 tempfile 사본에서 시작.
 
-**테스트 음원 상태(세션 끝 기준)**: Debussy(44.1k)·10cm(48k) 두 원본 모두 mp3gain 태그 없는 순수 상태로 복구 완료(128바이트 ID3v1 꼬리만 보존). 다음 세션 통합 테스트는 이 깨끗한 원본의 tempfile 사본에서 시작.
-
-**5단계 이후 = 6단계 GUI (PySide6, clean-room 재현, 5단계 완료 후 착수).** 세부 MVP 설계는 5단계 완료 후 사용자와 합의해 정한다(8 항목 6단계 참조).
-
+- **영문화 잔여 메모 해소됨** (D-3, 커밋 d7ade1a): `apply_gain.py`·`writer.py`·`decode.py`·`analysis.py` 의 사용자 대면 한국어 문자열 전부 영문화 완료. 라이브러리 예외도 "코어는 영문" 원칙 적용(합의됨). 남은 한국어는 docstring·주석뿐(의도적 유지).
 - 로컬에 미커밋 변경분이 생기면 첫 메시지에 함께 알린다.

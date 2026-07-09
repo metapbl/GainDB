@@ -128,11 +128,16 @@ class BaseGainTest(unittest.TestCase):
         """통합 CLI(mp3gain_cli.py)를 실제 subprocess 로 실행.
 
         반환: subprocess.CompletedProcess (returncode/stdout/stderr).
-        인코딩은 UTF-8 고정(9항목 PowerShell 인코딩 함정 회피).
+        인코딩은 UTF-8 고정(9항목 PowerShell 인코딩 함정 회피). 자식 파이썬의
+        stdout/stderr 도 UTF-8 로 쓰도록 PYTHONIOENCODING/PYTHONUTF8 을 넘긴다
+        (한글 파일명이 콘솔 기본 cp949 로 찍혀 디코딩이 깨지는 것을 방지).
         """
         if not CLI_SCRIPT.is_file():
             raise unittest.SkipTest(f"CLI not found: {CLI_SCRIPT}")
         cmd = [sys.executable, str(CLI_SCRIPT), *map(str, args)]
+        env = dict(os.environ)
+        env["PYTHONIOENCODING"] = "utf-8"
+        env["PYTHONUTF8"] = "1"
         return subprocess.run(
             cmd,
             cwd=str(REPO_ROOT),
@@ -140,6 +145,7 @@ class BaseGainTest(unittest.TestCase):
             capture_output=True,
             text=True,
             encoding="utf-8",
+            env=env,
         )
 
     def audio_body_sha256(self, path: str) -> str:

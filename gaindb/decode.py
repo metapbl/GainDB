@@ -9,6 +9,13 @@ MP3 → PCM 디코딩 모듈.
 ReplayGain 분석기(analysis.py)에 입력을 공급하는 단계.
 출력 샘플 스케일은 원본 ReplayGain 사양(16비트 정수, ±32768)에 맞춘다.
 ffmpeg 의 f32le 는 ±1.0 정규화 출력이므로 32768 을 곱해 스케일을 일치시킨다.
+
+모노 처리(원본 mp3gain 정합): 원본은 모노 신호를 원진폭 그대로 한 채널로
+분석하고, 라우드니스 계산에서 좌우를 동일 신호로 취급한다((lsum+rsum)*0.5).
+ffmpeg 의 -ac 2 up-mix 는 모노를 스테레오로 펼치며 각 채널을 1/√2 로 감쇠해
+평균제곱을 절반(=3dB 낮게)으로 만들어 원본과 어긋난다. 따라서 모노 파일은
+-ac 1 로 원진폭 그대로 디코딩한 뒤 코드에서 left=right 로 복제한다(감쇠 없음).
+스테레오/조인트/듀얼(2채널)은 기존대로 -ac 2 로 그대로 받는다.
 """
 
 from __future__ import annotations
@@ -33,13 +40,13 @@ class DecodeError(RuntimeError):
     """ffmpeg/ffprobe 호출 실패 또는 디코딩 불가 상황."""
 
 
-def _probe_sample_rate(path: Path) -> int:
-    """ffprobe 로 첫 오디오 스트림의 샘플레이트(Hz)를 조회한다."""
+def _probe_stream_info(path: Path) -> tuple[int, int]:
+    """ffprobe 로 첫 오디오 스트림의 (샘플레이트 Hz, 채널 수)를 조회한다."""
     cmd = [
         "ffprobe",
         "-v", "error",
         "-select_streams", "a:0",
-        "-show_entries", "stream=sample_rate",
+        "-show_entries", "stream=sample_rate,channels",
         "-of", "json",
         str(path),
     ]
@@ -58,13 +65,15 @@ def _probe_sample_rate(path: Path) -> int:
 
     try:
         info = json.loads(proc.stdout.decode("utf-8", "replace"))
-        rate = int(info["streams"][0]["sample_rate"])
+        stream = info["streams"][0]
+        rate = int(stream["sample_rate"])
+        channels = int(stream["channels"])
     except (ValueError, KeyError, IndexError) as exc:
         raise DecodeError(
-            f"Could not read sample rate from ffprobe output: {path}"
+            f"Could not read stream info from ffprobe output: {path}"
         ) from exc
 
-    return rate
+    return rate, channels
 
 
 def decode_pcm(path: str | Path) -> tuple[np.ndarray, np.ndarray, int]:
@@ -72,7 +81,9 @@ def decode_pcm(path: str | Path) -> tuple[np.ndarray, np.ndarray, int]:
     MP3 파일을 디코딩해 (left, right, sample_rate) 를 반환한다.
 
     - left, right: np.ndarray(dtype=float64), 원본 사양 스케일(±32768).
-      모노 원본도 ffmpeg 가 좌우 동일 신호로 복제하므로 항상 2채널로 받는다.
+      모노 원본은 -ac 1 로 원진폭 그대로 디코딩해 좌우를 동일 신호로 복제한다
+      (ffmpeg -ac 2 up-mix 의 1/√2 감쇠를 피해 원본 mp3gain 과 정합).
+      스테레오(2채널)는 -ac 2 로 그대로 받는다.
     - sample_rate: int(Hz). ReplayGain 지원 목록에 없으면 DecodeError.
 
     실패 시 DecodeError 를 던진다.
@@ -81,21 +92,23 @@ def decode_pcm(path: str | Path) -> tuple[np.ndarray, np.ndarray, int]:
     if not path.is_file():
         raise DecodeError(f"File not found: {path}")
 
-    sample_rate = _probe_sample_rate(path)
+    sample_rate, channels = _probe_stream_info(path)
     if sample_rate not in SUPPORTED_SAMPLE_RATES:
         raise DecodeError(
             f"Unsupported sample rate: {sample_rate} Hz "
             f"(supported: {sorted(SUPPORTED_SAMPLE_RATES, reverse=True)})"
         )
 
-    # 원본 샘플레이트 유지(-ar 강제 금지), 스테레오 고정, 32비트 float LE.
+    # 모노는 원진폭 유지 위해 1채널로, 그 외는 2채널로 디코딩.
+    # (원본 샘플레이트 유지: -ar 강제 금지. 32비트 float LE.)
+    out_channels = 1 if channels == 1 else 2
     cmd = [
         "ffmpeg",
         "-v", "error",
         "-i", str(path),
         "-f", "f32le",
         "-acodec", "pcm_f32le",
-        "-ac", "2",
+        "-ac", str(out_channels),
         "-",
     ]
     try:
@@ -114,13 +127,19 @@ def decode_pcm(path: str | Path) -> tuple[np.ndarray, np.ndarray, int]:
     if len(raw) == 0:
         raise DecodeError(f"Decoding produced no output: {path}")
 
-    interleaved = np.frombuffer(raw, dtype="<f4")
-    # 2채널 인터리브이므로 짝수 길이여야 한다.
-    if interleaved.size % 2 != 0:
-        # 비정상 종료 등으로 마지막 샘플이 잘린 경우 한 샘플 버린다.
-        interleaved = interleaved[: interleaved.size - 1]
+    samples = np.frombuffer(raw, dtype="<f4")
 
-    frames = interleaved.reshape(-1, 2)
+    if out_channels == 1:
+        # 모노: 원진폭 그대로 좌우 복제. float64 승격 + 사양 스케일.
+        mono = samples.astype(np.float64) * _PCM_SCALE
+        return mono, mono.copy(), sample_rate
+
+    # 스테레오: 2채널 인터리브이므로 짝수 길이여야 한다.
+    if samples.size % 2 != 0:
+        # 비정상 종료 등으로 마지막 샘플이 잘린 경우 한 샘플 버린다.
+        samples = samples[: samples.size - 1]
+
+    frames = samples.reshape(-1, 2)
     # float64 로 승격(필터 누산 정밀도) + 원본 사양 스케일로 변환.
     left = frames[:, 0].astype(np.float64) * _PCM_SCALE
     right = frames[:, 1].astype(np.float64) * _PCM_SCALE

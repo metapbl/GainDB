@@ -10,6 +10,8 @@
 - -c(ignore_clip_warning): 클립이어도 질의 없이 그대로 적용.
 - -s c 상세: 심은 값 그대로 출력(수치 대조), 비파괴(전체 바이트 동일),
   database 11칸.
+- min/max 스캔 회귀: -s s / -x 등 어느 recalc 경로에서도 global_gain
+  min/max 가 0/0 이 아니라 실제 값으로 출력됨(scan_gain 과 대조).
 
 원본 불간섭(11항목): 모든 작업은 tempfile 사본에서만(BaseGainTest).
 """
@@ -20,6 +22,7 @@ import re
 from math import log10, floor
 
 from gaindb.tag import read_mp3gain_ape_tag
+from gaindb.writer import scan_gain
 from gaindb.analysis import db_to_steps
 from mp3gain_cli import _auto_clip_track, _auto_clip_album
 from tests._support import BaseGainTest
@@ -33,6 +36,32 @@ def _find_float(pattern, text):
 def _find_int(pattern, text):
     m = re.search(pattern, text)
     return int(m.group(1)) if m else None
+
+
+def _parse_db_row_minmax(stdout):
+    """-o 출력에서 (max_global_gain, min_global_gain) 을 뽑는다.
+
+    -o 기본 행 칸 순서:
+      File, MP3 gain, dB gain, Max Amplitude, Max global_gain, Min global_gain
+    파일명에 공백이 있어도 뒤 숫자 칸은 안전하므로 뒤에서부터 읽는다
+    (Max=[-2], Min=[-1]). 헤더('File\t...')와 "Album" 행은 건너뛰고
+    파일 데이터 행 하나를 고른다. 없으면 (None, None).
+    """
+    for ln in stdout.splitlines():
+        if "\t" not in ln:
+            continue
+        if ln.startswith("File\t"):
+            continue
+        if ln.startswith('"Album"'):
+            continue
+        cols = ln.split("\t")
+        if len(cols) < 6:
+            continue
+        try:
+            return int(cols[-2]), int(cols[-1])
+        except ValueError:
+            continue
+    return None, None
 
 
 def _read_all_bytes(path):
@@ -205,6 +234,64 @@ class CheckTagDetailTest(BaseGainTest):
         self.assertNotEqual(cols[2], "NA")
         self.assertEqual(cols[6], "NA")
         self.assertEqual(cols[7], "NA")
+
+
+class MinMaxScanRegressionTest(BaseGainTest):
+    """global_gain min/max 스캔 회귀 (커밋 d8b44cc).
+
+    버그: min/max 스캔이 MIN_MAX_GAIN_RECALC 비트에만 묶여 있어, 그 비트가
+    없는 recalc 경로(-s s 는 FULL 만, -x 는 AMP 만)에서 Max/Min global_gain 이
+    0/0 으로 떨어졌다. 원본 mp3gain 은 scanFrameGain 을 어느 recalc 경로에서든
+    실행하므로 min/max 는 항상 나온다. 이를 재현·고정한다.
+
+    기대값은 scan_gain(사본)을 직접 불러 동적으로 구한다(fixture 가 ffmpeg 로
+    재생성돼도 안 깨지고, scan_gain 은 프레임 파싱만 하는 순수 함수라 신뢰
+    가능한 기준이다). CLI -o 출력의 Max/Min 칸이 이 값과 일치하고, 결정적으로
+    0/0 이 아님을 확인한다(이 버그의 증상이 정확히 0/0 이었음).
+
+    채널 모드 커버리지를 위해 stereo(mode 0)·mono(mode 3) 변형 fixture 를
+    순회한다(둘 다 max global_gain=255 포함). 없으면 SkipTest.
+    """
+
+    FIXTURES = ("test_stereo_44k.mp3", "test_mono_44k.mp3")
+
+    def _expected_minmax(self, path):
+        """scan_gain 반환을 (min, max) 로 정규화한다.
+
+        mp3gain_cli 는 min_gain, max_gain = scan_gain(path) 순으로 언팩하므로
+        (min, max) 튜플을 전제한다. 만약 실제 순서가 반대면 이 한 곳만 뒤집으면
+        된다(테스트 전반이 이 헬퍼를 경유).
+        """
+        a, b = scan_gain(path)
+        return a, b  # (min, max)
+
+    def _check(self, opt_args):
+        for name in self.FIXTURES:
+            with self.subTest(fixture=name):
+                path = self.copy_fixture(name)  # 없으면 SkipTest
+                exp_min, exp_max = self._expected_minmax(path)
+
+                r = self.run_cli(["-o", *opt_args, path])
+                self.assertEqual(r.returncode, 0, msg=r.stderr)
+
+                got_max, got_min = _parse_db_row_minmax(r.stdout)
+                self.assertIsNotNone(got_max, "no data row parsed")
+                # 회귀 핵심: 0/0 이 아니어야 한다.
+                self.assertFalse(got_max == 0 and got_min == 0,
+                                 "min/max collapsed to 0/0 (regression)")
+                # scan_gain 정답과 일치.
+                self.assertEqual(got_max, exp_max,
+                                 "CLI max global_gain must match scan_gain")
+                self.assertEqual(got_min, exp_min,
+                                 "CLI min global_gain must match scan_gain")
+
+    def test_skip_tag_reports_minmax(self):
+        # -s s: FULL 만 켜지는 경로. 수정 전엔 0/0 이었음.
+        self._check(["-s", "s"])
+
+    def test_maxamponly_reports_minmax(self):
+        # -x: AMP 만 켜지는 경로. min/max 는 여전히 나와야 한다.
+        self._check(["-x", "-s", "s"])
 
 
 if __name__ == "__main__":

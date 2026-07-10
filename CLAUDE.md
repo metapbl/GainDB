@@ -81,6 +81,8 @@ GaindB/
 │  │  ├─ mp3gain.exe           # [검증 기준] MSYS2+MinGW 로 빌드한 원본 1.6.2 CLI. git 제외
 │  │  └─ (replaygaindll.*, *.dsp/.dsw/.sln/.vcproj/.rc, resource.h, Makefile — 빌드·래퍼, 무시)
 │  └─ mp3gain-win-gui-1_3_4-src/  # 원본 Windows GUI(VB) 소스. 8단계 외관·동작 참고용(clean-room, 복붙 금지)
+├─ docs/
+│  └─ LICENSE_REVIEW.md    # 7단계 배포 라이선스 1차 점검 기록
 ├─ CLAUDE.md               # 이 컨텍스트 파일
 ├─ CopyClaudeMd.bat        # CLAUDE.md 사본 동기화 스크립트
 ├─ .gitignore
@@ -108,7 +110,7 @@ GaindB/
 4. **[완료] 태그 처리** — APEv2 읽기·쓰기·갱신·제거, scanFrameGain(min/max), changeGainAndTag 동등, undo, auto/album 연결. otherFields·Lyrics3/ID3v1 꼬리 보존. ID3v2(RVA2/TXXX) 포함.
 5. **[완료] CLI / 옵션 / 일괄 처리** — 원본 옵션을 빠짐없이 재현(`-r`/`-a`/`-e`/`-g`/`-l`/`-d`/`-m`/`-k`/`-c`/`-w`/`-s c|d|s|r|u|i|a`/`-u`/`-o`/`-q`/`-p`/`-x`/`-f`/`-t`/`-T` 등), 클리핑 경고·자동 클립(`-k`), database 출력(`-o`) 포함. 통합 테스트 스위트로 검증.
 6. **[완료] 샘플레이트 확장 (원본 동일 재현 완결)** — 44.1k·48k 외 ReplayGain 사양 전 샘플레이트(32k / MPEG2·MPEG2.5 계열)를 코어에 추가·검증. 계수는 공개 표준값 전사(자체 재설계는 비공개 target 곡선으로 불가 — 상세 10), frame.py MPEG2/2.5 파싱 실측 재검증(수정 불필요), mono 분석 3dB 버그 발견·수정, MPEG2/2.5 fixture·테스트 편입.
-7. **[6단계 후] 배포 라이선스 정합성 준비·검토** — 배포 대비 LGPL 구속 회피 근거 정리·점검. (a) clean-room 자체 점검: 코어·CLI·GUI 어디에도 원본 C·VB 코드가 옮겨지지 않았고 결과 일치·코드 독립임을 확인(2). (b) 배포 시 검토 항목: PySide6(LGPL) 링크 방식, ffmpeg 동봉 여부(GPL), 원본 소스 git 제외 상태 등. GPT·Claude 최신 모델 교차검증으로 1차 수행. **실제 공개 배포 직전의 최종 확인은 자격 있는 전문가(변호사) 검토를 남겨둔다 — AI 교차검증은 1차 수단일 뿐 법적 책임·자격을 대체하지 못한다(2.3). 로컬 개인 사용 단계에서는 불필요.**
+7. **[완료] 배포 라이선스 정합성 준비·검토** — 배포 대비 LGPL 구속 회피 근거 정리·점검. (a) clean-room 자체 점검: 코어·CLI·GUI 어디에도 원본 C·VB 코드가 옮겨지지 않았고 결과 일치·코드 독립임을 확인(2). (b) 배포 시 검토 항목: PySide6(LGPL) 링크 방식, ffmpeg 동봉 여부(GPL), 원본 소스 git 제외 상태 등. GPT·Claude 최신 모델 교차검증으로 1차 수행. **실제 공개 배포 직전의 최종 확인은 자격 있는 전문가(변호사) 검토를 남겨둔다 — AI 교차검증은 1차 수단일 뿐 법적 책임·자격을 대체하지 못한다(2.3). 로컬 개인 사용 단계에서는 불필요.**
 8. **[7단계 후] GUI (PySide6, clean-room 재현)** — 원본 MP3GainGUI 의 외관·기능·동작을 PySide6 로 동일 재현하되 VB 코드를 옮기지 않고 공개 동작만 보고 독립 구현(2). 기존 코어 + CLI 위에 얹는 새 프런트엔드(코어 재작성 없음). Windows·macOS 크로스플랫폼. **세부 MVP 설계(화면·버튼·옵션 구성·순서)는 착수 전 사용자와 합의해 정한다**(2.1). 원본 GUI 소스는 **VB6**(`.vbp`/`.frm`/`.frx`/`.bas`/`.cls`). 구성(관찰): 메인 창(`frmMain`)·옵션(`frmOptions`)·게인 입력(`frmGetGain`)·로그(`frmLogs`)·시스템 트레이(`frmSysTray`)·정보/기부/면책 다이얼로그, 경고 모달들(`frmStereoWarning`=단일채널 거부, `frmLayerCheckWarning`=Layer 오인, `frmSkipTagsWarn`/`frmReadOnly`/`frmResetWarn` 등); 모듈 `basLocalizer`(다국어)·`basSaveAnalysis`·`basListViewSort`·`Mp3Info.cls` 등. 다수 경고 폼은 CLI 가 이미 동작으로 재현한 상황의 GUI 대응 — 이 매핑을 PySide6 다이얼로그로 재현(화면·동작 관찰만, 복붙 금지). **다국어(한국어·영어)는 GUI 계층의 책임(합의됨): CLI 는 영문만 출력하고, 화면 표기의 다국어화는 PySide6 의 tr()/번역 파일로 GUI 에서 처리한다**(원본 basLocalizer 대응).
 
 ## 7. 개발 환경 · 작업 흐름
@@ -182,7 +184,7 @@ GaindB/
 **통합 테스트 스위트 (tests/, unittest, 외부 의존 없음).** `python -m unittest discover -s tests` 로 실행·전부 PASS. 옛 verify_*.py 8개를 대체·흡수하고 삭제. 모든 테스트는 원본 음원 불간섭 — tempfile 사본에서만 동작, `FixtureGuard` 가 원본 해시로 오염 감시, 무결성 판정은 `audio_body_sha256`(프레임 구간; 태그 생성·undo 0 잔존과 무관). 구성:
 
 - `_support.py` — REPO_ROOT/MP3_DIR(환경변수 `GAINDB_TEST_MP3_DIR` 우선), `KNOWN_FIXTURES`, `BaseGainTest`(사본·가드·`run_cli`[subprocess, UTF-8 강제]·`audio_body_sha256`).
-- `test_support_smoke`(3) / `test_roundtrip_options`(9) / `test_analysis_integration`(6) / `test_tag_integration`(7) / `test_options_parsing`(9) / `test_recalc_decode_skip`(5) / `test_cli_misc`(11+2 회귀) / `test_useid3_migration`(4) / `test_samplerate_expansion`(24).
+- `test_support_smoke`(3) / `test_roundtrip_options`(9) / `test_analysis_integration`(6) / `test_tag_integration`(7) / `test_options_parsing`(9) / `test_recalc_decode_skip`(5) / `test_cli_misc`(11+2 회귀) / `test_clip_integration` / `test_useid3_migration`(4) / `test_samplerate_expansion`(24). (전체 86건 PASS 기준; 개별 건수 표기는 근사.)
 - **verify_* → 통합 스위트 매핑**: cli_ab→options_parsing+roundtrip/tag, c1→analysis+cli_misc, c2→analysis/tag+cli_misc, c3→clip+cli_misc, d1→tag+cli_misc, d2→recalc_decode_skip, 5c→useid3_migration.
 - **mutagen 상호운용·exe 대조는 통합 스위트 밖(합의됨)**: 외부도구 상호운용·정답지 대조는 mutagen/exe 부재 환경 skip 오염을 피해 `manual_checks/`(git 제외)에 로컬 보존·수동 실행.
 
@@ -200,4 +202,10 @@ GaindB/
 - **허용오차 0.1dB 로 상향(합의됨).** 기존 "0.02dB 이내"를 0.1dB 로 조정. 사유: 저샘플레이트에서 디코더 차이(mpg123 vs ffmpeg)가 히스토그램 0.01dB 경계 양자화와 맞물려 실측 최대 0.06dB(32k 0.03, 24k 0.06). 2.1 "결과 일치" 완화가 아니라, 디코더가 항구적 예외(2.1)인 프로젝트에서 디코더 차이로 인한 불가피 편차의 실측 상한을 정한 것. 계수 오류(수 dB)는 이 기준으로 확실히 걸러짐.
 - **검증 인프라.** 새 fixture 9개(`test_{32k,24k,22k,16k,12k,11k,8k}.mp3`, `test_mono_{24k,12k}.mp3` — Debussy 에서 ffmpeg 변형, git 제외, `.gitignore`·`KNOWN_FIXTURES` 등록). 통합 스위트에 `test_samplerate_expansion.py` 추가(24건: FrameParse 9 / RoundTrip 6 / Analysis 9) → 전체 86건 PASS(커밋 04b9818). exe dB 정답 대조는 `manual_checks/compare_exe_lowrate.py`(git 제외, 로컬 수동). exe 실행은 VS Code 터미널에서 `$env:PATH="C:\msys64\ucrt64\bin;"+$env:PATH` 후 가능(MinGW DLL 경로).
 
+찾기:
 **다음 = 7단계 배포 라이선스 정합성 준비·검토.** 1~6단계 완료(코어의 원본 재현 완결). 7단계: 배포 대비 clean-room 자체 점검(코어·CLI·GUI 어디에도 원본 C·VB 코드가 옮겨지지 않음 확인) + LGPL 구속 회피 근거 정리(PySide6 링크 방식, ffmpeg 동봉 여부, 원본 소스 git 제외 상태), AI 교차검증 1차 + 전문가 최종 확인. 로컬 개인 사용 단계에서는 불필요(2.3). 그다음 8단계 GUI(PySide6, clean-room 재현, MVP 설계는 착수 전 합의).
+
+바꾸기:
+**7단계 완료 (배포 라이선스 정합성 1차 점검).** 코어+CLI 대상 점검·문서화 완료. (a) clean-room 자체 점검: 원본 C 소스(apetag/gain_analysis/id3tag/mp3gain.c)와 직접 대조 → 전 모듈 부합(차용은 알고리즘·계수 수치·비트 레이아웃·태그 포맷·옵션 체계 등 저작권 비대상뿐, 코드 독립). (b) 조치 3건: 도움말 산문 재작성(a7bf719 — `_wrap_explanation`/`_full_usage`가 원본 산문 verbatim이라 옵션·동작 유지하고 설명 문장만 독립 표현으로), analysis.py 계수 출처 정직 기재(a7bf719 — 실질 출처는 gain_analysis.c ABYule/ABButter 상수표), 주석 표현 정리(816fe81 — "원본 X 동등"류 → 결과 대응·독립 구현 취지). (c) git 분리 확인: `git ls-files`로 원본 C·VB·exe·fixture·음원 전부 추적 제외 확인. (d) 의존성 매트릭스: numpy·scipy(BSD, 고지만) / PySide6(LGPLv3, 동적링크·고지·재링크 보장) / ffmpeg(외부 호출은 전파 없음=기본안, 동봉 시 LGPL 빌드만 허용·GPL 빌드 금지). 산출물 `docs/LICENSE_REVIEW.md`(72719fb) — GPT 교차검증·전문가 최종 확인용 근거. **전문가 최종 확인은 실제 배포 직전 남겨둠, 로컬 개인 사용 단계에선 불필요(2.3).**
+
+**다음 = 8단계 GUI (PySide6, clean-room 재현).** 1~7단계 완료. 8단계: 원본 MP3GainGUI(VB6)의 외관·기능·동작을 PySide6로 동일 재현하되 VB 코드를 옮기지 않고 공개 동작만 보고 독립 구현(2). 기존 코어+CLI 위에 얹는 새 프런트엔드. Windows·macOS 크로스플랫폼. **세부 MVP 설계(화면·버튼·옵션 구성·순서)는 착수 전 사용자와 합의**(2.1, 6단계 로드맵 8번). 다국어(한국어·영어)는 GUI tr() 책임(CLI는 영문만). 원본 GUI 소스는 로컬 `mp3gain/mp3gain-win-gui-1_3_4-src/`에 보관(git 제외), 착수 시 사용자가 필요한 .frm/.bas 등을 붙여넣어 제공.

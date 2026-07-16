@@ -69,10 +69,10 @@ GaindB/
 ├─ apply_gain.py           # CLI: 수동/auto/album 게인 적용
 ├─ mp3gain_cli.py          # 통합 CLI 진입점(원본 mp3gain 옵션 체계 재현)
 ├─ tests/                  # 통합 테스트 스위트(unittest, 외부 의존 없음)
-├─ manual_checks/          # 외부도구 상호운용·exe 대조(git 제외, 로컬 수동)
-│  ├─ compare_exe_lowrate.py   # 6단계 저샘플레이트 exe dB 대조
-│  ├─ verify_id3_read.py       # ID3v2 읽기 상호운용 확인
-│  └─ verify_id3_write.py      # ID3v2 쓰기 상호운용 확인
+├─ manual_checks/          # 통합 스위트 밖 로컬 수동 검증(git 제외, mutagen/exe 상호운용·대조)
+│  ├─ compare_exe_lowrate.py   # 6단계 저샘플레이트 dB를 원본 exe와 -o -s s 대조(사본·scan only)
+│  ├─ verify_id3_read.py       # 4단계 ID3v2 읽기 경로 검증(mutagen으로 작성→우리 read)
+│  └─ verify_id3_write.py      # 4단계 ID3v2 쓰기 경로 검증(우리 write→mutagen read, round-trip)
 ├─ mp3gain/                # 원본 C·GUI 소스(LGPL, 사양 참고용). git 제외
 │  ├─ LICENSE  Makefile  README.md
 │  ├─ src/

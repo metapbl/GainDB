@@ -1,218 +1,200 @@
-"""gui/model.py — 파일 목록 테이블 모델.
-
-FileRow: 파일 한 개의 상태. gaindb.api.analyze_file 이 돌려준 dict 를 통째로
-보관하고(raw 값이 재계산의 씨앗), GUI 전용 필드(경로·상태·에러)만 얹는다.
-dict 키를 바깥에서 직접 만지지 않도록 헬퍼(get/set_result/clear_result)를 둔다.
-
-FileTableModel: QAbstractTableModel. 표시 포맷과 3색(clip 색상)을 담당하되,
-모든 수치는 api 가 계산한 값을 표시만 한다(GUI 무계산 원칙). 3색은 원본
-DispJunk 의 vbBlack/vbBlue/vbRed 동작을 관찰해 독립 구현(색값은 저작권 비대상).
-"""
-
+"""Qt table model for the MP3 gain file list (clean-room)."""
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from typing import Any, Optional
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QColor
 
 from gui.columns import COLUMNS, COLUMN_COUNT, Col
 
-
-# clip_state → 글자색(원본 DispJunk 대응). 색값은 관찰된 동작이라 차용 가능.
-_CLIP_COLOR = {
-    "none": QColor(Qt.GlobalColor.black),
-    "possible": QColor(Qt.GlobalColor.blue),
-    "definite": QColor(Qt.GlobalColor.red),
-}
-
-# clip 컬럼에 보일 문자열(원본 strClipYes="Y" / strClipMaybe="???").
-_CLIP_TEXT = {"none": "", "possible": "???", "definite": "Y"}
-
-# 빈 값 표시(원본은 " " 를 넣어 컬럼 폭을 유지).
-_BLANK = " "
+# Custom role used by the sort proxy to fetch the raw (typed) sort value
+# instead of the formatted display string.
+SORT_ROLE = int(Qt.ItemDataRole.UserRole) + 1
 
 
 @dataclass
 class FileRow:
-    """리스트의 한 행(파일 하나).
+    """One entry in the file list.
 
-    path         : 절대 경로(고유 식별자).
-    result       : analyze_file 결과 dict. 미분석이면 None.
-    status       : "pending" | "analyzed" | "applied" | "error" | "no_samples".
-    error_msg    : 에러 시 사람이 읽을 메시지(없으면 None).
+    `result` holds the full dict returned by api.analyze_file (or None until
+    analyzed). GUI-only bookkeeping lives in the other fields.
     """
+
     path: str
-    result: dict | None = None
-    status: str = "pending"
-    error_msg: str | None = None
-
-    @property
-    def display_name(self) -> str:
-        # MVP 는 전체 경로 표기(원본 기본 PATHFILE). 파일명만/경로분리 표기는 후속.
-        return self.path
-
-    @property
-    def clip_state(self) -> str:
-        if self.result is None:
-            return "none"
-        return self.result.get("clip_state", "none")
-
-    def get(self, key, default=None):
-        """result dict 에서 값 하나를 안전하게 꺼낸다(미분석이면 default)."""
-        if self.result is None:
-            return default
-        return self.result.get(key, default)
+    result: Optional[dict] = None
+    status: str = "pending"  # pending | analyzed | applied | error
+    error_msg: str = ""
 
     def set_result(self, result: dict) -> None:
-        """분석/재계산 결과를 반영하고 status 를 갱신한다."""
         self.result = result
-        self.error_msg = None
-        if result.get("status") == "not_enough_samples":
-            self.status = "no_samples"
-        else:
-            self.status = "analyzed"
+        self.status = "analyzed"
+        self.error_msg = ""
 
     def mark_applied(self, result: dict) -> None:
-        """적용 후(shift_after_apply 결과 등)를 반영한다."""
         self.result = result
-        self.error_msg = None
         self.status = "applied"
+        self.error_msg = ""
 
-    def mark_error(self, message: str) -> None:
-        self.error_msg = message
+    def mark_error(self, msg: str) -> None:
         self.status = "error"
+        self.error_msg = msg
 
     def clear_result(self) -> None:
-        """분석 결과를 지우고 pending 으로 되돌린다(원본 Clear Analysis)."""
         self.result = None
-        self.error_msg = None
         self.status = "pending"
+        self.error_msg = ""
 
 
-def _fmt_db(value) -> str:
-    """dB 값 표시(원본 Format$(..., "0.0")). None 이면 빈칸."""
-    if value is None:
-        return _BLANK
-    return f"{value:.1f}"
+def _fmt_db(value: Optional[float]) -> str:
+    return "" if value is None else f"{value:.1f}"
 
 
-def _fmt_int(value) -> str:
-    if value is None:
-        return _BLANK
-    return f"{int(value)}"
+def _fmt_int(value: Optional[int]) -> str:
+    return "" if value is None else str(value)
+
+
+# Warning colors only. "none" is intentionally left unset so the OS palette
+# supplies the correct text color (fixes invisible black text in dark mode).
+_CLIP_COLORS = {
+    "possible": QColor(0, 0, 255),   # blue
+    "definite": QColor(255, 0, 0),   # red
+}
+
+_CLIP_TEXT = {
+    "none": "",
+    "possible": "?",
+    "definite": "clip",
+}
 
 
 class FileTableModel(QAbstractTableModel):
-    """파일 행들을 담는 테이블 모델(표시 전용)."""
-
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._rows: list[FileRow] = []
+        self._seen: set[str] = set()
 
-    # --- Qt 필수 오버라이드 ---
+    # ---- Qt required overrides -------------------------------------------
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        return 0 if parent.isValid() else len(self._rows)
 
-    def rowCount(self, parent=QModelIndex()) -> int:
-        if parent.isValid():
-            return 0
-        return len(self._rows)
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        return 0 if parent.isValid() else COLUMN_COUNT
 
-    def columnCount(self, parent=QModelIndex()) -> int:
-        if parent.isValid():
-            return 0
-        return COLUMN_COUNT
-
-    def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
-        if orientation != Qt.Orientation.Horizontal:
+    def headerData(self, section: int, orientation, role=Qt.ItemDataRole.DisplayRole):
+        if role != Qt.ItemDataRole.DisplayRole:
             return None
-        if role == Qt.ItemDataRole.DisplayRole:
+        if orientation == Qt.Orientation.Horizontal:
             return COLUMNS[section].header
         return None
 
-    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+    def data(self, index: QModelIndex, role=Qt.ItemDataRole.DisplayRole) -> Any:
         if not index.isValid():
             return None
         row = self._rows[index.row()]
-        col = index.column()
+        col = COLUMNS[index.column()]
 
         if role == Qt.ItemDataRole.DisplayRole:
-            return self._display_text(row, col)
+            return self._display_text(row, col.index)
+
+        if role == SORT_ROLE:
+            return self._sort_value(row, col.index)
 
         if role == Qt.ItemDataRole.ForegroundRole:
-            # 원본 DispJunk: clip 상태에 따라 행 전체 글자색을 바꾼다.
-            return _CLIP_COLOR.get(row.clip_state)
+            if col.index == Col.CLIP and row.result:
+                return _CLIP_COLORS.get(row.result.get("clip_state"))
+            return None
 
         if role == Qt.ItemDataRole.TextAlignmentRole:
-            return int(COLUMNS[col].align)
+            return int(col.align)
 
-        if role == Qt.ItemDataRole.ToolTipRole and col == Col.NAME:
+        if role == Qt.ItemDataRole.ToolTipRole:
             if row.status == "error" and row.error_msg:
                 return row.error_msg
-            return row.path
+            if col.index == Col.NAME:
+                return row.path
+            return None
 
         return None
 
-    # --- 표시 텍스트 계산(포맷만, 수치 계산 없음) ---
+    # ---- display / sort helpers -----------------------------------------
+    def _display_text(self, row: FileRow, key: Col) -> str:
+        if key == Col.NAME:
+            return row.path  # full path + filename (matches original mp3gain)
 
-    def _display_text(self, row: FileRow, col: int) -> str:
-        if col == Col.NAME:
-            return os.path.basename(row.path) if row.status == "error" \
-                else row.display_name
-        if col == Col.VOLUME:
-            return _fmt_db(row.get("volume"))
-        if col == Col.TRACK_GAIN:
-            return _fmt_db(row.get("track_gain_db"))
-        if col == Col.CLIP:
-            return _CLIP_TEXT.get(row.clip_state, "")
-        if col == Col.MAX_AMP:
-            return _fmt_int(row.get("curr_max_amp"))
+        r = row.result
+        if not r:
+            return ""  # un-analyzed rows show empty cells
+
+        if key == Col.VOLUME:
+            return _fmt_db(r.get("volume"))
+        if key == Col.TRACK_GAIN:
+            return _fmt_db(r.get("track_gain_db"))
+        if key == Col.CLIP:
+            return _CLIP_TEXT.get(r.get("clip_state"), "")
+        if key == Col.MAX_AMP:
+            return _fmt_int(r.get("curr_max_amp"))
         return ""
 
-    # --- 행 관리 API (윈도우/워커가 사용) ---
+    def _sort_value(self, row: FileRow, key: Col) -> Any:
+        if key == Col.NAME:
+            return row.path
 
-    def rows(self) -> list[FileRow]:
-        return self._rows
+        r = row.result
+        if not r:
+            return None  # let the proxy decide placement of empties
 
-    def row_at(self, i: int) -> FileRow:
-        return self._rows[i]
+        if key == Col.VOLUME:
+            return r.get("volume")
+        if key == Col.TRACK_GAIN:
+            return r.get("track_gain_db")
+        if key == Col.CLIP:
+            return r.get("clip_state", "")
+        if key == Col.MAX_AMP:
+            return r.get("curr_max_amp")
+        return None
 
-    def index_of_path(self, path: str) -> int:
-        for i, r in enumerate(self._rows):
-            if r.path == path:
-                return i
-        return -1
-
-    def add_paths(self, paths) -> int:
-        """중복(경로 기준)을 제외하고 행을 추가한다. 추가된 개수를 반환."""
-        existing = {r.path for r in self._rows}
-        new_paths = [p for p in paths if p not in existing]
-        if not new_paths:
+    # ---- row management --------------------------------------------------
+    def add_paths(self, paths: list[str]) -> int:
+        new = [p for p in paths if p not in self._seen]
+        if not new:
             return 0
         start = len(self._rows)
-        self.beginInsertRows(QModelIndex(), start, start + len(new_paths) - 1)
-        self._rows.extend(FileRow(path=p) for p in new_paths)
+        self.beginInsertRows(QModelIndex(), start, start + len(new) - 1)
+        for p in new:
+            self._rows.append(FileRow(path=p))
+            self._seen.add(p)
         self.endInsertRows()
-        return len(new_paths)
+        return len(new)
 
-    def remove_rows(self, indexes) -> None:
-        """주어진 행 인덱스들을 제거한다(내림차순 처리로 인덱스 안정)."""
-        for i in sorted(set(indexes), reverse=True):
-            if 0 <= i < len(self._rows):
-                self.beginRemoveRows(QModelIndex(), i, i)
-                del self._rows[i]
+    def remove_rows(self, rows: list[int]) -> None:
+        for r in sorted(set(rows), reverse=True):
+            if 0 <= r < len(self._rows):
+                self.beginRemoveRows(QModelIndex(), r, r)
+                self._seen.discard(self._rows[r].path)
+                del self._rows[r]
                 self.endRemoveRows()
 
     def clear(self) -> None:
         if not self._rows:
             return
-        self.beginRemoveRows(QModelIndex(), 0, len(self._rows) - 1)
+        self.beginResetModel()
         self._rows.clear()
-        self.endRemoveRows()
+        self._seen.clear()
+        self.endResetModel()
 
-    def row_changed(self, i: int) -> None:
-        """i 번째 행의 표시를 갱신하라고 뷰에 알린다(워커 결과 반영 후 호출)."""
-        if 0 <= i < len(self._rows):
-            top = self.index(i, 0)
-            bottom = self.index(i, COLUMN_COUNT - 1)
-            self.dataChanged.emit(top, bottom)
+    def row_changed(self, row: int) -> None:
+        if 0 <= row < len(self._rows):
+            top = self.index(row, 0)
+            bot = self.index(row, COLUMN_COUNT - 1)
+            self.dataChanged.emit(top, bot)
+
+    def get_row(self, row: int) -> Optional[FileRow]:
+        if 0 <= row < len(self._rows):
+            return self._rows[row]
+        return None
+
+    def row_count(self) -> int:
+        return len(self._rows)

@@ -1,19 +1,19 @@
-"""gui/main_window.py — 메인 창(8단계 MVP 골격).
+"""gui/main_window.py — 메인 창(8단계 MVP 골격 + 정렬).
 
 원본 MP3GainGUI frmMain 의 화면 구성·동작을 관찰해 독립 구현한다(clean-room).
-이 단계(순서 2)는 골격만 만든다: 창·툴바·목표입력·테이블뷰·상태바·진행률과,
-파일/폴더 추가(버튼 + 드래그앤드롭)·Clear 까지. Track Analysis/Track Gain 은
-배선만 해두고 실제 분석·적용(워커)은 다음 단계에서 붙인다.
+파일/폴더 추가(버튼 + 드래그앤드롭)·Clear, 그리고 헤더 클릭 자연 정렬까지.
+Track Analysis/Track Gain 은 배선만 해두고 실제 워커는 다음 단계에서 붙인다.
 
-GUI 무계산 원칙: 수치는 gaindb.api 가 계산한 것만 표시한다. 여기서는 아직
-api 를 호출하지 않는다(다음 단계).
+GUI 무계산 원칙: 수치는 gaindb.api 가 계산한 것만 표시한다.
+정렬 순서는 프록시(뷰) 좌표, 실제 데이터는 원본 모델 좌표이므로
+삭제 시 mapToSource 로 반드시 변환한다.
 """
 
 from __future__ import annotations
 
 import os
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSortFilterProxyModel, QCollator, QModelIndex
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox,
     QTableView, QToolBar, QProgressBar, QPushButton, QFileDialog,
@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QAction
 
-from gui.model import FileTableModel
+from gui.model import FileTableModel, SORT_ROLE
 from gui.columns import Col
 from gaindb.api import DEFAULT_TARGET_DB
 
@@ -54,6 +54,41 @@ def collect_mp3_paths(paths, recurse: bool = True) -> list[str]:
     return result
 
 
+class NaturalSortProxy(QSortFilterProxyModel):
+    """Windows 11 탐색기식 자연 정렬 프록시.
+
+    - 문자열(파일명, clip 상태): QCollator 로 숫자 부분을 실제 크기 비교.
+    - 숫자(volume, track gain, curr max amp): 값 그대로 비교.
+    - None(미분석): 정렬 방향과 무관하게 항상 맨 아래로(결측 처리).
+    원본 typed 값은 SORT_ROLE 로 받는다(표시 문자열이 아니라).
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setSortRole(SORT_ROLE)
+        self._collator = QCollator()
+        self._collator.setNumericMode(True)
+        self._collator.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+
+    def lessThan(self, left: QModelIndex, right: QModelIndex) -> bool:
+        lv = self.sourceModel().data(left, SORT_ROLE)
+        rv = self.sourceModel().data(right, SORT_ROLE)
+
+        # 미분석(None)은 항상 뒤로. sortOrder 를 보정해 방향과 무관하게 처리.
+        if lv is None and rv is None:
+            return False
+        descending = self.sortOrder() == Qt.SortOrder.DescendingOrder
+        if lv is None:
+            return descending      # 내림차순이면 "작다"로 취급해 아래로
+        if rv is None:
+            return not descending  # 오름차순이면 좌측이 위, None(우측)은 아래
+
+        # 문자열은 자연 정렬, 그 외는 값 비교.
+        if isinstance(lv, str) or isinstance(rv, str):
+            return self._collator.compare(str(lv), str(rv)) < 0
+        return lv < rv
+
+
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -62,6 +97,8 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(True)  # 창 전체에서 파일/폴더 드롭 수용
 
         self.model = FileTableModel(self)
+        self.proxy = NaturalSortProxy(self)
+        self.proxy.setSourceModel(self.model)
 
         self._build_toolbar()
         self._build_central()
@@ -123,9 +160,12 @@ class MainWindow(QMainWindow):
         target_row.addStretch(1)
         layout.addLayout(target_row)
 
-        # 파일 목록 테이블
+        # 파일 목록 테이블 (프록시 경유)
         self.table = QTableView(self)
-        self.table.setModel(self.model)
+        self.table.setModel(self.proxy)
+        self.table.setSortingEnabled(True)  # 헤더 클릭 정렬
+        # 초기 정렬: Path\File 기준 오름차순(헤더 화살표와 상태 일치).
+        self.table.sortByColumn(int(Col.NAME), Qt.SortOrder.AscendingOrder)
         self.table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(
@@ -141,6 +181,7 @@ class MainWindow(QMainWindow):
         # 모델 행 수 변화 시 버튼 활성/비활성 갱신
         self.model.rowsInserted.connect(self._update_action_states)
         self.model.rowsRemoved.connect(self._update_action_states)
+        self.model.modelReset.connect(self._update_action_states)
         layout.addWidget(self.table)
 
         # 진행률(워커 연결은 다음 단계). 지금은 배치만.
@@ -208,7 +249,9 @@ class MainWindow(QMainWindow):
     def _on_clear(self):
         sel = self.table.selectionModel().selectedRows()
         if sel:
-            self.model.remove_rows([idx.row() for idx in sel])
+            # 프록시(정렬) 행 -> 원본 모델 행으로 변환 후 삭제.
+            source_rows = [self.proxy.mapToSource(idx).row() for idx in sel]
+            self.model.remove_rows(source_rows)
         else:
             self.model.clear()
 

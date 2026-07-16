@@ -70,6 +70,9 @@ GaindB/
 ├─ mp3gain_cli.py          # 통합 CLI 진입점(원본 mp3gain 옵션 체계 재현)
 ├─ tests/                  # 통합 테스트 스위트(unittest, 외부 의존 없음)
 ├─ manual_checks/          # 외부도구 상호운용·exe 대조(git 제외, 로컬 수동)
+│  ├─ compare_exe_lowrate.py   # 6단계 저샘플레이트 exe dB 대조
+│  ├─ verify_id3_read.py       # ID3v2 읽기 상호운용 확인
+│  └─ verify_id3_write.py      # ID3v2 쓰기 상호운용 확인
 ├─ mp3gain/                # 원본 C·GUI 소스(LGPL, 사양 참고용). git 제외
 │  ├─ LICENSE  Makefile  README.md
 │  ├─ src/
@@ -80,14 +83,21 @@ GaindB/
 │  │  ├─ rg_error.c / .h       # 오류 처리(보조)
 │  │  ├─ mp3gain.exe           # [검증 기준] MSYS2+MinGW 로 빌드한 원본 1.6.2 CLI. git 제외
 │  │  └─ (replaygaindll.*, *.dsp/.dsw/.sln/.vcproj/.rc, resource.h, Makefile — 빌드·래퍼, 무시)
-│  └─ mp3gain-win-gui-1_3_4-src/  # 원본 Windows GUI(VB) 소스. 8단계 외관·동작 참고용(clean-room, 복붙 금지)
+│  └─ mp3gain-win-gui-1_3_4-src/  # 원본 Windows GUI(VB6) 소스. 8단계 참고용(clean-room, 복붙 금지)
+│     ├─ frmMain.frm / Mp3Info.cls    # [참고 완료] 메인 창·DispJunk 표시 로직 / 스텝 산출(RadioMp3Gain 등)
+│     ├─ frmOptions.frm  frmGetGain.frm   # 옵션·게인입력 창(8단계 참고 예정)
+│     ├─ 경고 폼: frmStereoWarning/frmLayerCheckWarning/frmSkipTagsWarn/frmReadOnly/frmResetWarn (CLI 동작의 GUI 대응)
+│     ├─ 모듈: basLocalizer(다국어)·basListViewSort·basSaveAnalysis
+│     ├─ frmMaximizing.frm  # Max No-clip(MVP 제외)
+│     └─ (frmAbout/Disclaimer/Donate/Logs/SysTray, basCommandOutput[subprocess 파싱—미재현] 등 나머지 .frm/.bas/.frx/.vbp/.res)
 ├─ docs/
 │  └─ LICENSE_REVIEW.md    # 7단계 배포 라이선스 1차 점검 기록
 ├─ CLAUDE.md               # 이 컨텍스트 파일
 ├─ CopyClaudeMd.bat        # CLAUDE.md 사본 동기화 스크립트
 ├─ .gitignore
-├─ 10cm - 사랑은 은하수 다방에서.mp3   # 테스트 음원(git 제외, 48k)
-└─ Debussy - Arabesque No.1.mp3       # 테스트 음원(git 제외, 44.1k)
+├─ 10cm - 사랑은 은하수 다방에서.mp3   # 원본 테스트 음원(git 제외, 48k, 순수 상태)
+├─ Debussy - Arabesque No.1.mp3       # 원본 테스트 음원(git 제외, 44.1k, 순수 상태)
+└─ test_*.mp3                          # ffmpeg 변형 fixture 11개(git 제외): test_{8k,11k,12k,16k,22k,24k,32k}, test_stereo_44k, test_mono_{12k,24k,44k}. 상세는 10 로그(4·6단계)
 ````
 
 `mp3gain/` 하위 전체는 git 제외 — 원본 C·GUI 소스, 빌드 산출물 `mp3gain.exe` 모두 LGPL 분리 대상. exe 는 코드가 아니라 실행 결과만 검증 기준으로 쓰므로 clean-room 위반이 아니다(2.2 의 "관찰된 동작 차용").

@@ -99,6 +99,7 @@ from gaindb.analysis import (
     NOT_ENOUGH_SAMPLES,
 )
 from apply_gain import _fill_track_info, _fill_album_info
+from gaindb.api import analyze_file, DEFAULT_TARGET_DB
 
 VERSION = "0.5.0-dev"
 PROGNAME = "Gain dB"
@@ -304,6 +305,14 @@ def _atof(s):
         return float(s)
     except ValueError:
         return 0.0
+
+
+def _is_float(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 
 def _atoi(s):
@@ -1255,6 +1264,33 @@ def _run_debug_tag(files):
     return rc
 
 
+def _run_show(files, target_db):
+    """Gain dB dev/GUI-preview command (NOT original mp3gain).
+
+    Calls the shared gaindb.api.analyze_file for each file and prints the
+    GUI-facing summary: predicted Volume, Track Gain, clip status. This is the
+    same function the GUI/AVD call directly. Non-destructive. English output.
+    """
+    rc = 0
+    clip_label = {"none": "-", "possible": "???", "definite": "Y"}
+    print(f"target: {target_db:g} dB (relative to 89 dB ReplayGain reference)")
+    print("File\tVolume(dB)\tTrackGain(dB)\tClip\tCurrMaxAmp")
+    for path in files:
+        try:
+            r = analyze_file(path, target_db)
+        except DecodeError as exc:
+            print(f"{path}\tERROR: {exc}", file=sys.stderr)
+            rc = 1
+            continue
+        if r["status"] == "not_enough_samples":
+            print(f"{path}\tNA\tNA\tNA\tNA")
+            rc = 1
+            continue
+        print(f"{path}\t{r['volume']}\t{r['track_gain_db']:+.1f}\t"
+              f"{clip_label[r['clip_state']]}\t{r['curr_max_amp']}")
+    return rc
+
+
 def main(argv):
     if len(argv) < 2:
         _err_usage()
@@ -1271,6 +1307,16 @@ def main(argv):
         if not files:
             _err_usage()
         return _run_debug_tag(files)
+    if argv[1] == "--show":
+        rest = argv[2:]
+        target_db = DEFAULT_TARGET_DB
+        # Optional: --show <target_db> <files...>  (first token numeric = target)
+        if rest and _is_float(rest[0]):
+            target_db = float(rest[0])
+            rest = rest[1:]
+        if not rest:
+            _err_usage()
+        return _run_show(rest, target_db)
 
     opt = parse_args(argv)
 

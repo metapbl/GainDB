@@ -48,6 +48,9 @@ PINK_REF = 64.82             # 캘리브레이션 기준값(dB)
 # 디코더가 global_gain 을 2^(gain/4) 로 적용 → 1스텝 = 20*log10(2^0.25) = 5*log10(2) dB.
 _DB_PER_STEP_DIVISOR = 5.0 * math.log10(2.0)
 
+# 공개 별칭: 1 스텝당 dB(정밀값). api/GUI/AVD 가 import 해 쓰는 표시·계산 상수.
+DB_PER_STEP = _DB_PER_STEP_DIVISOR
+
 # --- 필터 계수 ---
 # lfilter(b, a, x) 규약: a[0]=1.0. Yulewalk: b=[b0..b10], a=[1.0, a1..a10].
 # Butterworth: b=[b0, b1, b2], a=[1.0, a1, a2].
@@ -341,3 +344,4 @@ def track_peak(left: np.ndarray, right: np.ndarray) -> float:
     lmax = float(np.abs(left).max()) if left.size else 0.0
     rmax = float(np.abs(right).max()) if right.size else 0.0
     return max(lmax, rmax) / 32768.0
+

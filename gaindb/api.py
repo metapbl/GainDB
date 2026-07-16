@@ -17,12 +17,13 @@ GUI 편의를 위해 apply_file_track_gain 래퍼로 감싼다(목표 dB→offse
 GUI 무계산 원칙:
   GUI 는 계산하지 않는다. 목표 dB 와 경로만 넘기고, 돌려받은 dict 를 표시만
   한다. 89·offset·db_to_steps·clip 판정식은 전부 이 모듈 내부(특히
-  _compute_display)에만 존재한다. 표시값을 만드는 세 진입점(analyze_file,
-  recompute_target, shift_after_apply)은 모두 _compute_display 하나를 공유하며,
-  apply_track_gain 의 steps 도 동일한 offset·db_to_steps 를 쓰므로 표시와 적용이
-  구조적으로 일치한다.
+  _compute_display)에만 존재한다. 표시값을 만드는 진입점(analyze_file,
+  read_file_tags, recompute_target, shift_after_apply)은 모두 _compute_display
+  하나를 공유하며, apply_track_gain 의 steps 도 동일한 offset·db_to_steps 를
+  쓰므로 표시와 적용이 구조적으로 일치한다.
 
-  GUI 가 아는 함수는 넷뿐:
+  GUI 가 아는 함수는 다섯:
+    read_file_tags(path, target_db)        # 추가 시 태그만 읽어 표시(가볍다)
     analyze_file(path, target_db)          # 최초 분석(무겁다: decode+scan)
     recompute_target(result, target_db)    # 목표 변경 시 즉시 재표시(가볍다)
     apply_file_track_gain(path, target_db) # 실제 적용(무겁다)
@@ -40,6 +41,7 @@ from gaindb.analysis import (
     NOT_ENOUGH_SAMPLES,
 )
 from gaindb.writer import scan_gain
+from gaindb.tag import read_mp3gain_tags
 from apply_gain import apply_track_gain
 
 # 목표 음량 기준: mp3gain 내부 89 dB ReplayGain 레퍼런스.
@@ -47,16 +49,19 @@ from apply_gain import apply_track_gain
 DEFAULT_TARGET_DB = 89.0
 
 
-def _compute_display(track_db: float, curr_max_amp: float,
+def _compute_display(track_db: float, curr_max_amp,
                      target_db: float) -> dict:
     """표시값 계산의 유일한 출처(89·offset·db_to_steps·clip 판정식이 여기만 있다).
 
-    analyze_file / recompute_target / shift_after_apply 세 진입점이 전부 이
-    함수를 호출한다. 어떤 경로로 값이 나오든 공식이 동일하므로 표시값끼리,
-    그리고 apply_track_gain 의 실제 steps 와도 정합이 보장된다.
+    analyze_file / read_file_tags / recompute_target / shift_after_apply 가
+    전부 이 함수를 호출한다. 어떤 경로로 값이 나오든 공식이 동일하므로
+    표시값끼리, 그리고 apply_track_gain 의 실제 steps 와도 정합이 보장된다.
 
     track_db     : 89dB 기준 raw dB (원본 mvarRadiodBGain, mod 미포함).
     curr_max_amp : peak * 32768 (원본 CurrMaxAmp, 클립 기준값).
+                   None 이면 peak 미보유 → clip 판정을 건너뛰고 "none"으로 둔다
+                   (원본 DispJunk 가 CurrMaxAmp=NOREALNUM 일 때 clip 표시를
+                   비우는 동작에 대응).
     target_db    : 사용자 지정 목표 음량(89dB 기준 상대). 예: 96.
 
     반환: volume·steps·track_gain_db·clip_state 만 담은 dict.
@@ -68,7 +73,10 @@ def _compute_display(track_db: float, curr_max_amp: float,
     steps = db_to_steps(track_db + modify_db)
     track_gain_db = steps * DB_PER_STEP
 
-    if curr_max_amp * (2.0 ** (steps / 4.0)) > 32767.0:
+    if curr_max_amp is None:
+        # peak 미보유: 클립을 판정할 근거가 없다(원본 DispJunk 동작).
+        clip_state = "none"
+    elif curr_max_amp * (2.0 ** (steps / 4.0)) > 32767.0:
         if curr_max_amp * (2.0 ** ((83.0 - volume) / 6.0206)) > 32767.0:
             clip_state = "possible"
         else:
@@ -81,6 +89,63 @@ def _compute_display(track_db: float, curr_max_amp: float,
         "steps": steps,
         "track_gain_db": round(track_gain_db, 1),
         "clip_state": clip_state,
+    }
+
+
+def read_file_tags(path: str, target_db: float = DEFAULT_TARGET_DB) -> dict:
+    """파일의 기존 mp3gain 태그만 읽어 GUI 표시용 결과를 반환한다(비파괴, 무출력).
+
+    원본 MP3GainGUI 의 AddSingleFile 이 파일 추가 시 `mp3gain /o /s c` 로
+    태그만 조회(디코딩 없음)해 볼륨을 즉시 표시하던 동작에 대응한다.
+    파일 끝부분의 태그만 읽으므로 매우 가볍다(디코딩 없음).
+
+    태그에 track_gain 이 있으면 그 raw dB(원본 RadiodBGain 대응)로 표시값을
+    만든다. peak(track_peak)이 있으면 curr_max_amp 로 clip 도 판정하고, 없으면
+    clip 은 "none"(원본 DispJunk 가 CurrMaxAmp 없을 때 clip 비우는 동작).
+
+    반환 dict(analyze_file 과 같은 키 구조, status 만 다름):
+      status : "ok"     — 태그에서 track_gain 을 읽어 표시값을 만듦(분석 불필요).
+               "no_tag" — 태그가 없거나 track_gain 미보유(분석 필요, 원본 NOREALNUM).
+      나머지 키(target_db·track_db·volume·steps·track_gain_db·peak·
+      curr_max_amp·min_gain·max_gain·clip_state)는 analyze_file 과 동일.
+    """
+    info, _file_tags = read_mp3gain_tags(path)
+
+    if not info.have_track_gain:
+        # 원본 RadiodBGain = NOREALNUM: 분석해야 값이 나온다.
+        return {
+            "status": "no_tag", "target_db": target_db,
+            "track_db": None, "volume": None, "steps": None,
+            "track_gain_db": None, "peak": None, "curr_max_amp": None,
+            "min_gain": None, "max_gain": None, "clip_state": "none",
+        }
+
+    track_db = info.track_gain  # 89dB 기준 raw dB (원본 RadiodBGain)
+
+    if info.have_track_peak:
+        peak = info.track_peak
+        curr_max_amp = peak * 32768.0
+    else:
+        peak = None
+        curr_max_amp = None
+
+    disp = _compute_display(track_db, curr_max_amp, target_db)
+
+    min_gain = info.min_gain if info.have_min_max_gain else None
+    max_gain = info.max_gain if info.have_min_max_gain else None
+
+    return {
+        "status": "ok",
+        "target_db": target_db,
+        "track_db": track_db,
+        "volume": disp["volume"],
+        "steps": disp["steps"],
+        "track_gain_db": disp["track_gain_db"],
+        "peak": peak,
+        "curr_max_amp": None if curr_max_amp is None else round(curr_max_amp),
+        "min_gain": min_gain,
+        "max_gain": max_gain,
+        "clip_state": disp["clip_state"],
     }
 
 
@@ -145,7 +210,7 @@ def recompute_target(result: dict, target_db: float) -> dict:
     유지한다. 원본 DispJunk 가 target 변경 시 재분석 없이 다시 그리던 동작과
     정합적이다.
 
-    result: analyze_file(또는 이전 recompute/shift)이 돌려준 dict.
+    result: analyze_file/read_file_tags(또는 이전 recompute/shift)가 돌려준 dict.
     target_db: 새 목표 음량.
 
     반환: 새 target 기준 표시값이 갱신된 새 dict(원본 dict 는 변경하지 않음).
@@ -154,10 +219,12 @@ def recompute_target(result: dict, target_db: float) -> dict:
     updated["target_db"] = target_db
 
     if result.get("status") != "ok" or result.get("track_db") is None:
-        # 분석 불가 상태는 표시값을 만들 수 없다. target 만 바꿔 돌려준다.
+        # 분석 불가/미태그 상태는 표시값을 만들 수 없다. target 만 바꿔 돌려준다.
         return updated
 
-    disp = _compute_display(result["track_db"], float(result["curr_max_amp"]),
+    cma = result.get("curr_max_amp")
+    disp = _compute_display(result["track_db"],
+                            None if cma is None else float(cma),
                             target_db)
     updated["volume"] = disp["volume"]
     updated["steps"] = disp["steps"]
@@ -194,7 +261,9 @@ def shift_after_apply(result: dict, applied_steps: int) -> dict:
     updated["track_db"] = new_track_db
 
     target_db = result.get("target_db", DEFAULT_TARGET_DB)
-    disp = _compute_display(new_track_db, float(result["curr_max_amp"]),
+    cma = result.get("curr_max_amp")
+    disp = _compute_display(new_track_db,
+                            None if cma is None else float(cma),
                             target_db)
     updated["volume"] = disp["volume"]
     updated["steps"] = disp["steps"]

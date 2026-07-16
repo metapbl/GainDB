@@ -1,29 +1,40 @@
-"""gui/main_window.py — 메인 창(8단계 MVP 골격 + 정렬).
+"""gui/main_window.py — 메인 창(8단계 MVP + 태그 스캔 + Track Analysis 워커).
 
 원본 MP3GainGUI frmMain 의 화면 구성·동작을 관찰해 독립 구현한다(clean-room).
-파일/폴더 추가(버튼 + 드래그앤드롭)·Clear, 그리고 헤더 클릭 자연 정렬까지.
-Track Analysis/Track Gain 은 배선만 해두고 실제 워커는 다음 단계에서 붙인다.
+파일/폴더 추가(버튼 + 드래그앤드롭)·Clear·헤더 클릭 자연 정렬·Delete 키 선택
+삭제·더블클릭 재생에 더해, 파일 추가 시 태그를 즉시 읽어 표시(원본
+AddSingleFile), Track Analysis 를 QThread 워커로 연결(값 없는 파일만).
 
 GUI 무계산 원칙: 수치는 gaindb.api 가 계산한 것만 표시한다.
 정렬 순서는 프록시(뷰) 좌표, 실제 데이터는 원본 모델 좌표이므로
-삭제 시 mapToSource 로 반드시 변환한다.
+삭제·더블클릭 시 mapToSource 로 반드시 변환한다.
+
+워커 규칙: 무거운 분석(ffmpeg 디코딩)은 AnalyzeWorker(QThread)에서 돌리고,
+워커는 시그널만 방출한다. 모델 변경은 전부 메인 스레드의 슬롯에서 수행한다.
+태그 읽기는 가벼워(디코딩 없음) 추가 흐름 안에서 동기로 처리한다(원본도 동기).
 """
 
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 
-from PySide6.QtCore import Qt, QSortFilterProxyModel, QCollator, QModelIndex
+from PySide6.QtCore import (
+    Qt, QSortFilterProxyModel, QCollator, QModelIndex, Signal, QRect, QPoint,
+)
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox,
     QTableView, QToolBar, QProgressBar, QPushButton, QFileDialog,
-    QAbstractItemView, QHeaderView,
+    QAbstractItemView, QHeaderView, QRubberBand,
 )
+
 from PySide6.QtGui import QAction
 
 from gui.model import FileTableModel, SORT_ROLE
 from gui.columns import Col
-from gaindb.api import DEFAULT_TARGET_DB
+from gui.workers import AnalyzeWorker
+from gaindb.api import DEFAULT_TARGET_DB, read_file_tags, recompute_target
 
 
 def collect_mp3_paths(paths, recurse: bool = True) -> list[str]:
@@ -52,6 +63,131 @@ def collect_mp3_paths(paths, recurse: bool = True) -> list[str]:
                     if os.path.isfile(fp) and name.lower().endswith(".mp3"):
                         result.append(fp)
     return result
+
+
+def open_with_default_app(path: str) -> None:
+    """OS 기본 앱으로 파일을 연다(원본 lstvMain_DblClick 의 ShellExecute 대응).
+
+    플랫폼별 분기: Windows=os.startfile, macOS=open, Linux=xdg-open.
+    실패해도 예외를 올리지 않고 호출자가 상태바로 안내하도록 예외를 전파한다.
+    """
+    if sys.platform.startswith("win"):
+        os.startfile(path)  # type: ignore[attr-defined]  # Windows 전용
+    elif sys.platform == "darwin":
+        subprocess.run(["open", path], check=False)
+    else:
+        subprocess.run(["xdg-open", path], check=False)
+
+
+class FileTableView(QTableView):
+    """Delete 키 삭제 + 빈 영역 고무줄(사각형) 선택을 지원하는 QTableView.
+
+    - Delete 키(원본 lstvMain_KeyDown, KeyCode 46 → ClearFiles): 선택 행만 삭제
+      요청 시그널을 낸다. 테이블 포커스 시에만 동작한다(전역 아님).
+    - 빈 영역 고무줄 선택(원본 lstvMain 의 rubber-band): 행이 없는 여백에서
+      좌클릭 드래그를 시작하면 사각형을 그려 겹치는 행을 선택한다. QTableView 는
+      QListView/QTreeView 와 달리 setSelectionRectVisible 이 없어 직접 구현한다.
+      행 위에서 시작한 클릭·드래그는 고무줄에 개입하지 않고 QTableView 기본
+      동작(클릭 선택·행 드래그 선택·더블클릭)에 위임한다.
+    - Ctrl+A 전체선택·doubleClicked 는 QTableView 기본 동작이라 손대지 않는다.
+    """
+
+    delete_requested = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._rubber_band: QRubberBand | None = None
+        self._rubber_origin = QPoint()
+        self._rubber_active = False
+        self._rubber_additive = False  # Ctrl 로 시작하면 기존 선택에 추가
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Delete:
+            self.delete_requested.emit()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def mousePressEvent(self, event):
+        # 좌클릭이고 빈 영역(행 없음)에서 시작할 때만 고무줄 선택 개시.
+        if event.button() == Qt.MouseButton.LeftButton:
+            index = self.indexAt(event.position().toPoint())
+            if not index.isValid():
+                self._rubber_active = True
+                self._rubber_origin = event.position().toPoint()
+                self._rubber_additive = bool(
+                    event.modifiers() & Qt.KeyboardModifier.ControlModifier
+                )
+                if self._rubber_band is None:
+                    self._rubber_band = QRubberBand(
+                        QRubberBand.Shape.Rectangle, self.viewport()
+                    )
+                self._rubber_band.setGeometry(
+                    QRect(self._rubber_origin, self._rubber_origin))
+                self._rubber_band.show()
+                # Ctrl 이 아니면 기존 선택을 비운다(새 선택 시작).
+                if not self._rubber_additive:
+                    self.clearSelection()
+                event.accept()
+                return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._rubber_active and self._rubber_band is not None:
+            pos = event.position().toPoint()
+            rect = QRect(self._rubber_origin, pos).normalized()
+            self._rubber_band.setGeometry(rect)
+            self._select_in_rect(rect)
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self._rubber_active and event.button() == Qt.MouseButton.LeftButton:
+            self._rubber_active = False
+            if self._rubber_band is not None:
+                self._rubber_band.hide()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def _select_in_rect(self, rect: QRect):
+        """뷰포트 좌표 사각형 rect 에 걸치는 행을 선택한다.
+
+        각 행의 첫 열 셀 사각형이 rect 와 겹치면 그 행을 선택 집합에 넣는다.
+        additive(Ctrl 시작)면 드래그 시작 시점의 선택 위에 더해지도록, 매번
+        rect 기준 새 선택을 계산해 반영한다(간단·예측 가능). 행 선택 모드라
+        한 행만 골라도 행 전체가 선택된다.
+        """
+        sel_model = self.selectionModel()
+        model = self.model()
+        if model is None:
+            return
+
+        from PySide6.QtCore import QItemSelection, QItemSelectionModel
+
+        selection = QItemSelection()
+        last_col = model.columnCount() - 1
+        for r in range(model.rowCount()):
+            row_rect = self.visualRect(model.index(r, 0))
+            # 세로로 겹치면 그 행이 사각형에 걸친 것으로 본다(가로 전체 행 선택).
+            if row_rect.top() <= rect.bottom() and row_rect.bottom() >= rect.top():
+                left = model.index(r, 0)
+                right = model.index(r, last_col)
+                selection.select(left, right)
+
+        if self._rubber_additive:
+            sel_model.select(
+                selection,
+                QItemSelectionModel.SelectionFlag.Select
+                | QItemSelectionModel.SelectionFlag.Rows,
+            )
+        else:
+            sel_model.select(
+                selection,
+                QItemSelectionModel.SelectionFlag.ClearAndSelect
+                | QItemSelectionModel.SelectionFlag.Rows,
+            )
 
 
 class NaturalSortProxy(QSortFilterProxyModel):
@@ -99,6 +235,10 @@ class MainWindow(QMainWindow):
         self.model = FileTableModel(self)
         self.proxy = NaturalSortProxy(self)
         self.proxy.setSourceModel(self.model)
+
+        self._worker: AnalyzeWorker | None = None  # 실행 중 워커 보유(GC 방지)
+        self._analyzed_count = 0                   # 이번 분석에서 성공한 개수
+        self._failed_count = 0                     # 이번 분석에서 실패한 개수
 
         self._build_toolbar()
         self._build_central()
@@ -160,8 +300,8 @@ class MainWindow(QMainWindow):
         target_row.addStretch(1)
         layout.addLayout(target_row)
 
-        # 파일 목록 테이블 (프록시 경유)
-        self.table = QTableView(self)
+        # 파일 목록 테이블 (프록시 경유, Delete 키 + 더블클릭 재생 지원)
+        self.table = FileTableView(self)
         self.table.setModel(self.proxy)
         self.table.setSortingEnabled(True)  # 헤더 클릭 정렬
         # 초기 정렬: Path\File 기준 오름차순(헤더 화살표와 상태 일치).
@@ -172,6 +312,8 @@ class MainWindow(QMainWindow):
             QAbstractItemView.SelectionMode.ExtendedSelection)
         self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(False)
+        self.table.delete_requested.connect(self._on_delete_selected)
+        self.table.doubleClicked.connect(self._on_double_click)
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(
             int(Col.NAME), QHeaderView.ResizeMode.Stretch)
@@ -184,7 +326,7 @@ class MainWindow(QMainWindow):
         self.model.modelReset.connect(self._update_action_states)
         layout.addWidget(self.table)
 
-        # 진행률(워커 연결은 다음 단계). 지금은 배치만.
+        # 진행률
         prog_row = QHBoxLayout()
         prog_row.addWidget(QLabel("Progress:"))
         self.progress = QProgressBar(self)
@@ -192,6 +334,7 @@ class MainWindow(QMainWindow):
         prog_row.addWidget(self.progress, 1)
         self.btn_cancel = QPushButton("Cancel", self)
         self.btn_cancel.setEnabled(False)
+        self.btn_cancel.clicked.connect(self._on_cancel)
         prog_row.addWidget(self.btn_cancel)
         layout.addLayout(prog_row)
 
@@ -202,24 +345,74 @@ class MainWindow(QMainWindow):
 
     # --- 상태 갱신 ---
 
-    def _update_action_states(self, *args):
-        has_rows = self.model.rowCount() > 0
-        self.act_analyze.setEnabled(has_rows)
-        self.act_gain.setEnabled(has_rows)
-        self.act_clear.setEnabled(has_rows)
-        self.statusBar().showMessage(f"{self.model.rowCount()} file(s)")
+    def _is_busy(self) -> bool:
+        return self._worker is not None and self._worker.isRunning()
 
-    # --- 파일 추가 공통 ---
+    def _update_action_states(self, *args):
+        busy = self._is_busy()
+        has_rows = self.model.rowCount() > 0
+        # 워커 실행 중에는 파일 추가·분석·적용·Clear 를 잠근다.
+        self.act_add_files.setEnabled(not busy)
+        self.act_add_folder.setEnabled(not busy)
+        self.act_analyze.setEnabled(has_rows and not busy)
+        self.act_gain.setEnabled(has_rows and not busy)
+        self.act_clear.setEnabled(has_rows and not busy)
+        if not busy:
+            self.statusBar().showMessage(f"{self.model.rowCount()} file(s)")
+
+    # --- 파일 추가 공통 (추가 직후 태그 동기 스캔) ---
 
     def _add_from(self, paths):
         mp3s = collect_mp3_paths(paths, recurse=True)
         if not mp3s:
             self.statusBar().showMessage("No .mp3 files found")
             return
-        added = self.model.add_paths(mp3s)
+        new_rows = self.model.add_paths(mp3s)  # 추가된 모델 행 인덱스 목록
+        if not new_rows:
+            self.statusBar().showMessage(
+                f"No new files, {self.model.rowCount()} total"
+            )
+            return
+
+        # 원본 AddSingleFile 대응: 추가 직후 태그만 읽어(디코딩 없음) 즉시 표시.
+        target_db = self.spin_target.value()
+        tagged = 0
+        for r in new_rows:
+            fr = self.model.get_row(r)
+            if fr is None:
+                continue
+            try:
+                result = read_file_tags(fr.path, target_db)
+            except Exception:
+                # 태그 읽기 실패는 치명적이지 않다. 미분석 상태로 두고 넘어감.
+                continue
+            fr.set_tag_result(result)
+            if result.get("status") == "ok":
+                tagged += 1
+            self.model.row_changed(r)
+
         self.statusBar().showMessage(
-            f"Added {added} file(s), {self.model.rowCount()} total"
+            f"Added {len(new_rows)} file(s) "
+            f"({tagged} with tags), {self.model.rowCount()} total"
         )
+
+    # --- 대상 행 결정(선택 있으면 선택, 없으면 전체) ---
+
+    def _target_source_rows(self) -> list[int]:
+        """작업 대상 모델 행 인덱스. 선택 행이 있으면 그것, 없으면 전체.
+
+        선택 인덱스는 프록시(뷰) 좌표이므로 mapToSource 로 원본 모델 행으로
+        변환한다.
+        """
+        sel = self.table.selectionModel().selectedRows()
+        if sel:
+            return [self.proxy.mapToSource(idx).row() for idx in sel]
+        return list(range(self.model.row_count()))
+
+    def _selected_source_rows(self) -> list[int]:
+        """선택된 행의 원본 모델 인덱스만 반환(선택 없으면 빈 리스트)."""
+        sel = self.table.selectionModel().selectedRows()
+        return [self.proxy.mapToSource(idx).row() for idx in sel]
 
     # --- 툴바 액션 ---
 
@@ -236,10 +429,37 @@ class MainWindow(QMainWindow):
             self._add_from([folder])
 
     def _on_analyze(self):
-        # 다음 단계(워커)에서 gaindb.api.analyze_file 로 연결.
-        self.statusBar().showMessage(
-            "Track Analysis will be connected in the next step."
-        )
+        if self._is_busy():
+            return
+
+        # 대상 행 중 "값이 아직 없는" 것만 분석한다(원본 RadiodBGain=NOREALNUM).
+        paths = []
+        for r in self._target_source_rows():
+            fr = self.model.get_row(r)
+            if fr is not None and fr.needs_analysis():
+                paths.append(fr.path)
+
+        if not paths:
+            self.statusBar().showMessage(
+                "Nothing to analyze (all selected files already have values)"
+            )
+            return
+
+        target_db = self.spin_target.value()
+        self._analyzed_count = 0
+        self._failed_count = 0
+        self._worker = AnalyzeWorker(paths, target_db, self)
+        self._worker.progress.connect(self._on_worker_progress)
+        self._worker.row_done.connect(self._on_worker_row_done)
+        self._worker.failed.connect(self._on_worker_failed)
+        self._worker.done.connect(self._on_worker_finished)
+
+        self.progress.setRange(0, len(paths))
+        self.progress.setValue(0)
+        self.btn_cancel.setEnabled(True)
+        self._update_action_states()
+        self.statusBar().showMessage(f"Analyzing {len(paths)} file(s)...")
+        self._worker.start()
 
     def _on_gain(self):
         self.statusBar().showMessage(
@@ -247,17 +467,102 @@ class MainWindow(QMainWindow):
         )
 
     def _on_clear(self):
-        sel = self.table.selectionModel().selectedRows()
-        if sel:
-            # 프록시(정렬) 행 -> 원본 모델 행으로 변환 후 삭제.
-            source_rows = [self.proxy.mapToSource(idx).row() for idx in sel]
-            self.model.remove_rows(source_rows)
+        if self._is_busy():
+            return
+        rows = self._selected_source_rows()
+        if rows:
+            self.model.remove_rows(rows)
         else:
             self.model.clear()
 
+    def _on_delete_selected(self):
+        """Delete 키: 선택 행만 삭제(원본 ClearFiles). 선택 없으면 무동작.
+
+        _on_clear 와 달리 선택이 없을 때 전체 삭제하지 않는다(원본 동작).
+        분석 중에는 목록 변경을 잠근다.
+        """
+        if self._is_busy():
+            return
+        rows = self._selected_source_rows()
+        if rows:
+            self.model.remove_rows(rows)
+
+    def _on_double_click(self, index: QModelIndex):
+        """더블클릭한 곡을 OS 기본 앱으로 연다(원본 lstvMain_DblClick 대응).
+
+        index 는 프록시(뷰) 좌표이므로 mapToSource 로 원본 행을 구해 path 를
+        얻는다. 파일이 없거나 열기 실패 시 상태바로 안내하고 넘어간다.
+        """
+        if not index.isValid():
+            return
+        r = self.proxy.mapToSource(index).row()
+        fr = self.model.get_row(r)
+        if fr is None:
+            return
+        if not os.path.exists(fr.path):
+            self.statusBar().showMessage(f"File not found: {fr.path}")
+            return
+        try:
+            open_with_default_app(fr.path)
+        except Exception as exc:
+            self.statusBar().showMessage(f"Could not open file: {exc}")
+
     def _on_target_changed(self, value):
-        # 다음 단계에서 분석된 행에 recompute_target 을 호출해 재표시.
+        # 목표가 바뀌면 값이 있는 전 행을 재계산해 다시 표시(원본 targetChange
+        # → GainAdjust → DispJunk). 재분석은 하지 않는다(가볍다).
+        for r in range(self.model.row_count()):
+            fr = self.model.get_row(r)
+            if fr is None or not fr.result:
+                continue
+            if fr.result.get("status") != "ok":
+                continue
+            fr.result = recompute_target(fr.result, value)
+            self.model.row_changed(r)
         self.statusBar().showMessage(f"Target set to {value:.1f} dB")
+
+    def _on_cancel(self):
+        if self._worker is not None:
+            self._worker.request_cancel()
+            self.btn_cancel.setEnabled(False)
+            self.statusBar().showMessage("Cancelling after current file...")
+
+    # --- 워커 슬롯(전부 메인 스레드에서 실행: 모델 변경은 여기서만) ---
+
+    def _on_worker_progress(self, done: int, total: int):
+        self.progress.setValue(done)
+        self.statusBar().showMessage(f"Analyzed {done}/{total}")
+
+    def _on_worker_row_done(self, path: str, result: dict):
+        self._analyzed_count += 1
+        r = self.model.find_row_by_path(path)
+        if r is None:
+            return  # 그 사이 삭제됨
+        fr = self.model.get_row(r)
+        fr.set_result(result)
+        self.model.row_changed(r)
+
+    def _on_worker_failed(self, path: str, msg: str):
+        self._failed_count += 1
+        r = self.model.find_row_by_path(path)
+        if r is None:
+            return
+        fr = self.model.get_row(r)
+        fr.mark_error(msg)
+        self.model.row_changed(r)
+
+    def _on_worker_finished(self):
+        self._worker = None
+        self.btn_cancel.setEnabled(False)
+        self.progress.setValue(0)
+        self._update_action_states()
+        done = self._analyzed_count
+        failed = self._failed_count
+        if failed:
+            self.statusBar().showMessage(
+                f"Analyzed {done} file(s), {failed} failed"
+            )
+        else:
+            self.statusBar().showMessage(f"Analyzed {done} file(s)")
 
     # --- 드래그 앤 드롭(원본 lstvMain_OLEDragDrop 대응) ---
 
@@ -274,6 +579,9 @@ class MainWindow(QMainWindow):
             event.ignore()
 
     def dropEvent(self, event):
+        if self._is_busy():
+            event.ignore()
+            return
         urls = event.mimeData().urls()
         paths = [u.toLocalFile() for u in urls if u.isLocalFile()]
         if paths:

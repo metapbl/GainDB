@@ -19,8 +19,8 @@ SORT_ROLE = int(Qt.ItemDataRole.UserRole) + 1
 class FileRow:
     """One entry in the file list.
 
-    `result` holds the full dict returned by api.analyze_file (or None until
-    analyzed). GUI-only bookkeeping lives in the other fields.
+    `result` holds the full dict returned by api.analyze_file / read_file_tags
+    (or None until scanned). GUI-only bookkeeping lives in the other fields.
     """
 
     path: str
@@ -46,6 +46,25 @@ class FileRow:
         self.result = None
         self.status = "pending"
         self.error_msg = ""
+
+    def set_tag_result(self, result: dict) -> None:
+        """파일 추가 시 태그 스캔 결과를 반영한다(원본 AddSingleFile 대응).
+
+        태그에서 값을 읽었으면(status="ok") 분석 불필요 상태로, 태그가 없으면
+        (status="no_tag") 분석 필요 상태로 둔다. 어느 쪽이든 result 는 보관해
+        표시(빈칸 또는 값)에 쓴다.
+        """
+        self.result = result
+        self.error_msg = ""
+        self.status = "analyzed" if result.get("status") == "ok" else "pending"
+
+    def needs_analysis(self) -> bool:
+        """Track Analysis 대상인지(값이 아직 없는지). 원본 RadiodBGain=NOREALNUM.
+
+        이미 분석/적용됐거나 태그에서 값을 읽었으면(status="analyzed"/"applied")
+        대상이 아니다. 그 외(pending/no_tag/error)는 분석이 필요하다.
+        """
+        return self.status not in ("analyzed", "applied")
 
 
 def _fmt_db(value: Optional[float]) -> str:
@@ -126,7 +145,7 @@ class FileTableModel(QAbstractTableModel):
 
         r = row.result
         if not r:
-            return ""  # un-analyzed rows show empty cells
+            return ""  # un-scanned rows show empty cells
 
         if key == Col.VOLUME:
             return _fmt_db(r.get("volume"))
@@ -157,17 +176,22 @@ class FileTableModel(QAbstractTableModel):
         return None
 
     # ---- row management --------------------------------------------------
-    def add_paths(self, paths: list[str]) -> int:
+    def add_paths(self, paths: list[str]) -> list[int]:
+        """새 경로를 행으로 추가하고, 추가된 행들의 모델 인덱스 목록을 반환한다.
+
+        반환값(추가된 행 인덱스)은 호출자가 곧바로 태그 스캔 결과를 채우는 데
+        쓴다(원본 AddSingleFile 이 추가 직후 DispJunk 하던 동작 대응).
+        """
         new = [p for p in paths if p not in self._seen]
         if not new:
-            return 0
+            return []
         start = len(self._rows)
         self.beginInsertRows(QModelIndex(), start, start + len(new) - 1)
         for p in new:
             self._rows.append(FileRow(path=p))
             self._seen.add(p)
         self.endInsertRows()
-        return len(new)
+        return list(range(start, start + len(new)))
 
     def remove_rows(self, rows: list[int]) -> None:
         for r in sorted(set(rows), reverse=True):
@@ -194,6 +218,18 @@ class FileTableModel(QAbstractTableModel):
     def get_row(self, row: int) -> Optional[FileRow]:
         if 0 <= row < len(self._rows):
             return self._rows[row]
+        return None
+
+    def find_row_by_path(self, path: str) -> Optional[int]:
+        """경로로 모델 행 인덱스를 찾는다(워커 시그널의 path→행 역참조용).
+
+        정렬 프록시·삭제로 뷰 인덱스가 흔들려도 path 는 안정적이므로,
+        워커는 path 로 결과를 돌려주고 여기서 원본 모델 행을 되찾는다.
+        없으면 None(그 사이 삭제된 경우).
+        """
+        for i, row in enumerate(self._rows):
+            if row.path == path:
+                return i
         return None
 
     def row_count(self) -> int:

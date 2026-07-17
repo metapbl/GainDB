@@ -284,3 +284,29 @@ GaindB/
 - **버그 2(경미): SyntaxWarning.** `main_window.py` `PathElideDelegate` docstring 안 `\F`·`\M`·`\)` 가 이스케이프로 오인. 해결: 해당 docstring `"""` → `r"""`(raw string). 동작 무관, 경고만 제거.
 
 - **다음 세션 시작점**: CLAUDE.md 첨부 후 **버그 1·2 우선 처리**. 첫 메시지에 `gui/workers.py`·`gui/main_window.py` 전문을 붙여 제공 → 버그 1(Cancel 후 UI 굳음)을 특정(AnalyzeWorker done 방출·완료 슬롯 연결 점검)하고 버그 2(docstring raw string)를 함께 수정. 두 버그 해소·검증 후, 잔여 항목 택일: (a) 진행바·Cancel/Pause/Rescan 실동작 최종 확인, (b) GUI 순수 함수부 tests 편입(collect_mp3_paths·표시 수식·shift/recompute; 파괴적 적용은 fixture 사본만·원본 불간섭 9) → `gaindb/api.py`·`gaindb/analysis.py`·`tests/_support.py`, (c) 후순위 기능 착수(우클릭 팝업=Album/Undo/RemoveTags/Play, 컬럼폭·정렬 저장, Album/Constant/Max No-clip, 트레이·로그·언어) → 해당 원본 폼(frmMain 팝업·frmOptions·frmGetGain 등) 붙여 제공. 우선순위는 사용자 결정.
+
+**[진척 15 - 취소 정책 변경 + 파일 내부 진행률 (버그 1·2 처리)]** (커밋 6930347·fb53611)
+
+- **버그 1 원인 재특정(진척 14 추정은 오진).** "트랙 분석 Cancel 후 UI 굳음"의 진짜 원인은 AnalyzeWorker done 미방출·연결 어긋남이 아니라, **초장시간 곡(암욜맨 10시간)을 통째로 디코딩하는 방식** 그 자체였다. 원인 두 겹: (1) 취소가 파일 경계에서만 반영돼, 진행 중 ffmpeg 가 10시간 전체를 PCM 으로 뽑을 때까지 run()이 그 파일에 갇혀 취소가 안 먹힘("Cancelling..."에서 멈춤). (2) 곡 전체 PCM(스테레오 10h ≈ 12GB, f64 승격·join 으로 순간 25GB+)을 메모리에 올려 시스템이 스와핑으로 얼어붙음(다운 직전). 워커·시그널 코드는 정상이었다.
+- **취소 정책 변경(합의됨, 진척 12·13 정책 갱신).** "파일 경계에서만·진행 중 ffmpeg 방치" → "**청크 경계에서 취소·진행 중 ffmpeg 즉시 kill**". decode 계층이 청크마다 should_cancel 을 확인해 서면 proc.kill() 후 DecodeCancelled(=DecodeError 하위)를 던지고, 워커는 이를 실패가 아닌 정상 취소로 구분(failed 아님, 조용히 루프 탈출). 취소가 수백 ms 이내 반영. 원본 재현 로직과 무관한 GUI/코어 취소 UX 라 2.1 과 무충돌이며, 원본 GUI 도 exe subprocess 를 취소 시 종료했으므로 오히려 원본 취소 동작에 더 가깝다.
+- **파일 내부 진행률(합의됨).** 긴 곡 디코딩 중에도 UI 가 살아있음을 보이도록, decode 가 duration(ffprobe) 기반으로 예측한 총 PCM 바이트 대비 누적 바이트 비율(0~1, 근사·1.0 클램프)을 on_progress 로 방출 → 워커 file_progress(float) 시그널 → 메인 창이 상태바 텍스트("작업 k/N — 파일명 — NN.N%", 소수점 1자리)와 **진행바 세분 합산**(_PROGRESS_SCALE=1000, 값=(완료수+현재fraction)×1000)에 반영. 태그 스캔 진행바(진척 14 오프셋 누적)는 성격이 달라 세분 합산 미적용(기존 파일 단위 유지).
+- **버그 2 해소.** main_window.py PathElideDelegate docstring 의 `\F`·`\M`·`\)` SyntaxWarning → docstring 을 raw string(r""")로 전환해 제거(동작 무관).
+- **창 닫기 안전(커밋 6930347).** MainWindow.closeEvent 신설: 실행 중 워커가 있으면 request_cancel 후 wait(10초, 초과 시 terminate)로 종료를 보장한 뒤 닫는다. `QThread: Destroyed while thread is still running` 경고·크래시 제거. (이 커밋에 진척 15 GUI 변경분—file_progress 슬롯·세분 합산·취소 문구—이 함께 포함됨. 커밋 경계가 다소 뒤섞였으나 전 코드 커밋·트리 clean 확인.)
+
+**[진척 16 - 초장시간 곡 스트리밍 분석 (곡 전체 PCM 미적재)]** (커밋 fb53611)
+
+버그 1 의 근본(메모리 폭증)을 해소. 곡 전체 PCM 을 메모리에 올리지 않고 청크를 흘려보내며 분석을 누적한다. 10시간 곡도 청크 하나(≈10초 분량) 크기의 메모리로 처리. **결과는 일괄 처리와 비트 단위 동일**(diff=0 실측)이라 진척 6 의 exe 대조·0.1dB 검증 불변.
+
+- **TrackAnalyzer(analysis.py, 신설).** 상태 객체 방식: feed(left_chunk, right_chunk)로 청크를 먹이고 result()/peak_normalized()/histogram()으로 결과를 낸다. 동일성 근거: (1) **필터** — lfilter 의 zi(초기 조건)를 청크마다 이어받아 연속 통과(전체 lfilter 와 부동소수까지 동일). 최초 zi=0(일괄 경로가 zi 없이 부를 때의 내부 초기값과 동일). (2) **RMS 윈도우** — 필터 출력을 윈도우(50ms)로 자르는 것은 일괄과 동일. 청크 경계가 윈도우 경계와 어긋나면 완전한 윈도우만 처리하고 자투리(<1윈도우)를 버퍼에 남겨 다음 feed 에 이어붙임. 곡 끝 불완전 윈도우는 일괄처럼 버림. (3) **peak** — 필터 전 원샘플 좌우 abs 최댓값을 청크마다 갱신(track_peak 정의와 동일). 기존 함수(analyze_track/track_histogram/track_peak)는 전부 보존(CLI·Album·테스트 호환).
+- **decode_pcm_streaming(decode.py, 신설).** ffmpeg stdout 을 512KB 로 읽되 모으지 않고, 프레임 경계로 정렬해 약 chunk_seconds(기본 10초) 분량마다 on_chunk(left,right)로 흘려보낸다(프레임 미달 잔여 바이트는 pending 으로 이월). 취소·진행률 콜백은 decode_pcm 과 동일 규약. sample_rate 를 반환.
+- **api.analyze_file 스트리밍 전환.** _probe_stream_info 로 sample_rate 를 먼저 얻어 TrackAnalyzer 생성 → decode_pcm_streaming(on_chunk=analyzer.feed)로 청크를 먹임 → result()/peak_normalized(). 곡 전체 배열을 안 만듦. scan_gain·표시 계산 불변. (ffprobe 가 analyze_file·decode_pcm_streaming 에서 각 1회 = 2회 호출되나 수 ms 라 무시, 안전 우선.)
+- **ResourceWarning 제거.** Popen 은 subprocess.run 과 달리 파이프를 자동으로 안 닫아 unclosed file 경고가 났다. 두 디코더를 `with proc:` 컨텍스트로 감싸 파이프 자동 정리. 공통 헬퍼 _spawn_ffmpeg·_resolve_channels 로 두 함수 중복(검증·기동) 통합.
+- **검증.** 스트리밍=일괄 대조 diff=0.00e+00·peak 일치(Debussy 사본). 통합 스위트 86건 PASS·경고 0. GUI 실사용: 10시간 곡 메모리 폭증 없이 분석·상태바 %·Cancel 즉시 반영 확인. decode_pcm(통짜 반환)은 짧은 곡·테스트용으로 존치.
+
+**[사고 기록 - fixture 원본 재오염·복구 (9 함정 재강조)]**
+
+진척 14 이후 어느 시점(GUI 실험/분석 CLI 로 추정)에 원본 두 음원(Debussy 44.1k·10cm 48k)에 mp3gain APE 태그가 다시 기록돼 있었다(track_gain·peak·min/max). 이 때문에 test_recalc_decode_skip·test_cli_misc 3건이 "fresh copy 에 track_gain 있음"·"1차 분석인데 decode 0회"·"-s s 인데 APE 태그 있음"으로 실패(코드 결함 아님·오염 탓, 9 함정과 동일 유형 재발). **undo 필드가 없어 오디오 본문은 무사**(적용이 아니라 분석·태그기록만 됨). 복구: `mp3gain_cli.py -s d`로 두 파일의 APE 태그 제거(오디오·ID3v1 꼬리 유지) → --debug-tag 로 순수 상태(APE none) 확인 → 86건 PASS 복귀. **재강조: 모든 검증은 사본에서만(9 함정). 원본 경로를 검증 명령에 직접 쓰지 말 것.**
+
+**8단계 MVP 완료(초장시간 곡 포함 실사용 가능).** 파일/폴더 추가·태그 스캔·자연 정렬·유니코드·리스트 UX·Track Analysis/Gain(워커)·표시 수식(exe 실측 일치)·단축키·Clear·취소(청크 경계 즉시)·파일 내부 진행률·스트리밍 분석(수 시간 곡 대응)·창 닫기 안전 완료.
+
+- **다음 세션 시작점**: 잔여 항목 택일. (a) GUI 순수 함수부 tests 편입(collect_mp3_paths·표시 수식·shift/recompute·TrackAnalyzer 스트리밍=일괄 대조를 정식 테스트로) → tests/_support.py·gaindb/api.py·gaindb/analysis.py. (b) 후순위 기능(우클릭 팝업=Album/Undo/RemoveTags/Play, 컬럼폭·정렬 저장, Album/Constant/Max No-clip, 트레이·로그·언어) → 해당 원본 폼 붙여 제공. (c) 진행률 시그널 스로틀(초장시간 곡에서 file_progress emit 폭주 시 "직전값과 0.1%↑ 차이날 때만 emit") — 현재 체감 문제 없으면 보류. 우선순위는 사용자 결정.

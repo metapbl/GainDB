@@ -114,6 +114,13 @@ class FileTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._rows: list[FileRow] = []
         self._seen: set[str] = set()
+        # path -> row index. 워커 시그널의 path→행 역참조를 O(1) 로 만든다.
+        # 예전 find_row_by_path 는 리스트를 선형 탐색해, 대량 스캔 시 슬롯이
+        # 파일마다 O(N) 을 돌아 전체가 O(N^2) 였다(수천 곡에서 후반 UI 지연의
+        # 주범). 추가는 append-only 라 O(1) 로 등록하고, 삭제 시에만 뒤 인덱스가
+        # 밀리므로 이 맵을 재빌드한다(삭제 자체가 이미 리스트 del 로 O(N) 이라
+        # 차수는 그대로, 삭제는 드물어 실질 이득이 크다).
+        self._index: dict[str, int] = {}
 
     # ---- Qt required overrides -------------------------------------------
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
@@ -200,26 +207,35 @@ class FileTableModel(QAbstractTableModel):
         """새 경로를 행으로 추가하고, 추가된 행들의 모델 인덱스 목록을 반환한다.
 
         반환값(추가된 행 인덱스)은 호출자가 곧바로 태그 스캔 결과를 채우는 데
-        쓴다(원본 AddSingleFile 이 추가 직후 DispJunk 하던 동작 대응).
+        쓴다(원본 AddSingleFile 이 추가 직후 DispJunk 하던 동작 대응). 추가는
+        append-only 라 _index 에 O(1) 로 등록한다(뒤 인덱스가 밀리지 않으므로
+        재빌드 불필요).
         """
         new = [p for p in paths if p not in self._seen]
         if not new:
             return []
         start = len(self._rows)
         self.beginInsertRows(QModelIndex(), start, start + len(new) - 1)
-        for p in new:
+        for i, p in enumerate(new):
             self._rows.append(FileRow(path=p))
             self._seen.add(p)
+            self._index[p] = start + i
         self.endInsertRows()
         return list(range(start, start + len(new)))
 
     def remove_rows(self, rows: list[int]) -> None:
+        removed = False
         for r in sorted(set(rows), reverse=True):
             if 0 <= r < len(self._rows):
                 self.beginRemoveRows(QModelIndex(), r, r)
                 self._seen.discard(self._rows[r].path)
                 del self._rows[r]
                 self.endRemoveRows()
+                removed = True
+        # 삭제로 뒤 행 인덱스가 밀렸으므로 path->index 맵을 다시 세운다.
+        # 삭제는 이미 리스트 del 로 O(N) 이라 재빌드를 얹어도 차수는 그대로다.
+        if removed:
+            self._rebuild_index()
 
     def clear(self) -> None:
         if not self._rows:
@@ -227,7 +243,12 @@ class FileTableModel(QAbstractTableModel):
         self.beginResetModel()
         self._rows.clear()
         self._seen.clear()
+        self._index.clear()
         self.endResetModel()
+
+    def _rebuild_index(self) -> None:
+        """path->row index 맵을 현재 _rows 로부터 다시 세운다(삭제 후 호출)."""
+        self._index = {row.path: i for i, row in enumerate(self._rows)}
 
     def row_changed(self, row: int) -> None:
         if 0 <= row < len(self._rows):
@@ -245,12 +266,10 @@ class FileTableModel(QAbstractTableModel):
 
         정렬 프록시·삭제로 뷰 인덱스가 흔들려도 path 는 안정적이므로,
         워커는 path 로 결과를 돌려주고 여기서 원본 모델 행을 되찾는다.
-        없으면 None(그 사이 삭제된 경우).
+        _index(path->row) 로 O(1) 조회한다(예전엔 선형 탐색 O(N)). 없으면
+        None(그 사이 삭제된 경우).
         """
-        for i, row in enumerate(self._rows):
-            if row.path == path:
-                return i
-        return None
+        return self._index.get(path)
 
     def row_count(self) -> int:
         return len(self._rows)

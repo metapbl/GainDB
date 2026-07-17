@@ -184,6 +184,7 @@ GaindB/
 - **이 미러의 `.c` 는 크롤 불가**: `application/octet-stream` MIME. 소스는 로컬 보관 + 사용자가 붙여넣어 제공(5). Claude 가 크롤로 가져오려 시도하지 말 것.
 - **테스트는 원본 음원을 절대 건드리지 않는다(영구 제약, 오염 사고 교훈)**: 모든 검증·테스트는 tempfile 사본에서만 동작하고 끝나면 정리한다. 각 테스트는 깨끗한 fixture(또는 `-s d` 로 태그 제거한 상태)에서 시작한다. 과거 옛 verify_*.py 가 원본 두 음원에 mp3gain 태그를 남겨 round-trip 해시가 어긋나 보이는 사고가 있었다(코드 결함 아님, 원본 오염 탓). 두 음원은 순수 상태로 복구함.
 - **undo 0 태그는 남는다(원본 동일 동작)**: 깨끗한 파일에 `-g N` 적용 후 `-u` 하면 오디오 본문은 비트 동일로 복원되지만 `MP3GAIN_UNDO 0,0` APE 태그가 남아 파일 전체 해시는 달라진다(원본 changeGainAndTag 의 "don't remove it"). 무손실 검증은 전체 해시가 아니라 tag_offset 까지의 오디오 본문 해시로 판정한다.
+- **적용 후 표시 갱신은 peak(curr_max_amp)도 함께 이동해야 한다(clip 정합의 핵심)**: `shift_after_apply` 는 원본 `AlterDb` 의 세 갱신을 모두 재현해야 한다 — raw track_db 하향(`-steps×DB_PER_STEP`), **peak `×2^(steps/4)` 갱신**, 그에 따른 clip 재판정. peak 갱신을 빠뜨리면 목표를 올렸다 내렸다 할 때 curr_max_amp 가 이전 목표의 값으로 남아 clip 표시가 실제 파일과 어긋난다(원본 exe 대조로 실증: 실제 peak 17196 인데 화면엔 48635·거짓 clip). 목표만 바꾸는 `recompute_target` 은 반대로 peak 를 건드리지 않는다(파일 미변경이므로).
 
 ## 10. 진척 로그 / 다음 세션 시작점
 
@@ -252,8 +253,16 @@ GaindB/
 - **목표 변경 시 재표시**: `_on_target_changed` 가 값 있는 전 행에 `recompute_target` 적용 후 `row_changed`(재분석 없음). 원본 `targetChange`→`GainAdjust`→`DispJunk`. status 는 analyzed 유지 → 목표 바꿔도 재분석 대상 안 됨.
 - **리스트 UX 원본 대조·보강**: (a) Delete 키 = 선택 행만 삭제(`FileTableView.keyPressEvent`, 원본 `lstvMain_KeyDown` KeyCode 46→ClearFiles; 선택 없으면 무동작=전체삭제 아님, Clear 버튼과 구분). (b) 더블클릭 재생(`_on_double_click`→`open_with_default_app`, 원본 `lstvMain_DblClick` 의 ShellExecute; 플랫폼 분기 win=os.startfile/mac=open/linux=xdg-open; 정렬 상태서도 mapToSource 로 정확한 곡). (c) 빈 영역 고무줄 선택(`FileTableView` mousePress/Move/Release + QRubberBand; QTableView 는 setSelectionRectVisible 이 없어=QListView/QTree 전용, 직접 구현; 행 위 시작은 super() 위임, Ctrl 시작은 기존 선택에 추가). Ctrl+A 전체선택은 QTableView 기본. `add_paths` 반환을 bool→추가 행 인덱스 리스트로 변경(추가 직후 태그 스캔 대상 지정용).
 
-**8단계 순서 3·4 완료. 다음 = 순서 5: ApplyWorker(Track Gain 실제 적용).**
+**8단계 순서 3·4 완료.** (미구현이던 순서 5 = 아래 진척 13 에서 완료.)
 
-- **미구현(다음)**: Track Gain 버튼이 아직 상태바 안내만. `gaindb.api.apply_file_track_gain`(목표→offset 변환 내장, 파괴적)을 ApplyWorker(QThread)로 연결. 적용 후 `shift_after_apply` 로 표시 갱신(재분석 없이 raw track_db 이동). 대상은 Analysis 와 동일 규칙(선택 있으면 선택·없으면 전체). auto-clip 끔 + 지정값 적용 + 클립 표시만(MVP 합의). 적용은 파일을 **실제로 변경**하므로 원본 불간섭 테스트 원칙(9)·되돌리기(undo) 흐름 유의.
-- **후순위(원본에 있으나 MVP 제외)**: 우클릭 팝업 메뉴(Album/Undo/RemoveTags/Play 등), 컬럼 순서·폭 저장/복원, 정렬 상태 저장, Album·Constant·Max No-clip, 트레이·로그·언어메뉴. **드래그 중 뷰 밖으로 나갈 때 자동 스크롤(고무줄 선택 확장)은 미구현 — 현재는 보이는 범위 내에서만 고무줄 선택. 필요 시 후속 보강**(당면 불편은 크지 않다고 판단, 사용자 확인).
-- **다음 세션 시작점**: CLAUDE.md 첨부 후 `apply_gain.py`(apply_track_gain 시그니처·반환)·`gaindb/api.py`(apply_file_track_gain·shift_after_apply)·`gui/main_window.py`(현재 `_on_gain` 배선)·`gui/workers.py`(AnalyzeWorker 를 본떠 ApplyWorker 작성) 붙여 제공하면 ApplyWorker 작성 착수.
+- **후순위(원본에 있으나 MVP 제외)**: 우클릭 팝업 메뉴(Album/Undo/RemoveTags/Play 등), 컬럼 순서·폭 저장/복원, 정렬 상태 저장, Album·Constant·Max No-clip, 트레이·로그·언어메뉴. **드래그 중 뷰 밖 자동 스크롤(고무줄 선택 확장)은 미구현 — 현재는 보이는 범위 내에서만.** 필요 시 후속 보강(당면 불편은 크지 않다고 판단, 사용자 확인).
+
+**[진척 13 - 8단계 순서 5 완료: ApplyWorker(Track Gain 실제 적용)]** (커밋 551d2b8·c9c7650·28f04e1)
+
+- **ApplyWorker(QThread) 연결** (`gui/workers.py`). Track Gain 버튼이 대상 행의 경로+기존 result 를 씨앗으로 넘겨 워커를 띄운다. 워커는 파일별로 원본 `RadioGain` 동작을 재현: (a) 미분석이면(씨앗 없음/미유효) `analyze_file` 로 먼저 분석 → (b) 스텝 0 이면 적용하지 않고 분석 결과만 방출(`row_analyzed`, 원본 "분석까지만") → (c) 스텝 있으면 `apply_file_track_gain`(파괴적) 적용 후 `shift_after_apply` 로 표시 dict 만들어 방출(`row_applied`). 시그널 progress/row_analyzed/row_applied/failed/done. 모델 변경은 전부 메인 스레드 슬롯에서. 대상 규칙은 "선택 있으면 선택·없으면 전체"(원본 mnuSelectedFiles), 값 있는 행도 포함(원본은 RadiodBGain 있으면 재분석만 생략).
+- **원본 RadioGain 확증(frmMain.frm)**: 이미 분석된 파일도 배제하지 않되 `/g` 실행은 `RadioMp3Gain <> 0` 일 때만 → 스텝 0 이면 분석까지만. 적용 성공 시 `AlterDb -steps*FIVELOG10TWO` 로 메모리 dB 이동 후 DispJunk(재분석 없음). 우리 shift_after_apply 와 동형.
+- **표시 수식 3건 정정(Mp3Info.cls·DispJunk 대조, 커밋 551d2b8)**: 화면 대조로 드러난 버그를 원본 소스로 확정·수정. (1) **Volume = 89 − raw**(원본 DispJunk `DEFAULTTARGET + ModifydBGain − RadiodBGain` 에서 ModifydBGain 상쇄 → 목표 무관한 "현재 실제 음량"). 기존 `target − raw` 는 오류였음. (2) **shift 부호**: 적용 후 raw 를 `−steps×DB_PER_STEP` 로 낮춘다(원본 AlterDb `mvarRadiodBGain += -steps*FIVELOG10TWO`). 기존 `+` 오류로 Track Gain 이 0 으로 수렴 안 하던 문제 해결. (3) **peak 갱신**: shift 시 curr_max_amp `×2^(steps/4)`(원본 AlterDb `mvarCurrMaxAmp *= 2^(intGainChange/4)`). 누락으로 목표 왕복 시 거짓 clip 표시되던 문제 해결(9 함정에 등재). clip possible 분기는 원본대로 target 기준 볼륨(`83 − (target − raw)`) 사용.
+- **원본 exe 실측 검증**: 104 파일 사본을 `mp3gain.exe -s s` 로 스캔 → Max PCM 17195.6·Track dB 0.51·gain 0. 우리 `--show` 와 완전 일치(CurrMaxAmp 17196, Volume 88.5, clip 없음). GUI 4파일도 원본 GUI 와 Volume·Track Gain(0.0)·CurrMaxAmp·clip 전부 일치 확인(목표 97·89 양쪽, 스크린샷 대조).
+- **미검증(다음 점검 권장)**: 진행바·Cancel 실제 동작 최종 확인(배선은 돼 있음), 오염된 목록 재현 시 Clear 후 재추가로 태그 재스캔 안내.
+- **다음 = 8단계 잔여 MVP 마감 점검 후 통합 스위트 편입 검토.** ApplyWorker 는 파일을 실제 변경하므로 자동 테스트는 원본 불간섭 원칙(9) 하에 fixture 사본으로만. GUI 로직(collect_mp3_paths·표시 수식·shift/recompute)의 순수 함수부는 tests 편입 가능성 검토. 그 후 후순위 항목(우클릭 메뉴·Album 등) 중 사용자 우선순위대로.
+- **다음 세션 시작점**: CLAUDE.md 첨부 후, (a) 잔여 MVP 점검이면 `gui/main_window.py`·`gui/workers.py`; (b) 표시 수식 테스트 편입이면 `gaindb/api.py`·`gaindb/analysis.py`; (c) 후순위 기능 착수면 해당 원본 폼(frmMain 팝업 메뉴 등, 사용자 제공) 붙여 제공.

@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QHeaderView, QRubberBand,
 )
 
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QKeySequence
 
 from gui.model import FileTableModel, SORT_ROLE
 from gui.columns import Col
@@ -258,27 +258,47 @@ class MainWindow(QMainWindow):
         tb.setMovable(False)
         self.addToolBar(tb)
 
+        # 단축키는 원본 mp3gain 메뉴(frmMain.frm)를 재현: Add Files=Ctrl+F,
+        # Add Folder=Ctrl+D, Track Analysis=Ctrl+T, Track Gain=Ctrl+G.
+        # Clear 는 원본에 전용 단축키가 없어(원본은 Delete=선택삭제만) 편의로
+        # Ctrl+Shift+Delete 를 붙였다(전체 삭제=파괴적이라 오발 방지 위해 3키
+        # 조합, 사용자 합의). 툴팁에 단축키를 표기한다. busy 시에는
+        # _update_action_states 가 QAction 을 비활성화해 단축키도 함께 막힌다.
+
         self.act_add_files = QAction("Add Files", self)
+        self.act_add_files.setShortcut(QKeySequence("Ctrl+F"))
+        self.act_add_files.setToolTip("Add MP3 files to the list (Ctrl+F)")
         self.act_add_files.triggered.connect(self._on_add_files)
         tb.addAction(self.act_add_files)
 
         self.act_add_folder = QAction("Add Folder", self)
+        self.act_add_folder.setShortcut(QKeySequence("Ctrl+D"))
+        self.act_add_folder.setToolTip("Add all MP3 files in a folder (Ctrl+D)")
         self.act_add_folder.triggered.connect(self._on_add_folder)
         tb.addAction(self.act_add_folder)
 
         tb.addSeparator()
 
         self.act_analyze = QAction("Track Analysis", self)
+        self.act_analyze.setShortcut(QKeySequence("Ctrl+T"))
+        self.act_analyze.setToolTip("Analyze track gain without applying (Ctrl+T)")
         self.act_analyze.triggered.connect(self._on_analyze)
         tb.addAction(self.act_analyze)
 
         self.act_gain = QAction("Track Gain", self)
+        self.act_gain.setShortcut(QKeySequence("Ctrl+G"))
+        self.act_gain.setToolTip("Apply track gain to files (Ctrl+G)")
         self.act_gain.triggered.connect(self._on_gain)
         tb.addAction(self.act_gain)
 
         tb.addSeparator()
 
         self.act_clear = QAction("Clear", self)
+        self.act_clear.setShortcut(QKeySequence("Ctrl+Shift+Delete"))
+        self.act_clear.setToolTip(
+            "Clear selected files, or all files if none selected "
+            "(Ctrl+Shift+Delete)"
+        )
         self.act_clear.triggered.connect(self._on_clear)
         tb.addAction(self.act_clear)
 
@@ -512,13 +532,16 @@ class MainWindow(QMainWindow):
         self._worker.start()
 
     def _on_clear(self):
+        """Clear 버튼/단축키: 목록 전체 삭제(원본 ClearAll 대응).
+
+        선택 여부와 무관하게 항상 전부 비운다(원본 lstvMain.ListItems.Clear).
+        선택 행만 지우는 것은 Delete 키(_on_delete_selected, 원본 ClearFiles)가
+        전담해 역할이 갈린다. 파일 목록만 비울 뿐 파일 자체는 건드리지 않으므로
+        확인 대화상자는 두지 않는다(원본도 없음). 워커 실행 중에는 잠근다.
+        """
         if self._is_busy():
             return
-        rows = self._selected_source_rows()
-        if rows:
-            self.model.remove_rows(rows)
-        else:
-            self.model.clear()
+        self.model.clear()
 
     def _on_delete_selected(self):
         """Delete 키: 선택 행만 삭제(원본 ClearFiles). 선택 없으면 무동작.

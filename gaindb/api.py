@@ -51,33 +51,34 @@ DEFAULT_TARGET_DB = 89.0
 
 def _compute_display(track_db: float, curr_max_amp,
                      target_db: float) -> dict:
-    """표시값 계산의 유일한 출처(89·offset·db_to_steps·clip 판정식이 여기만 있다).
-
-    analyze_file / read_file_tags / recompute_target / shift_after_apply 가
-    전부 이 함수를 호출한다. 어떤 경로로 값이 나오든 공식이 동일하므로
-    표시값끼리, 그리고 apply_track_gain 의 실제 steps 와도 정합이 보장된다.
+    """표시값 계산의 유일한 출처(원본 DispJunk / RadioMp3Gain 재현).
 
     track_db     : 89dB 기준 raw dB (원본 mvarRadiodBGain, mod 미포함).
-    curr_max_amp : peak * 32768 (원본 CurrMaxAmp, 클립 기준값).
-                   None 이면 peak 미보유 → clip 판정을 건너뛰고 "none"으로 둔다
-                   (원본 DispJunk 가 CurrMaxAmp=NOREALNUM 일 때 clip 표시를
-                   비우는 동작에 대응).
-    target_db    : 사용자 지정 목표 음량(89dB 기준 상대). 예: 96.
+    curr_max_amp : peak * 32768 (원본 CurrMaxAmp). None 이면 clip "none".
+    target_db    : 사용자 지정 목표 음량(89dB 기준 상대).
 
-    반환: volume·steps·track_gain_db·clip_state 만 담은 dict.
+    Volume(원본 DispJunk): 89 + ModifydBGain - RadiodBGain = 89 - raw. 즉
+    modify_db 가 상쇄되는 "곡의 현재 실제 음량". 적용 후 shift_after_apply 가
+    raw 를 낮춰 목표로 수렴한다.
+    steps / clip 판정: 원본 RadioMp3Gain·DispJunk 와 동일하게 modify_db 반영.
+    원본 clip 의 possible 분기는 (83 - (target - raw)) 를 쓰므로, Volume(=89-raw)
+    이 아니라 target 기준 값을 별도로 계산해 넣는다.
     """
     modify_db = target_db - DEFAULT_TARGET_DB
 
-    volume = DEFAULT_TARGET_DB + modify_db - track_db
+    # 원본 DispJunk: Volume = 89 - raw (ModifydBGain 상쇄).
+    volume = DEFAULT_TARGET_DB - track_db
+    # 원본 clip 판정에 쓰이는 target 기준 볼륨 = DEFAULTTARGET + ModifydBGain - raw.
+    target_volume = DEFAULT_TARGET_DB + modify_db - track_db
 
     steps = db_to_steps(track_db + modify_db)
     track_gain_db = steps * DB_PER_STEP
 
     if curr_max_amp is None:
-        # peak 미보유: 클립을 판정할 근거가 없다(원본 DispJunk 동작).
         clip_state = "none"
     elif curr_max_amp * (2.0 ** (steps / 4.0)) > 32767.0:
-        if curr_max_amp * (2.0 ** ((83.0 - volume) / 6.0206)) > 32767.0:
+        # 원본: CurrMaxAmp * 2^((83 - target_volume)/6.0206) > 32767 → possible.
+        if curr_max_amp * (2.0 ** ((83.0 - target_volume) / 6.0206)) > 32767.0:
             clip_state = "possible"
         else:
             clip_state = "definite"
@@ -236,35 +237,40 @@ def recompute_target(result: dict, target_db: float) -> dict:
 def shift_after_apply(result: dict, applied_steps: int) -> dict:
     """게인 적용 후 표시값을 갱신한다(재분석 없음, 가볍다).
 
-    적용으로 파일 음량이 applied_steps 만큼 커졌으므로(1스텝 ≈ +DB_PER_STEP),
-    raw track_db 를 그만큼 올린 뒤(원본 AlterDb 대응) _compute_display 로 표시
-    값을 다시 계산한다. 목표는 result 에 보관된 target_db 를 그대로 쓴다.
-    적용이 성공했다면 다음 재계산에서 steps 가 0 으로 수렴하는 것이 정상이다.
+    원본 RadioGain 이 적용 성공 후 `AlterDb(-steps * FIVELOG10TWO)` 로
+    수행하는 두 갱신을 재현한다:
+      1) mvarRadiodBGain += (-steps * FIVELOG10TWO) → raw track_db 를 낮춘다.
+         raw 는 "89 로 맞추는 데 필요한 게인"이므로, 곡을 applied_steps 만큼
+         키웠으면 그만큼 덜 필요하다(빼기). 낮춘 raw 로 재계산하면 steps 는 0,
+         Volume(=89-raw)은 목표로 수렴한다.
+      2) mvarCurrMaxAmp *= 2^(steps/4) → peak(클립 기준)을 실제 적용에 맞춰
+         갱신한다. 이걸 빠뜨리면 목표를 올렸다 내렸다 할 때 curr_max_amp 가
+         이전 목표의 값으로 남아 clip 표시가 실제 파일과 어긋난다(원본은 매
+         적용마다 정확히 갱신함).
 
     result: 적용 직전의 dict(target_db·track_db·curr_max_amp 포함).
     applied_steps: 방금 적용된 정수 스텝.
-
     반환: "적용된 상태"를 반영한 새 dict(원본 dict 는 변경하지 않음).
-
-    주의: curr_max_amp(peak)는 무손실 게인 적용 후 실제로는 2^(steps/4) 배로
-    바뀌지만, 원본 GUI 도 적용 후 CurrMaxAmp 를 재측정하지 않고 표시 dB 만
-    이동시킨다(재분석 없음). 여기서도 curr_max_amp 는 유지해 원본 동작과
-    맞춘다. 정확한 peak 가 필요하면 재분석(analyze_file)한다.
     """
     updated = dict(result)
 
     if result.get("status") != "ok" or result.get("track_db") is None:
         return updated
 
-    # 음량이 applied_steps 만큼 커졌으므로 raw track_db 를 그만큼 올린다.
-    new_track_db = result["track_db"] + applied_steps * DB_PER_STEP
+    # (1) 원본 AlterDb: mvarRadiodBGain += (-steps * FIVELOG10TWO). raw 를 낮춘다.
+    new_track_db = result["track_db"] - applied_steps * DB_PER_STEP
     updated["track_db"] = new_track_db
 
-    target_db = result.get("target_db", DEFAULT_TARGET_DB)
+    # (2) 원본 AlterDb: mvarCurrMaxAmp *= 2^(steps/4). peak 를 적용에 맞춰 갱신.
     cma = result.get("curr_max_amp")
-    disp = _compute_display(new_track_db,
-                            None if cma is None else float(cma),
-                            target_db)
+    if cma is not None:
+        new_cma = float(cma) * (2.0 ** (applied_steps / 4.0))
+        updated["curr_max_amp"] = round(new_cma)
+    else:
+        new_cma = None
+
+    target_db = result.get("target_db", DEFAULT_TARGET_DB)
+    disp = _compute_display(new_track_db, new_cma, target_db)
     updated["volume"] = disp["volume"]
     updated["steps"] = disp["steps"]
     updated["track_gain_db"] = disp["track_gain_db"]

@@ -46,6 +46,11 @@ from PySide6.QtWidgets import (
     QTableView, QToolBar, QProgressBar, QPushButton, QFileDialog,
     QAbstractItemView, QHeaderView, QRubberBand,
 )
+from PySide6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox,
+    QTableView, QToolBar, QProgressBar, QPushButton, QFileDialog,
+    QAbstractItemView, QHeaderView, QRubberBand, QStyledItemDelegate,
+)
 
 from PySide6.QtGui import QAction, QKeySequence
 
@@ -243,6 +248,106 @@ class NaturalSortProxy(QSortFilterProxyModel):
         return lv < rv
 
 
+class PathElideDelegate(QStyledItemDelegate):
+    """Path\\File 컬럼 전용 델리게이트: 경로를 먼저 접고 파일명을 최후까지 보존.
+
+    표준 elide 모드(ElideLeft/Middle/Right)는 문자열을 한 지점에서만 접어
+    "경로만 접고 파일명은 보존, 그래도 좁으면 파일명 자름"이라는 2단계 규칙을
+    표현할 수 없다. 그래서 직접 그린다. 셀 폭에 맞춰 단계적으로 축소한다:
+
+      1) 전체 경로가 다 들어가면 그대로.
+      2) 안 들어가면 경로를 접는다: 드라이브(첫 요소) + \\…\\ + 마지막 폴더 +
+         \\ + 파일명. 예: C:\\Users\\...\\MUSIC\\104.mp3 → C:\\…\\MUSIC\\104.mp3.
+      3) 그렇게 최소로 접어도 넘치면, 그때만 파일명을 뒤에서 elide 한다
+         (C:\\…\\MUSIC\\some very long na…). 즉 파일명이 최후까지 보호된다.
+
+    그리기만 커스터마이즈하고 배경·선택 하이라이트는 기본 스타일에 맡겨
+    다크테마 팔레트(진척 11)를 깨지 않는다. 전체 경로 툴팁·정렬은 모델의
+    ToolTipRole·SORT_ROLE 이 그대로 담당하므로 여기서 건드리지 않는다.
+    """
+
+    _SEP = "\u2026"  # '…' (한 글자 말줄임표)
+
+    def _elide_path(self, text: str, avail: int, fm) -> str:
+        """text(전체 경로)를 폭 avail(px)에 맞춰 단계적으로 축소한 문자열."""
+        # 1) 다 들어가면 그대로.
+        if fm.horizontalAdvance(text) <= avail:
+            return text
+
+        # 경로를 구분자로 분해. 이 앱은 Windows 절대경로(\\)를 저장한다.
+        # 안전하게 os.sep 과 '/' 둘 다 인식하되, 재조립은 원래 구분자를 쓴다.
+        sep = "\\" if "\\" in text else "/"
+        parts = text.split(sep)
+        # parts = [드라이브(또는 첫 요소), ..., 마지막폴더, 파일명]
+        if len(parts) >= 3:
+            drive = parts[0]
+            filename = parts[-1]
+            last_dir = parts[-2]
+            # 2) 경로 접기: 드라이브\…\마지막폴더\파일명.
+            folded = f"{drive}{sep}{self._SEP}{sep}{last_dir}{sep}{filename}"
+            if fm.horizontalAdvance(folded) <= avail:
+                return folded
+            # 3) 최소로 접어도 넘침: 파일명만 뒤에서 elide.
+            #    접힌 경로 접두(드라이브\…\마지막폴더\)의 폭을 뺀 나머지에
+            #    파일명을 맞춘다.
+            prefix = f"{drive}{sep}{self._SEP}{sep}{last_dir}{sep}"
+            prefix_w = fm.horizontalAdvance(prefix)
+            remain = avail - prefix_w
+            if remain <= 0:
+                # 접두조차 안 들어갈 만큼 극단적으로 좁으면 전체를 좌측 elide
+                # (파일명 우선 노출).
+                return fm.elidedText(text, Qt.TextElideMode.ElideLeft, avail)
+            elided_name = fm.elidedText(
+                filename, Qt.TextElideMode.ElideRight, remain)
+            return prefix + elided_name
+
+        # 경로 요소가 2개 이하(예외적)면 좌측 elide 로 파일명 우선 노출.
+        return fm.elidedText(text, Qt.TextElideMode.ElideLeft, avail)
+
+    def paint(self, painter, option, index):
+        from PySide6.QtWidgets import QStyle, QApplication
+
+        # 표시할 원본 텍스트(전체 경로)를 모델에서 가져온다.
+        text = index.data(Qt.ItemDataRole.DisplayRole) or ""
+
+        # 옵션을 초기화하고, 배경·선택 하이라이트는 기본 스타일이 그리게 한다.
+        opt = self.initStyleOption_copy(option, index)
+        # 기본 컨트롤이 텍스트까지 그리지 않도록 텍스트를 비운다.
+        opt.text = ""
+        style = opt.widget.style() if opt.widget else QApplication.style()
+        style.drawControl(QStyle.ControlElement.CE_ItemViewItem, opt, painter,
+                          opt.widget)
+
+        # 텍스트 그릴 사각형(스타일이 계산한 텍스트 영역)에 우리 문자열을 그린다.
+        text_rect = style.subElementRect(
+            QStyle.SubElement.SE_ItemViewItemText, opt, opt.widget)
+        fm = opt.fontMetrics
+        # 좌우 여백을 약간 두어 문자가 테두리에 붙지 않게 한다.
+        avail = text_rect.width() - 4
+        shown = self._elide_path(str(text), max(avail, 0), fm)
+
+        # 선택 여부에 따라 팔레트에서 텍스트 색을 고른다(다크테마 유지).
+        if opt.state & QStyle.StateFlag.State_Selected:
+            color = opt.palette.highlightedText().color()
+        else:
+            color = opt.palette.text().color()
+        painter.save()
+        painter.setPen(color)
+        painter.drawText(
+            text_rect.adjusted(2, 0, -2, 0),
+            int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),
+            shown,
+        )
+        painter.restore()
+
+    def initStyleOption_copy(self, option, index):
+        """option 을 복사·초기화해 반환(원본 option 을 변형하지 않기 위해)."""
+        from PySide6.QtWidgets import QStyleOptionViewItem
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        return opt
+
+
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -349,6 +454,16 @@ class MainWindow(QMainWindow):
         self.table = FileTableView(self)
         self.table.setModel(self.proxy)
         self.table.setSortingEnabled(True)  # 헤더 클릭 정렬
+        # 긴 경로는 셀에서 중간 생략(E:\내 음악\...\name.mp3)해 파일명이 안
+        # 잘리게 한다. 창을 넓히면 그만큼 더 보인다. 전체 경로는 행 툴팁으로
+        # 확인 가능(data() ToolTipRole). 수치 컬럼은 짧아 elide 영향이 없다.
+        # Path\File 컬럼은 전용 델리게이트로 그린다: 경로를 먼저 접고
+        # (C:\…\MUSIC\) 파일명을 최후까지 보존, 그래도 좁으면 파일명 elide.
+        # 창을 넓히면 접혔던 경로가 다시 드러난다. 전체 경로는 행 툴팁으로 확인.
+        self.table.setItemDelegateForColumn(
+            int(Col.NAME), PathElideDelegate(self.table))
+        # 데이터 행 높이를 촘촘하게(가로 헤더 높이는 별개라 영향 없음).
+        self.table.verticalHeader().setDefaultSectionSize(22)
         # 초기 정렬: Path\File 기준 오름차순(헤더 화살표와 상태 일치).
         self.table.sortByColumn(int(Col.NAME), Qt.SortOrder.AscendingOrder)
         self.table.setSelectionBehavior(

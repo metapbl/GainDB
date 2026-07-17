@@ -6,6 +6,12 @@
 
 취소는 파일 경계에서만 반영한다(진행 중인 ffmpeg 프로세스를 강제 중단하지
 않고, 현재 파일이 끝나면 멈춘다). 파일별 예외는 워커가 잡아 failed 로 넘긴다.
+
+태그 스캔(TagScanWorker)만은 성격이 다르다: 디코딩 없이 파일 꼬리 태그만
+읽으므로 곡당 매우 가볍고(~1ms), 취소는 사실상 즉시 반영된다. 대량 추가 시
+UI 프리징을 없애기 위해 추가 흐름에서 이 워커로 태그를 백그라운드로 채운다.
+태그 스캔의 "취소"는 완전 취소가 아니라 일시 중단(Pause)이며, 멈춘 뒤 남은
+행은 Rescan 으로 이어서 스캔한다(메인 창이 pending 행을 다시 넘긴다).
 """
 
 from __future__ import annotations
@@ -15,9 +21,64 @@ from PySide6.QtCore import QThread, Signal
 from gaindb.api import (
     analyze_file,
     apply_file_track_gain,
+    read_file_tags,
     recompute_target,
     shift_after_apply,
 )
+
+
+class TagScanWorker(QThread):
+    """주어진 경로들의 mp3gain 태그만 읽어 표시값을 채우는 워커(가볍다).
+
+    원본 MP3GainGUI AddSingleFile 의 `/o /s c` 태그 조회에 대응한다. 디코딩이
+    없어 곡당 ~1ms. 대량 추가 시 메인 스레드가 이걸 순차로 돌면 UI 가 몇 분
+    프리징되므로 백그라운드로 옮긴다. 파일은 변경하지 않는다(읽기 전용).
+
+    시그널:
+      progress(done, total) : 한 파일 처리가 끝날 때마다 방출.
+      row_done(path, result): 태그 조회 성공 시 결과 dict 와 함께 방출.
+                              (result["status"] 는 "ok" 또는 "no_tag" — 둘 다
+                              정상 흐름이라 failed 가 아니라 row_done 으로 보낸다.)
+      done()                : 전체 종료(Pause 포함).
+
+    태그 읽기 중 진짜 예외(파일 손상 등)는 조용히 건너뛴다(원래 _add_from 도
+    태그 실패를 무시했음). 그런 행은 pending 으로 남아 나중에 분석 대상이 된다.
+    """
+
+    progress = Signal(int, int)
+    row_done = Signal(str, dict)
+    done = Signal()
+
+    def __init__(self, paths: list[str], target_db: float, parent=None) -> None:
+        super().__init__(parent)
+        self._paths = list(paths)
+        self._target_db = target_db
+        self._cancel = False
+
+    def request_cancel(self) -> None:
+        """파일 경계에서 멈추도록 중단(Pause)을 요청한다."""
+        self._cancel = True
+
+    @property
+    def was_cancelled(self) -> bool:
+        """중단(Pause) 요청이 들어온 채로 종료됐는지. 완료 슬롯의 메시지 분기용."""
+        return self._cancel
+
+    def run(self) -> None:
+        total = len(self._paths)
+        done = 0
+        for path in self._paths:
+            if self._cancel:
+                break
+            try:
+                result = read_file_tags(path, self._target_db)
+                self.row_done.emit(path, result)
+            except Exception:
+                # 태그 읽기 실패는 치명적이지 않다. pending 으로 남겨 넘어간다.
+                pass
+            done += 1
+            self.progress.emit(done, total)
+        self.done.emit()
 
 
 class AnalyzeWorker(QThread):

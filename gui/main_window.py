@@ -1,9 +1,22 @@
-"""gui/main_window.py — 메인 창(8단계 MVP + 태그 스캔 + Analysis/Gain 워커).
+"""gui/main_window.py — 메인 창(8단계 MVP + 태그 스캔 워커 + Analysis/Gain 워커).
 
 원본 MP3GainGUI frmMain 의 화면 구성·동작을 관찰해 독립 구현한다(clean-room).
 파일/폴더 추가(버튼 + 드래그앤드롭)·Clear·헤더 클릭 자연 정렬·Delete 키 선택
-삭제·더블클릭 재생에 더해, 파일 추가 시 태그를 즉시 읽어 표시(원본
-AddSingleFile), Track Analysis 와 Track Gain 을 QThread 워커로 연결한다.
+삭제·더블클릭 재생에 더해, 파일 추가 시 태그를 백그라운드 워커로 읽어 표시
+(원본 AddSingleFile), Track Analysis 와 Track Gain 도 QThread 워커로 연결한다.
+
+태그 스캔 워커화(대량 추가 프리징 해소): 파일 추가 시 행은 메인에서 즉시 만들고
+(빈칸 상태로 목록에 바로 보임), 태그는 TagScanWorker 가 백그라운드로 채운다.
+스캔 진행 중에는 겸용 버튼이 Pause 로, 멈춘 뒤 미스캔(pending) 행이 남으면
+Rescan 으로 바뀐다(같은 자리에서 상태 전환). Track Analysis/Track Gain 진행
+중에는 같은 버튼이 Cancel 이다(작업 성격상 이어가기 개념이 없어 Rescan 없음).
+
+겸용 버튼(진행바 옆) 규칙 — _update_action_states 에서 결정:
+  - 태그 스캔 워커 실행 중          → "Pause" (활성)   : 파일 경계에서 스캔 중단
+  - 분석/적용 워커 실행 중          → "Cancel"(활성)   : 파일 경계에서 작업 중단
+  - 멈춤 + 미스캔(pending) 행 있음  → "Rescan"(활성)   : 남은 pending 이어 스캔
+  - 멈춤 + pending 없음             → "Cancel"(비활성) : 동작 없음(기본 상태)
+클릭 핸들러는 하나이며 위 상태에 따라 pause/cancel/rescan 으로 분기한다.
 
 Track Gain(원본 RadioGain 재현): 대상 행마다 (a) 미분석이면 먼저 분석 →
 (b) 변동 스텝이 0 이면 분석까지만 → (c) 스텝이 있으면 실제 적용. 이 판단·
@@ -15,7 +28,8 @@ GUI 무계산 원칙: 수치는 gaindb.api 가 계산한 것만 표시한다.
 
 워커 규칙: 무거운 작업(ffmpeg 디코딩·파일 적용)은 워커에서 돌리고,
 워커는 시그널만 방출한다. 모델 변경은 전부 메인 스레드의 슬롯에서 수행한다.
-태그 읽기는 가벼워(디코딩 없음) 추가 흐름 안에서 동기로 처리한다(원본도 동기).
+태그 스캔도 워커로 돌리되(대량 추가 프리징 해소) 워커는 읽기만 하고 모델
+변경은 메인 슬롯이 담당한다.
 """
 
 from __future__ import annotations
@@ -37,8 +51,8 @@ from PySide6.QtGui import QAction, QKeySequence
 
 from gui.model import FileTableModel, SORT_ROLE
 from gui.columns import Col
-from gui.workers import AnalyzeWorker, ApplyWorker
-from gaindb.api import DEFAULT_TARGET_DB, read_file_tags, recompute_target
+from gui.workers import TagScanWorker, AnalyzeWorker, ApplyWorker
+from gaindb.api import DEFAULT_TARGET_DB, recompute_target
 
 
 def collect_mp3_paths(paths, recurse: bool = True) -> list[str]:
@@ -240,8 +254,14 @@ class MainWindow(QMainWindow):
         self.proxy = NaturalSortProxy(self)
         self.proxy.setSourceModel(self.model)
 
-        # 실행 중 워커 보유(GC 방지). 분석·적용 중 한 종류만 동시에 돈다.
-        self._worker: AnalyzeWorker | ApplyWorker | None = None
+        # 실행 중 워커 보유(GC 방지). 한 번에 한 종류만 돈다(busy 잠금).
+        # _worker_kind: "scan" | "analyze" | "apply" | None.
+        #   겸용 버튼(Pause/Cancel/Rescan) 텍스트·동작이 이 종류에 따라 갈린다.
+        self._worker: TagScanWorker | AnalyzeWorker | ApplyWorker | None = None
+        self._worker_kind: str | None = None
+        self._scanned_count = 0    # 이번 태그 스캔에서 처리한 개수
+        self._scan_offset = 0      # 이번 스캔 시작 시점에 이미 스캔돼 있던 행 수
+                                   # (전체 목록 대비 누적 진행바 계산용 오프셋)
         self._analyzed_count = 0   # 이번 작업에서 분석/적용 성공 개수
         self._applied_count = 0    # 이번 Track Gain 에서 실제 적용된 개수
         self._failed_count = 0     # 이번 작업에서 실패한 개수
@@ -296,8 +316,7 @@ class MainWindow(QMainWindow):
         self.act_clear = QAction("Clear", self)
         self.act_clear.setShortcut(QKeySequence("Ctrl+Shift+Delete"))
         self.act_clear.setToolTip(
-            "Clear selected files, or all files if none selected "
-            "(Ctrl+Shift+Delete)"
+            "Clear all files from the list (Ctrl+Shift+Delete)"
         )
         self.act_clear.triggered.connect(self._on_clear)
         tb.addAction(self.act_clear)
@@ -358,10 +377,12 @@ class MainWindow(QMainWindow):
         self.progress = QProgressBar(self)
         self.progress.setValue(0)
         prog_row.addWidget(self.progress, 1)
-        self.btn_cancel = QPushButton("Cancel", self)
-        self.btn_cancel.setEnabled(False)
-        self.btn_cancel.clicked.connect(self._on_cancel)
-        prog_row.addWidget(self.btn_cancel)
+        # 겸용 버튼: 상태에 따라 Pause / Cancel / Rescan 으로 바뀐다.
+        # 클릭 핸들러는 하나(_on_action_button)이며 내부에서 분기한다.
+        self.btn_action = QPushButton("Cancel", self)
+        self.btn_action.setEnabled(False)
+        self.btn_action.clicked.connect(self._on_action_button)
+        prog_row.addWidget(self.btn_action)
         layout.addLayout(prog_row)
 
         self.setCentralWidget(central)
@@ -372,7 +393,23 @@ class MainWindow(QMainWindow):
     # --- 상태 갱신 ---
 
     def _is_busy(self) -> bool:
-        return self._worker is not None and self._worker.isRunning()
+        # isRunning()은 start() 직후 아직 False 일 수 있어(스레드 기동 지연)
+        # 그 짧은 창에 버튼이 Rescan 으로 잘못 그려졌다. 워커 객체 존재 여부로
+        # 판정한다 — _on_*_finished 가 _worker=None 을 하므로 이게 안정적이다.
+        return self._worker is not None
+
+    def _has_pending(self) -> bool:
+        """목록에 태그 스캔 미시도(Rescan 대상) 행이 하나라도 있는지.
+
+        태그 스캔을 아직 시도하지 않은 행(needs_tag_scan)이 Rescan 대상이다.
+        태그가 없어서 값이 없는 행은 이미 스캔을 시도했으므로 대상이 아니다
+        (그런 행은 Track Analysis 로 값을 채운다).
+        """
+        for r in range(self.model.row_count()):
+            fr = self.model.get_row(r)
+            if fr is not None and fr.needs_tag_scan():
+                return True
+        return False
 
     def _update_action_states(self, *args):
         busy = self._is_busy()
@@ -383,46 +420,66 @@ class MainWindow(QMainWindow):
         self.act_analyze.setEnabled(has_rows and not busy)
         self.act_gain.setEnabled(has_rows and not busy)
         self.act_clear.setEnabled(has_rows and not busy)
+
+        # 겸용 버튼 텍스트·활성 결정(설계 표 그대로):
+        #   태그 스캔 중  → Pause(활성)
+        #   분석/적용 중  → Cancel(활성)
+        #   멈춤+pending  → Rescan(활성)
+        #   멈춤+무pending→ Cancel(비활성)
+        if busy:
+            if self._worker_kind == "scan":
+                self.btn_action.setText("Pause")
+            else:
+                self.btn_action.setText("Cancel")
+            self.btn_action.setEnabled(True)
+        else:
+            if self._has_pending():
+                self.btn_action.setText("Rescan")
+                self.btn_action.setEnabled(True)
+            else:
+                self.btn_action.setText("Cancel")
+                self.btn_action.setEnabled(False)
+
         if not busy:
             self.statusBar().showMessage(f"{self.model.rowCount()} file(s)")
 
-    # --- 파일 추가 공통 (추가 직후 태그 동기 스캔) ---
+    # --- 겸용 버튼 클릭(Pause / Cancel / Rescan 분기) ---
 
-    def _add_from(self, paths):
-        mp3s = collect_mp3_paths(paths, recurse=True)
-        if not mp3s:
-            self.statusBar().showMessage("No .mp3 files found")
-            return
-        new_rows = self.model.add_paths(mp3s)  # 추가된 모델 행 인덱스 목록
-        if not new_rows:
-            self.statusBar().showMessage(
-                f"No new files, {self.model.rowCount()} total"
-            )
-            return
+    def _on_action_button(self):
+        """진행바 옆 겸용 버튼. 현재 상태에 따라 pause/cancel/rescan.
 
-        # 원본 AddSingleFile 대응: 추가 직후 태그만 읽어(디코딩 없음) 즉시 표시.
-        target_db = self.spin_target.value()
-        tagged = 0
-        for r in new_rows:
+        - 태그 스캔 실행 중  : Pause  → 스캔 중단 요청(파일 경계에서 멈춤).
+        - 분석/적용 실행 중  : Cancel → 작업 중단 요청(파일 경계에서 멈춤).
+        - 멈춤 + pending 있음 : Rescan → 남은 pending 행을 이어서 태그 스캔.
+        """
+        if self._is_busy():
+            # 실행 중이면 종류 불문 중단 요청(Pause/Cancel 동작은 동일).
+            if self._worker is not None:
+                self._worker.request_cancel()
+                self.btn_action.setEnabled(False)
+                if self._worker_kind == "scan":
+                    self.statusBar().showMessage("Pausing after current file...")
+                else:
+                    self.statusBar().showMessage(
+                        "Cancelling after current file...")
+            return
+        # 멈춰 있으면 Rescan: pending 행 태그 스캔 재개.
+        self._start_tag_scan(self._pending_paths())
+
+    # --- 대상 행 결정 ---
+
+    def _pending_paths(self) -> list[str]:
+        """태그 스캔 미시도(Rescan 대상) 행들의 경로. Rescan/최초 스캔의 대상.
+
+        needs_tag_scan()==True 인 행만 모은다. 이로써 Rescan 은 이미 스캔한
+        행(태그 있든 없든)을 건너뛰고 중단 지점부터 이어간다.
+        """
+        paths = []
+        for r in range(self.model.row_count()):
             fr = self.model.get_row(r)
-            if fr is None:
-                continue
-            try:
-                result = read_file_tags(fr.path, target_db)
-            except Exception:
-                # 태그 읽기 실패는 치명적이지 않다. 미분석 상태로 두고 넘어감.
-                continue
-            fr.set_tag_result(result)
-            if result.get("status") == "ok":
-                tagged += 1
-            self.model.row_changed(r)
-
-        self.statusBar().showMessage(
-            f"Added {len(new_rows)} file(s) "
-            f"({tagged} with tags), {self.model.rowCount()} total"
-        )
-
-    # --- 대상 행 결정(선택 있으면 선택, 없으면 전체) ---
+            if fr is not None and fr.needs_tag_scan():
+                paths.append(fr.path)
+        return paths
 
     def _target_source_rows(self) -> list[int]:
         """작업 대상 모델 행 인덱스. 선택 행이 있으면 그것, 없으면 전체.
@@ -439,6 +496,66 @@ class MainWindow(QMainWindow):
         """선택된 행의 원본 모델 인덱스만 반환(선택 없으면 빈 리스트)."""
         sel = self.table.selectionModel().selectedRows()
         return [self.proxy.mapToSource(idx).row() for idx in sel]
+
+    # --- 태그 스캔 워커 시작(최초 추가 후 · Rescan 공용) ---
+
+    def _start_tag_scan(self, paths: list[str]):
+        """주어진 경로들의 태그를 백그라운드로 스캔한다(원본 AddSingleFile).
+
+        최초 추가 직후와 Rescan/추가가 이 함수를 공유한다. 이미 워커가 돌고
+        있으면 무시한다(busy 잠금). 대상이 없으면 아무 것도 안 한다.
+
+        진행바는 "전체 목록 대비 누적" 기준이다(태그 스캔만의 방식 — Pause/
+        Rescan 으로 이어가므로). 범위 = 전체 행 수, 오프셋 = 이번 스캔 시작
+        시점에 이미 스캔돼 있던 행 수(전체 − 이번 대상). 진행 시 오프셋을
+        더한 값을 표시해, 재개·추가가 전체에서 이어지는 것이 드러난다.
+        """
+        if self._is_busy() or not paths:
+            self._update_action_states()
+            return
+        target_db = self.spin_target.value()
+        total = self.model.row_count()
+        self._scan_offset = total - len(paths)  # 이미 스캔된 행 수
+        self._scanned_count = 0
+        self._worker = TagScanWorker(paths, target_db, self)
+        self._worker_kind = "scan"
+        self._worker.progress.connect(self._on_scan_progress)
+        self._worker.row_done.connect(self._on_scan_row_done)
+        self._worker.done.connect(self._on_scan_finished)
+
+        self.progress.setRange(0, total)
+        self.progress.setValue(self._scan_offset)  # 이미 스캔된 만큼 채우고 시작
+        self._update_action_states()  # 버튼을 Pause 로
+        self.statusBar().showMessage(
+            f"Scanning tags {self._scan_offset}/{total}")
+        self._worker.start()
+
+    # --- 파일 추가 공통 (행 즉시 추가 → 태그는 워커로 백그라운드 스캔) ---
+
+    def _add_from(self, paths):
+        if self._is_busy():
+            self.statusBar().showMessage("Busy — wait for the current task")
+            return
+        mp3s = collect_mp3_paths(paths, recurse=True)
+        if not mp3s:
+            self.statusBar().showMessage("No .mp3 files found")
+            return
+        new_rows = self.model.add_paths(mp3s)  # 추가된 모델 행(빈칸 상태로 즉시 표시)
+        if not new_rows:
+            self.statusBar().showMessage(
+                f"No new files, {self.model.rowCount()} total"
+            )
+            return
+        # 원본 AddSingleFile 대응: 태그 조회를 백그라운드 워커로 돌린다. 새로
+        # 추가된 행뿐 아니라 이전 Pause 로 남은 미스캔 행까지 함께 이어 스캔
+        # 하도록 _pending_paths()(전체 미스캔)를 대상으로 넘긴다. 진행바는
+        # _start_tag_scan 이 전체 목록 기준으로 다시 잡으므로, 추가된 만큼
+        # 분모가 커지고 이미 스캔된 만큼 채운 채 시작한다.
+        self.statusBar().showMessage(
+            f"Added {len(new_rows)} file(s), {self.model.rowCount()} total — "
+            f"scanning tags..."
+        )
+        self._start_tag_scan(self._pending_paths())
 
     # --- 툴바 액션 ---
 
@@ -475,6 +592,7 @@ class MainWindow(QMainWindow):
         self._analyzed_count = 0
         self._failed_count = 0
         self._worker = AnalyzeWorker(paths, target_db, self)
+        self._worker_kind = "analyze"
         self._worker.progress.connect(self._on_worker_progress)
         self._worker.row_done.connect(self._on_worker_row_done)
         self._worker.failed.connect(self._on_worker_failed)
@@ -482,8 +600,7 @@ class MainWindow(QMainWindow):
 
         self.progress.setRange(0, len(paths))
         self.progress.setValue(0)
-        self.btn_cancel.setEnabled(True)
-        self._update_action_states()
+        self._update_action_states()  # 버튼을 Cancel 로
         self.statusBar().showMessage(f"Analyzing {len(paths)} file(s)...")
         self._worker.start()
 
@@ -491,10 +608,17 @@ class MainWindow(QMainWindow):
         """Track Gain 적용(원본 RadioGain 재현). ApplyWorker 로 위임한다.
 
         대상: 선택 있으면 선택·없으면 전체(원본 mnuSelectedFiles 분기 대응).
-        Analysis 와 달리 값 있는 행도 대상에 포함한다 — 워커가 파일별로
-        (미분석이면 분석 → 스텝 0이면 분석까지만 → 스텝 있으면 적용)을
-        판단·수행한다. 씨앗으로 각 행의 기존 result 를 함께 넘겨, 이미 값이
-        있으면 재분석을 피한다(원본이 RadiodBGain 보유 시 재분석 안 함과 일치).
+        단, 이미 값이 있으면서 목표까지의 스텝이 0 인 곡(이미 목표에 도달 →
+        적용 불필요)은 대상·분모에서 뺀다. 원본 RadioGain 도 실제 /g 실행은
+        RadioMp3Gain<>0 일 때만 하므로, "적용될 곡"만 분모로 잡는 게 원본
+        동작에 맞고 진행바도 실제 작업량을 반영한다(이미 적용된 곡을 재시작
+        때 다시 훑어 진행바가 중간부터 시작한 것처럼 보이던 문제도 해소).
+
+        값이 아직 없는 곡(미분석)은 steps 를 미리 모르므로 포함한다 — 워커가
+        분석 후 steps=0 이면 그때 건너뛴다(row_analyzed). 값 있는 곡은 여기서
+        steps 를 알 수 있어 0 이면 미리 제외한다. 씨앗으로 각 행의 기존 result
+        를 함께 넘겨 이미 값이 있으면 재분석을 피한다(원본이 RadiodBGain 보유
+        시 재분석 안 함과 일치).
         """
         if self._is_busy():
             return
@@ -506,11 +630,19 @@ class MainWindow(QMainWindow):
             fr = self.model.get_row(r)
             if fr is None:
                 continue
+            # 값이 있고 steps 를 아는 곡은 steps==0 이면 제외(이미 목표 도달).
+            res = fr.result
+            if (res and res.get("status") == "ok"
+                    and res.get("steps") is not None
+                    and res.get("steps") == 0):
+                continue
             paths.append(fr.path)
             seed_results[fr.path] = fr.result  # None 이면 워커가 분석함
 
         if not paths:
-            self.statusBar().showMessage("No files to apply gain to")
+            self.statusBar().showMessage(
+                "Nothing to apply (all target files already at target)"
+            )
             return
 
         target_db = self.spin_target.value()
@@ -518,6 +650,7 @@ class MainWindow(QMainWindow):
         self._applied_count = 0
         self._failed_count = 0
         self._worker = ApplyWorker(paths, target_db, seed_results, self)
+        self._worker_kind = "apply"
         self._worker.progress.connect(self._on_apply_progress)
         self._worker.row_analyzed.connect(self._on_apply_analyzed)
         self._worker.row_applied.connect(self._on_apply_applied)
@@ -526,8 +659,7 @@ class MainWindow(QMainWindow):
 
         self.progress.setRange(0, len(paths))
         self.progress.setValue(0)
-        self.btn_cancel.setEnabled(True)
-        self._update_action_states()
+        self._update_action_states()  # 버튼을 Cancel 로
         self.statusBar().showMessage(f"Applying gain to {len(paths)} file(s)...")
         self._worker.start()
 
@@ -538,6 +670,7 @@ class MainWindow(QMainWindow):
         선택 행만 지우는 것은 Delete 키(_on_delete_selected, 원본 ClearFiles)가
         전담해 역할이 갈린다. 파일 목록만 비울 뿐 파일 자체는 건드리지 않으므로
         확인 대화상자는 두지 않는다(원본도 없음). 워커 실행 중에는 잠근다.
+        Clear 후 pending 이 사라지므로 겸용 버튼은 기본(Cancel 비활성)으로 복귀.
         """
         if self._is_busy():
             return
@@ -547,7 +680,7 @@ class MainWindow(QMainWindow):
         """Delete 키: 선택 행만 삭제(원본 ClearFiles). 선택 없으면 무동작.
 
         _on_clear 와 달리 선택이 없을 때 전체 삭제하지 않는다(원본 동작).
-        분석/적용 중에는 목록 변경을 잠근다.
+        분석/적용/스캔 중에는 목록 변경을 잠근다.
         """
         if self._is_busy():
             return
@@ -588,13 +721,49 @@ class MainWindow(QMainWindow):
             self.model.row_changed(r)
         self.statusBar().showMessage(f"Target set to {value:.1f} dB")
 
-    def _on_cancel(self):
-        if self._worker is not None:
-            self._worker.request_cancel()
-            self.btn_cancel.setEnabled(False)
-            self.statusBar().showMessage("Cancelling after current file...")
+    # --- 태그 스캔 워커 슬롯(전부 메인 스레드: 모델 변경은 여기서만) ---
 
-    # --- 분석 워커 슬롯(전부 메인 스레드에서 실행: 모델 변경은 여기서만) ---
+    def _on_scan_progress(self, done: int, total_in_batch: int):
+        # done 은 이번 워커 내 카운트. 전체 목록 대비로 보이도록 오프셋을 더한다.
+        overall_total = self.model.row_count()
+        overall_done = self._scan_offset + done
+        self.progress.setValue(overall_done)
+        self.statusBar().showMessage(
+            f"Scanning tags {overall_done}/{overall_total}")
+
+    def _on_scan_row_done(self, path: str, result: dict):
+        self._scanned_count += 1
+        r = self.model.find_row_by_path(path)
+        if r is None:
+            return  # 그 사이 삭제됨
+        fr = self.model.get_row(r)
+        fr.set_tag_result(result)  # status "ok"→analyzed / "no_tag"→pending
+        self.model.row_changed(r)
+
+    def _on_scan_finished(self):
+        # None 처리 전에 중단(Pause) 여부를 읽어둔다.
+        cancelled = self._worker.was_cancelled if self._worker else False
+        self._worker = None
+        self._worker_kind = None
+        self._update_action_states()  # 멈춤 → pending 있으면 Rescan 로
+        done = self._scanned_count
+        total = self.model.row_count()
+        if cancelled:
+            # Pause: 진행바를 리셋하지 않고 현재값(스캔된 만큼) 그대로 둔다.
+            self.statusBar().showMessage(
+                f"Paused — scanned {self._scan_offset + done}/{total} tag(s). "
+                f"Press Rescan to continue."
+            )
+        else:
+            # 완료: 100% 를 찍었으면 완료로 판정(리셋하지 않고 꽉 채워 둔다).
+            # 이후 파일을 추가하면 분모가 커져 자연히 비율이 줄었다 다시 찬다.
+            self.progress.setRange(0, total)
+            self.progress.setValue(total)
+            self.statusBar().showMessage(
+                f"Tag scan done — {total} file(s) total"
+            )
+
+    # --- 분석 워커 슬롯 ---
 
     def _on_worker_progress(self, done: int, total: int):
         self.progress.setValue(done)
@@ -622,7 +791,7 @@ class MainWindow(QMainWindow):
         # None 처리 전에 취소 여부를 읽어둔다(이후 self._worker 는 사라짐).
         cancelled = self._worker.was_cancelled if self._worker else False
         self._worker = None
-        self.btn_cancel.setEnabled(False)
+        self._worker_kind = None
         self.progress.setValue(0)
         self._update_action_states()
         done = self._analyzed_count
@@ -633,7 +802,7 @@ class MainWindow(QMainWindow):
         msg = ", ".join(parts)
         self.statusBar().showMessage(f"Cancelled — {msg}" if cancelled else msg)
 
-    # --- 적용 워커 슬롯(Track Gain, 전부 메인 스레드에서 실행) ---
+    # --- 적용 워커 슬롯(Track Gain) ---
 
     def _on_apply_progress(self, done: int, total: int):
         self.progress.setValue(done)
@@ -663,7 +832,7 @@ class MainWindow(QMainWindow):
         # None 처리 전에 취소 여부를 읽어둔다(이후 self._worker 는 사라짐).
         cancelled = self._worker.was_cancelled if self._worker else False
         self._worker = None
-        self.btn_cancel.setEnabled(False)
+        self._worker_kind = None
         self.progress.setValue(0)
         self._update_action_states()
         applied = self._applied_count

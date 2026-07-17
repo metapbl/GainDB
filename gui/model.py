@@ -21,17 +21,23 @@ class FileRow:
 
     `result` holds the full dict returned by api.analyze_file / read_file_tags
     (or None until scanned). GUI-only bookkeeping lives in the other fields.
+
+    `tag_scanned` marks whether a tag scan has been attempted for this row
+    (원본 AddSingleFile 의 태그 조회 시도 여부). "태그가 없어서 값이 없는 행"과
+    "아직 태그를 안 읽은 행"을 구분해 Rescan 대상(미시도 행)을 정확히 좁힌다.
     """
 
     path: str
     result: Optional[dict] = None
     status: str = "pending"  # pending | analyzed | applied | error
     error_msg: str = ""
+    tag_scanned: bool = False
 
     def set_result(self, result: dict) -> None:
         self.result = result
         self.status = "analyzed"
         self.error_msg = ""
+        self.tag_scanned = True  # 분석까지 됐으면 태그 스캔도 불필요.
 
     def mark_applied(self, result: dict) -> None:
         self.result = result
@@ -46,23 +52,37 @@ class FileRow:
         self.result = None
         self.status = "pending"
         self.error_msg = ""
+        self.tag_scanned = False
 
     def set_tag_result(self, result: dict) -> None:
         """파일 추가 시 태그 스캔 결과를 반영한다(원본 AddSingleFile 대응).
 
         태그에서 값을 읽었으면(status="ok") 분석 불필요 상태로, 태그가 없으면
         (status="no_tag") 분석 필요 상태로 둔다. 어느 쪽이든 result 는 보관해
-        표시(빈칸 또는 값)에 쓴다.
+        표시(빈칸 또는 값)에 쓴다. 태그 스캔은 시도됐으므로 tag_scanned 를
+        세워 Rescan 대상(미시도 행)에서 제외한다 — 태그 없는 행이 영원히
+        Rescan 대상으로 남던 문제를 막는다.
         """
         self.result = result
         self.error_msg = ""
         self.status = "analyzed" if result.get("status") == "ok" else "pending"
+        self.tag_scanned = True
+
+    def needs_tag_scan(self) -> bool:
+        """태그 스캔(또는 Rescan) 대상인지. 아직 태그 스캔을 시도하지 않은 행.
+
+        태그가 없어서 값이 없는 행(tag_scanned=True, status="pending")과
+        아직 태그를 안 읽은 행(tag_scanned=False)을 구분한다. 전자는 대상이
+        아니고 후자만 대상이다.
+        """
+        return not self.tag_scanned
 
     def needs_analysis(self) -> bool:
         """Track Analysis 대상인지(값이 아직 없는지). 원본 RadiodBGain=NOREALNUM.
 
         이미 분석/적용됐거나 태그에서 값을 읽었으면(status="analyzed"/"applied")
-        대상이 아니다. 그 외(pending/no_tag/error)는 분석이 필요하다.
+        대상이 아니다. 그 외(pending/no_tag/error)는 분석이 필요하다. 태그 스캔
+        시도 여부와는 무관하다(태그가 없던 행도 분석하면 값이 나오므로 대상).
         """
         return self.status not in ("analyzed", "applied")
 

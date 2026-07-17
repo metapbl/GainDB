@@ -7,6 +7,9 @@
 취소는 파일 경계에서만 반영한다(진행 중인 ffmpeg 프로세스를 강제 중단하지
 않고, 현재 파일이 끝나면 멈춘다). 파일별 예외는 워커가 잡아 failed 로 넘긴다.
 
+각 워커는 파일 처리 직전에 current(path) 를 방출한다 — 메인 창이 상태바에
+"지금 처리 중인 파일명"을 보여주는 데 쓴다(경로 없이 basename 만 표시).
+
 태그 스캔(TagScanWorker)만은 성격이 다르다: 디코딩 없이 파일 꼬리 태그만
 읽으므로 곡당 매우 가볍고(~1ms), 취소는 사실상 즉시 반영된다. 대량 추가 시
 UI 프리징을 없애기 위해 추가 흐름에서 이 워커로 태그를 백그라운드로 채운다.
@@ -35,6 +38,7 @@ class TagScanWorker(QThread):
     프리징되므로 백그라운드로 옮긴다. 파일은 변경하지 않는다(읽기 전용).
 
     시그널:
+      current(path)         : 각 파일 처리 직전 방출(상태바 "처리 중" 표시용).
       progress(done, total) : 한 파일 처리가 끝날 때마다 방출.
       row_done(path, result): 태그 조회 성공 시 결과 dict 와 함께 방출.
                               (result["status"] 는 "ok" 또는 "no_tag" — 둘 다
@@ -45,6 +49,7 @@ class TagScanWorker(QThread):
     태그 실패를 무시했음). 그런 행은 pending 으로 남아 나중에 분석 대상이 된다.
     """
 
+    current = Signal(str)
     progress = Signal(int, int)
     row_done = Signal(str, dict)
     done = Signal()
@@ -70,6 +75,7 @@ class TagScanWorker(QThread):
         for path in self._paths:
             if self._cancel:
                 break
+            self.current.emit(path)  # 상태바 "처리 중" 표시용(처리 직전).
             try:
                 result = read_file_tags(path, self._target_db)
                 self.row_done.emit(path, result)
@@ -85,13 +91,15 @@ class AnalyzeWorker(QThread):
     """주어진 경로들을 파일별로 analyze_file 로 분석하는 워커.
 
     시그널:
+      current(path)         : 각 파일 처리 직전 방출(상태바 "처리 중" 표시용).
       progress(done, total) : 한 파일 처리가 끝날 때마다 방출(성공/실패 무관).
       row_done(path, result): 분석 성공 시 결과 dict 와 함께 방출.
       failed(path, msg)     : 분석 중 예외 발생 시 오류 메시지와 함께 방출.
-      finished()            : 전체 종료(취소 포함). QThread 기본 finished 와
+      done()                : 전체 종료(취소 포함). QThread 기본 finished 와
                               구분해 명시적으로 방출한다.
     """
 
+    current = Signal(str)
     progress = Signal(int, int)
     row_done = Signal(str, dict)
     failed = Signal(str, str)
@@ -118,6 +126,7 @@ class AnalyzeWorker(QThread):
         for path in self._paths:
             if self._cancel:
                 break
+            self.current.emit(path)  # 상태바 "처리 중" 표시용(처리 직전).
             try:
                 result = analyze_file(path, self._target_db)
                 if result.get("status") == "not_enough_samples":
@@ -149,6 +158,7 @@ class ApplyWorker(QThread):
     recompute_target 으로 steps 를 목표에 맞춰 다시 계산한다.
 
     시그널:
+      current(path)             : 각 파일 처리 직전 방출(상태바 "처리 중" 표시용).
       progress(done, total)     : 파일 하나 처리가 끝날 때마다 방출.
       row_analyzed(path, result): 분석만 하고 적용 안 함(steps=0). 표시 dict.
       row_applied(path, result) : 적용까지 함. shift_after_apply 반영된 표시 dict.
@@ -158,6 +168,7 @@ class ApplyWorker(QThread):
     적용은 파일을 실제로 변경한다(파괴적). 취소는 파일 경계에서만 반영한다.
     """
 
+    current = Signal(str)
     progress = Signal(int, int)
     row_analyzed = Signal(str, dict)
     row_applied = Signal(str, dict)
@@ -204,6 +215,7 @@ class ApplyWorker(QThread):
         for path in self._paths:
             if self._cancel:
                 break
+            self.current.emit(path)  # 상태바 "처리 중" 표시용(처리 직전).
             try:
                 result = self._ensure_analysis(path)
 

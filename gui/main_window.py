@@ -619,18 +619,19 @@ class MainWindow(QMainWindow):
         self.model.row_changed(r)
 
     def _on_worker_finished(self):
+        # None 처리 전에 취소 여부를 읽어둔다(이후 self._worker 는 사라짐).
+        cancelled = self._worker.was_cancelled if self._worker else False
         self._worker = None
         self.btn_cancel.setEnabled(False)
         self.progress.setValue(0)
         self._update_action_states()
         done = self._analyzed_count
         failed = self._failed_count
+        parts = [f"Analyzed {done} file(s)"]
         if failed:
-            self.statusBar().showMessage(
-                f"Analyzed {done} file(s), {failed} failed"
-            )
-        else:
-            self.statusBar().showMessage(f"Analyzed {done} file(s)")
+            parts.append(f"{failed} failed")
+        msg = ", ".join(parts)
+        self.statusBar().showMessage(f"Cancelled — {msg}" if cancelled else msg)
 
     # --- 적용 워커 슬롯(Track Gain, 전부 메인 스레드에서 실행) ---
 
@@ -659,6 +660,8 @@ class MainWindow(QMainWindow):
         self.model.row_changed(r)
 
     def _on_apply_finished(self):
+        # None 처리 전에 취소 여부를 읽어둔다(이후 self._worker 는 사라짐).
+        cancelled = self._worker.was_cancelled if self._worker else False
         self._worker = None
         self.btn_cancel.setEnabled(False)
         self.progress.setValue(0)
@@ -671,7 +674,8 @@ class MainWindow(QMainWindow):
             parts.append(f"{analyzed_only} already at target")
         if failed:
             parts.append(f"{failed} failed")
-        self.statusBar().showMessage(", ".join(parts))
+        msg = ", ".join(parts)
+        self.statusBar().showMessage(f"Cancelled — {msg}" if cancelled else msg)
 
     # --- 드래그 앤 드롭(원본 lstvMain_OLEDragDrop 대응) ---
 

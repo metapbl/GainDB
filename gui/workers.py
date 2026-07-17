@@ -46,6 +46,11 @@ class AnalyzeWorker(QThread):
         """파일 경계에서 멈추도록 취소를 요청한다(스레드 안전한 플래그 설정)."""
         self._cancel = True
 
+    @property
+    def was_cancelled(self) -> bool:
+        """취소 요청이 들어온 채로 종료됐는지. 완료 슬롯의 메시지 분기에 쓴다."""
+        return self._cancel
+
     def run(self) -> None:
         total = len(self._paths)
         done = 0
@@ -109,6 +114,11 @@ class ApplyWorker(QThread):
 
     def request_cancel(self) -> None:
         self._cancel = True
+
+    @property
+    def was_cancelled(self) -> bool:
+        """취소 요청이 들어온 채로 종료됐는지. 완료 슬롯의 메시지 분기에 쓴다."""
+        return self._cancel
 
     def _ensure_analysis(self, path: str):
         """이 파일의 분석 result 를 확보한다(없거나 미분석이면 새로 분석).

@@ -887,12 +887,17 @@ class MainWindow(QMainWindow):
             f"Scanning tags {done}/{self._scan_total} — {os.path.basename(path)}")
 
     def _on_scan_progress(self, done: int, total_in_batch: int):
-        # done 은 이번 워커 내 카운트. 전체 목록 대비로 보이도록 오프셋을 더한다.
+        # done 은 이번 워커 내 전진 수(성공/실패 무관). 이것을 카운트의 단일
+        # 기준으로 삼는다 — 진행바·상태바·완료 메시지가 모두 이 값을 쓰도록
+        # 통일해, 태그 읽기가 예외로 실패한 파일이 섞여도 표시가 어긋나지
+        # 않게 한다(예전엔 성공만 세는 _scanned_count 와 진행바가 벌어졌음).
+        self._scanned_count = done
         overall_done = self._scan_offset + done
         self.progress.setValue(overall_done)
 
     def _on_scan_row_done(self, path: str, result: dict):
-        self._scanned_count += 1
+        # 카운트 증가는 _on_scan_progress(전진 기준)로 일원화했으므로 여기서는
+        # 세지 않는다. 이 슬롯은 모델 반영만 담당한다.
         r = self.model.find_row_by_path(path)
         if r is None:
             return  # 그 사이 삭제됨

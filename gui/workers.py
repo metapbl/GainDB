@@ -4,8 +4,20 @@
 떼어낸다. 워커는 gaindb.api 의 순수/적용 함수만 호출하고 결과를 시그널로만
 방출한다 — Qt 모델을 직접 건드리지 않는다(모델 변경은 메인 스레드 슬롯의 책임).
 
-취소는 파일 경계에서만 반영한다(진행 중인 ffmpeg 프로세스를 강제 중단하지
-않고, 현재 파일이 끝나면 멈춘다). 파일별 예외는 워커가 잡아 failed 로 넘긴다.
+취소(정책 갱신):
+  예전에는 취소를 파일 경계에서만 반영했으나(진행 중 ffmpeg 방치), 초장시간
+  곡(수 시간)에서는 그 한 곡이 끝날 때까지 취소가 먹히지 않아 UI 가 굳은 것
+  처럼 보였다. 이제 워커는 analyze_file 에 should_cancel 콜백을 넘겨, decode
+  계층이 청크 경계마다 취소를 확인하고 진행 중 ffmpeg 를 즉시 kill 한다. 취소
+  시 decode 는 DecodeCancelled(=DecodeError 하위)를 던지며, 워커는 이를 실패
+  (failed)가 아니라 정상 취소로 구분해 조용히 루프를 빠져나온다. 취소는 여전히
+  '청크 경계'라 즉시는 아니지만 수백 ms 이내로 반영된다.
+
+파일 내부 진행률:
+  긴 곡 디코딩 중에도 UI 가 살아있음을 보이도록, 워커는 analyze_file 에
+  on_progress 콜백을 넘겨 파일 내부 진행률(0~1)을 file_progress 시그널로
+  방출한다. 메인 창이 이를 상태바 텍스트("파일명 — NN.N%")와 진행바 세분
+  합산에 쓴다. duration 기반 근사라 완료 시 1.0 으로 마무리된다.
 
 각 워커는 파일 처리 직전에 current(path) 를 방출한다 — 메인 창이 상태바에
 "지금 처리 중인 파일명"을 보여주는 데 쓴다(경로 없이 basename 만 표시).
@@ -14,7 +26,9 @@
 읽으므로 곡당 매우 가볍고(~1ms), 취소는 사실상 즉시 반영된다. 대량 추가 시
 UI 프리징을 없애기 위해 추가 흐름에서 이 워커로 태그를 백그라운드로 채운다.
 태그 스캔의 "취소"는 완전 취소가 아니라 일시 중단(Pause)이며, 멈춘 뒤 남은
-행은 Rescan 으로 이어서 스캔한다(메인 창이 pending 행을 다시 넘긴다).
+행은 Rescan 으로 이어서 스캔한다(메인 창이 pending 행을 다시 넘긴다). 태그
+스캔은 디코딩이 없어 파일 내부 진행률이 무의미하므로 file_progress 를 쓰지
+않는다(시그널은 인터페이스 통일을 위해 정의만 둔다).
 """
 
 from __future__ import annotations
@@ -28,6 +42,7 @@ from gaindb.api import (
     recompute_target,
     shift_after_apply,
 )
+from gaindb.decode import DecodeCancelled
 
 
 class TagScanWorker(QThread):
@@ -91,16 +106,19 @@ class AnalyzeWorker(QThread):
     """주어진 경로들을 파일별로 analyze_file 로 분석하는 워커.
 
     시그널:
-      current(path)         : 각 파일 처리 직전 방출(상태바 "처리 중" 표시용).
-      progress(done, total) : 한 파일 처리가 끝날 때마다 방출(성공/실패 무관).
-      row_done(path, result): 분석 성공 시 결과 dict 와 함께 방출.
-      failed(path, msg)     : 분석 중 예외 발생 시 오류 메시지와 함께 방출.
-      done()                : 전체 종료(취소 포함). QThread 기본 finished 와
-                              구분해 명시적으로 방출한다.
+      current(path)              : 각 파일 처리 직전 방출(상태바 "처리 중" 표시).
+      progress(done, total)      : 한 파일 처리가 끝날 때마다 방출(성공/실패 무관).
+      file_progress(fraction)    : 현재 파일의 디코딩 내부 진행률(0~1). 긴 곡에서
+                                   진행 상황을 보이려 청크마다 방출한다.
+      row_done(path, result)     : 분석 성공 시 결과 dict 와 함께 방출.
+      failed(path, msg)          : 분석 중 (취소가 아닌) 예외 발생 시 방출.
+      done()                     : 전체 종료(취소 포함). QThread 기본 finished 와
+                                   구분해 명시적으로 방출한다.
     """
 
     current = Signal(str)
     progress = Signal(int, int)
+    file_progress = Signal(float)
     row_done = Signal(str, dict)
     failed = Signal(str, str)
     done = Signal()  # 자체 완료 시그널(QThread.finished 와 이름 충돌 회피)
@@ -112,7 +130,11 @@ class AnalyzeWorker(QThread):
         self._cancel = False
 
     def request_cancel(self) -> None:
-        """파일 경계에서 멈추도록 취소를 요청한다(스레드 안전한 플래그 설정)."""
+        """청크 경계에서 멈추도록 취소를 요청한다(스레드 안전한 플래그 설정).
+
+        decode 계층이 이 플래그를 콜백으로 받아 청크마다 확인하고, 서면 진행
+        중 ffmpeg 를 kill 하고 DecodeCancelled 를 던진다.
+        """
         self._cancel = True
 
     @property
@@ -128,11 +150,18 @@ class AnalyzeWorker(QThread):
                 break
             self.current.emit(path)  # 상태바 "처리 중" 표시용(처리 직전).
             try:
-                result = analyze_file(path, self._target_db)
+                result = analyze_file(
+                    path, self._target_db,
+                    should_cancel=lambda: self._cancel,
+                    on_progress=self.file_progress.emit,
+                )
                 if result.get("status") == "not_enough_samples":
                     self.failed.emit(path, "Not enough samples to analyze.")
                 else:
                     self.row_done.emit(path, result)
+            except DecodeCancelled:
+                # 취소는 실패가 아니다. 루프를 빠져나가 done 으로 마무리한다.
+                break
             except Exception as exc:  # 파일 손상·ffmpeg 실패 등 → 행 오류로.
                 self.failed.emit(path, str(exc))
             done += 1
@@ -157,19 +186,27 @@ class ApplyWorker(QThread):
     이미 있으면 재분석하지 않는 것과 일치). target_db 가 씨앗과 다르면
     recompute_target 으로 steps 를 목표에 맞춰 다시 계산한다.
 
+    취소·진행률: 미분석 곡을 내부에서 분석할 때 analyze_file 에 should_cancel·
+    on_progress 를 넘긴다. 취소되면 DecodeCancelled 를 받아 정상 종료한다.
+    이미 분석된 씨앗 재사용·적용 단계는 디코딩이 없어 진행률이 없다(적용은
+    빠르므로 file_progress 를 굳이 방출하지 않는다).
+
     시그널:
-      current(path)             : 각 파일 처리 직전 방출(상태바 "처리 중" 표시용).
+      current(path)             : 각 파일 처리 직전 방출(상태바 "처리 중" 표시).
       progress(done, total)     : 파일 하나 처리가 끝날 때마다 방출.
+      file_progress(fraction)   : 미분석 곡 분석 시 디코딩 내부 진행률(0~1).
       row_analyzed(path, result): 분석만 하고 적용 안 함(steps=0). 표시 dict.
       row_applied(path, result) : 적용까지 함. shift_after_apply 반영된 표시 dict.
-      failed(path, msg)         : 분석/적용 중 예외 발생.
+      failed(path, msg)         : 분석/적용 중 (취소가 아닌) 예외 발생.
       done()                    : 전체 종료(취소 포함).
 
-    적용은 파일을 실제로 변경한다(파괴적). 취소는 파일 경계에서만 반영한다.
+    적용은 파일을 실제로 변경한다(파괴적). 취소는 청크(분석 중)·파일(적용 중)
+    경계에서 반영된다.
     """
 
     current = Signal(str)
     progress = Signal(int, int)
+    file_progress = Signal(float)
     row_analyzed = Signal(str, dict)
     row_applied = Signal(str, dict)
     failed = Signal(str, str)
@@ -196,7 +233,7 @@ class ApplyWorker(QThread):
         """이 파일의 분석 result 를 확보한다(없거나 미분석이면 새로 분석).
 
         반환: 목표(target_db)에 맞춰 계산된 표시 result dict.
-        예외는 호출자(run)가 잡아 failed 로 넘긴다.
+        예외(DecodeCancelled 포함)는 호출자(run)가 처리한다.
         """
         seed = self._seed.get(path)
         # 씨앗이 유효한 분석 결과면(track_db 보유) 재분석 없이 재사용한다
@@ -206,8 +243,12 @@ class ApplyWorker(QThread):
             if seed.get("target_db") != self._target_db:
                 return recompute_target(seed, self._target_db)
             return seed
-        # 미분석: 지금 분석한다(무겁다: decode+scan).
-        return analyze_file(path, self._target_db)
+        # 미분석: 지금 분석한다(무겁다: decode+scan). 취소·진행률 콜백 전달.
+        return analyze_file(
+            path, self._target_db,
+            should_cancel=lambda: self._cancel,
+            on_progress=self.file_progress.emit,
+        )
 
     def run(self) -> None:
         total = len(self._paths)
@@ -236,6 +277,9 @@ class ApplyWorker(QThread):
                     applied_steps = apply_res.get("steps") or 0
                     shown = shift_after_apply(result, applied_steps)
                     self.row_applied.emit(path, shown)
+            except DecodeCancelled:
+                # 취소는 실패가 아니다. 루프를 빠져나가 done 으로 마무리한다.
+                break
             except Exception as exc:
                 self.failed.emit(path, str(exc))
             done += 1

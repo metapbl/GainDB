@@ -24,16 +24,26 @@ GUI 무계산 원칙:
 
   GUI 가 아는 함수는 다섯:
     read_file_tags(path, target_db)        # 추가 시 태그만 읽어 표시(가볍다)
-    analyze_file(path, target_db)          # 최초 분석(무겁다: decode+scan)
+    analyze_file(path, target_db, ...)     # 최초 분석(무겁다: decode+scan)
     recompute_target(result, target_db)    # 목표 변경 시 즉시 재표시(가볍다)
     apply_file_track_gain(path, target_db) # 실제 적용(무겁다)
     shift_after_apply(result, steps)        # 적용 후 재표시(가볍다)
+
+취소·진행률(GUI 대응):
+  analyze_file 은 무거운 decode 단계에서 should_cancel(취소 콜백)과
+  on_progress(파일 내부 진행률 콜백, 0~1)를 그대로 decode_pcm 에 넘긴다.
+  취소되면 decode 계층이 DecodeCancelled(=DecodeError 하위)를 던지므로,
+  호출자(워커)는 이를 실패가 아닌 정상 취소로 구분해 처리한다.
 """
 
 from __future__ import annotations
 
-from gaindb.decode import decode_pcm
+from pathlib import Path
+from typing import Callable
+
+from gaindb.decode import decode_pcm_streaming, _probe_stream_info
 from gaindb.analysis import (
+    TrackAnalyzer,
     analyze_track,
     track_peak,
     db_to_steps,
@@ -43,6 +53,7 @@ from gaindb.analysis import (
 from gaindb.writer import scan_gain
 from gaindb.tag import read_mp3gain_tags
 from apply_gain import apply_track_gain
+
 
 # 목표 음량 기준: mp3gain 내부 89 dB ReplayGain 레퍼런스.
 # (상대값이며 절대 SPL/LUFS 가 아니다. GUI 라벨/툴팁에 명시할 것.)
@@ -150,13 +161,26 @@ def read_file_tags(path: str, target_db: float = DEFAULT_TARGET_DB) -> dict:
     }
 
 
-def analyze_file(path: str, target_db: float = DEFAULT_TARGET_DB) -> dict:
+def analyze_file(
+    path: str,
+    target_db: float = DEFAULT_TARGET_DB,
+    should_cancel: Callable[[], bool] | None = None,
+    on_progress: Callable[[float], None] | None = None,
+) -> dict:
     """한 MP3 를 분석해 GUI 표시용 결과를 반환한다(비파괴, 무출력).
 
-    무겁다(decode + analyze + scan). 최초 1회만 호출하고, 이후 목표 변경·적용
-    후 재표시는 recompute_target / shift_after_apply 로 처리한다(재분석 없음).
+    스트리밍 분석: 곡 전체 PCM 을 메모리에 올리지 않고, decode_pcm_streaming
+    이 흘려보내는 청크를 TrackAnalyzer 에 먹여 히스토그램·peak 을 누적한다.
+    초장시간 곡(수 시간)도 청크 하나 크기의 메모리로 처리한다. 결과는 일괄
+    처리(analyze_track/track_peak)와 수학적으로 동일하다(검증됨).
 
     target_db: 사용자 지정 목표 음량(89 dB 기준 상대). 예: 96.
+    should_cancel: 디코딩 청크마다 확인되는 취소 콜백. True 면 decode 계층이
+      DecodeCancelled(=DecodeError 하위)를 던진다(기본 None = 취소 없음).
+      취소는 실패가 아니므로 호출자(워커)가 예외로 구분해 처리해야 한다.
+    on_progress: 디코딩 청크마다 호출되는 파일 내부 진행률 콜백(0.0~1.0,
+      duration 기반 근사). 분석·스캔 단계는 디코딩 대비 짧아 진행률에 포함하지
+      않는다(기본 None = 콜백 없음).
 
     반환 dict:
       status        : "ok" | "not_enough_samples"
@@ -170,9 +194,16 @@ def analyze_file(path: str, target_db: float = DEFAULT_TARGET_DB) -> dict:
       min_gain,max_gain : scan_gain 결과(프레임 global_gain min/max).
       clip_state    : "none"(검정) | "possible"(파랑 ???) | "definite"(빨강 Y).
     """
-    left, right, sample_rate = decode_pcm(path)
+    # analyzer 생성에 필요한 sample_rate 를 먼저 확보(ffprobe, 매우 가벼움).
+    sample_rate, _channels, _duration = _probe_stream_info(Path(path))
+    analyzer = TrackAnalyzer(sample_rate)
 
-    track_db = analyze_track(left, right, sample_rate)
+    # 스트리밍 디코드: 청크를 analyzer 에 먹이고 버린다(곡 전체를 안 모음).
+    decode_pcm_streaming(
+        path, on_chunk=analyzer.feed,
+        should_cancel=should_cancel, on_progress=on_progress)
+
+    track_db = analyzer.result()
     if track_db is NOT_ENOUGH_SAMPLES:
         return {
             "status": "not_enough_samples", "target_db": target_db,
@@ -181,8 +212,7 @@ def analyze_file(path: str, target_db: float = DEFAULT_TARGET_DB) -> dict:
             "min_gain": None, "max_gain": None, "clip_state": "none",
         }
 
-    peak = track_peak(left, right)
-    del left, right
+    peak = analyzer.peak_normalized()
     min_gain, max_gain = scan_gain(path)
 
     curr_max_amp = peak * 32768.0
@@ -279,7 +309,10 @@ def shift_after_apply(result: dict, applied_steps: int) -> dict:
 
 
 def apply_file_track_gain(path: str, target_db: float = DEFAULT_TARGET_DB,
-                          skip_tag: bool = False, use_id3: bool = False) -> dict:
+                          skip_tag: bool = False, use_id3: bool = False,
+                          should_cancel: Callable[[], bool] | None = None,
+                          on_progress: Callable[[float], None] | None = None
+                          ) -> dict:
     """목표 dB 를 반영해 Track ReplayGain 을 실제 적용한다(파괴적, 무겁다).
 
     GUI 는 apply_gain.apply_track_gain 을 직접 부르지 않고 이 래퍼를 쓴다.
@@ -289,6 +322,9 @@ def apply_file_track_gain(path: str, target_db: float = DEFAULT_TARGET_DB,
 
     path: 대상 MP3. target_db: 목표 음량(89dB 기준 상대).
     skip_tag / use_id3: apply_track_gain 으로 그대로 전달(원본 -s s / -s i).
+    should_cancel / on_progress: 시그니처 정합용 인자(현재 apply_track_gain 은
+      디코딩이 없어 사용하지 않는다 — 미분석 곡 분석은 워커가 analyze_file 에
+      직접 콜백을 넘겨 처리한다). 향후 확장 여지를 위해 받아둔다.
 
     반환: apply_track_gain 의 결과 dict(status·db_gain·steps·frames_changed·
           tag_written)를 그대로 돌려준다. GUI 는 status·steps 로 행 상태를
@@ -297,3 +333,4 @@ def apply_file_track_gain(path: str, target_db: float = DEFAULT_TARGET_DB,
     db_gain_mod = target_db - DEFAULT_TARGET_DB
     return apply_track_gain(path, db_gain_mod=db_gain_mod,
                             skip_tag=skip_tag, use_id3=use_id3)
+

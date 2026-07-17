@@ -269,4 +269,18 @@ GaindB/
 **8단계 MVP 사실상 완성(핵심 흐름).** 완료: 파일/폴더 추가·태그 스캔·자연 정렬·다크색상·유니코드·리스트 UX(Delete/더블클릭/고무줄)·Track Analysis(AnalyzeWorker)·Track Gain(ApplyWorker, 원본 RadioGain 재현)·표시 수식(원본 exe 실측 일치)·단축키·Clear 정리.
 
 - **미검증(다음 점검 권장)**: 진행바·Cancel 실동작 최종 확인(배선은 됨), 대량 추가 시 태그 스캔 버벅임 여부, 오염된 목록은 Clear 후 재추가로 태그 재스캔.
-- **다음 세션 시작점**: CLAUDE.md 첨부 후 택일. (a) **잔여 MVP 최종 점검** → `gui/main_window.py`·`gui/workers.py`. (b) **GUI 순수 함수부 tests 편입 검토**(collect_mp3_paths·표시 수식·shift/recompute; 파괴적 적용은 fixture 사본으로만, 원본 불간섭 9) → `gaindb/api.py`·`gaindb/analysis.py`·`tests/_support.py`. (c) **후순위 기능 착수**(우클릭 팝업=Album/Undo/RemoveTags/Play, 컬럼폭·정렬 저장, Album/Constant/Max No-clip, 트레이·로그·언어) → 해당 원본 폼(frmMain 팝업·frmOptions·frmGetGain 등) 붙여 제공. 우선순위는 사용자 결정.
+
+**[진척 14 - 8단계 잔여 MVP 점검: 백그라운드 태그 스캔 + Track Gain/진행바 보정 + 리스트 표시 개선]** (커밋 828614f·90cb712·8c77fd1 등)
+
+- **취소 상태 표시**(828614f): AnalyzeWorker·ApplyWorker 에 `was_cancelled` 읽기전용 프로퍼티 추가, 완료 슬롯이 워커 정리 전 플래그를 읽어 상태바에 "Cancelled — ..." 접두 표시.
+- **백그라운드 태그 스캔 도입**(90cb712): 대량 파일 추가 시 UI 프리징 해소(1만 곡 기준 기존 2~3분 멈춤 → 백그라운드 처리). `TagScanWorker`(태그만 읽는 경량 워커, 곡당 ~1ms) 신설 — 행은 `add_paths` 로 즉시 삽입하고 태그값은 `row_done` 으로 사후 채움. 겸용 버튼 로직(합의): 스캔 중=**Pause** / 분석·게인 중=**Cancel** / 일시정지 후 pending 있으면=**Rescan**. 태그 스캔 진행바는 **전체 목록 대비 누적 비율**(파일 추가 시 분모 증가, 100% 도달 시 완료 판정 — 트랙 분석·게인의 매회 리셋 방식과 구분, 합의). `FileRow.tag_scanned` 플래그로 "태그 없는 곡"과 "아직 스캔 안 한 곡"을 구분 → Rescan 이 중단 지점부터 재개(진행바가 0 부터 다시 차는 건 처리분을 분모에서 뺀 착시, 정상 동작). **표시 정책 재확인**: pending 행은 값 빈칸으로 두어 원본 미분석 표시와 일치.
+- **Track Gain 분모·오프셋 보정**(90cb712): `steps==0`(이미 목표 도달) 곡을 `_on_gain` 단계에서 대상 제외 → 부분 적용·Cancel 후 재실행 시 진행바 분모가 잔여분만 반영. "already at target"의 의미 = 태그값 없어 분석해봤더니 조정 불필요(steps=0)했던 곡(값 있던 곡은 대상에서 조용히 제외되므로 이 문구에 안 나옴). `_scan_offset`·`_scanned_count` 등 카운터 변수를 `FileTableView.__init__` 에 잘못 둔 것을 `MainWindow.__init__` 으로 정정.
+- **리스트 표시 개선**: 데이터 행 높이만 22px 로 촘촘하게(`verticalHeader().setDefaultSectionSize(22)`, 헤더 높이 불변). NAME 컬럼 `PathElideDelegate` — 경로를 먼저 접고(`C:\…\LastFolder\Filename`) 그래도 넘치면 파일명을 우측 생략(파일명 우선 보존, 원본 전체경로 표시 취지 유지). 상태바 현재 파일명은 경로 없이 basename 만(합의).
+- **현재 파일명 상태바 표시**(8c77fd1): 세 워커에 `current(path)` 시그널 추가, 처리 직전 emit → "작업 k/N — 파일명" 표시. **주의: 이 커밋 이후 버그 1(아래) 발생 정황 — 시그널 연결 재배선 중 완료 경로가 어긋났을 가능성.**
+
+**미해결 버그 2건(다음 세션 최우선):**
+
+- **버그 1(실제 결함): 트랙 분석 Cancel 후 전체 UI 굳음.** "Cancelling after current file..." 상태에서 모든 버튼(Cancel 포함) 비활성으로 멈춤. 추정 원인: AnalyzeWorker 취소 경로에서 `done` 미방출(루프 내 `return` 으로 done 누락 의심) 또는 main_window 완료 슬롯 연결 어긋남 → `self._worker` 미정리 → `_update_action_states` 가 계속 busy 판정. 8c77fd1(current 시그널)의 재배선과 연관 의심. 확인 대상: `workers.py` AnalyzeWorker.run() 취소 처리·done emit 위치, `main_window.py` `_on_analyze` 연결부·완료 슬롯·`_update_action_states`.
+- **버그 2(경미): SyntaxWarning.** `main_window.py` `PathElideDelegate` docstring 안 `\F`·`\M`·`\)` 가 이스케이프로 오인. 해결: 해당 docstring `"""` → `r"""`(raw string). 동작 무관, 경고만 제거.
+
+- **다음 세션 시작점**: CLAUDE.md 첨부 후 **버그 1·2 우선 처리**. 첫 메시지에 `gui/workers.py`·`gui/main_window.py` 전문을 붙여 제공 → 버그 1(Cancel 후 UI 굳음)을 특정(AnalyzeWorker done 방출·완료 슬롯 연결 점검)하고 버그 2(docstring raw string)를 함께 수정. 두 버그 해소·검증 후, 잔여 항목 택일: (a) 진행바·Cancel/Pause/Rescan 실동작 최종 확인, (b) GUI 순수 함수부 tests 편입(collect_mp3_paths·표시 수식·shift/recompute; 파괴적 적용은 fixture 사본만·원본 불간섭 9) → `gaindb/api.py`·`gaindb/analysis.py`·`tests/_support.py`, (c) 후순위 기능 착수(우클릭 팝업=Album/Undo/RemoveTags/Play, 컬럼폭·정렬 저장, Album/Constant/Max No-clip, 트레이·로그·언어) → 해당 원본 폼(frmMain 팝업·frmOptions·frmGetGain 등) 붙여 제공. 우선순위는 사용자 결정.

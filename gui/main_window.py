@@ -1,15 +1,19 @@
-"""gui/main_window.py — 메인 창(8단계 MVP + 태그 스캔 + Track Analysis 워커).
+"""gui/main_window.py — 메인 창(8단계 MVP + 태그 스캔 + Analysis/Gain 워커).
 
 원본 MP3GainGUI frmMain 의 화면 구성·동작을 관찰해 독립 구현한다(clean-room).
 파일/폴더 추가(버튼 + 드래그앤드롭)·Clear·헤더 클릭 자연 정렬·Delete 키 선택
 삭제·더블클릭 재생에 더해, 파일 추가 시 태그를 즉시 읽어 표시(원본
-AddSingleFile), Track Analysis 를 QThread 워커로 연결(값 없는 파일만).
+AddSingleFile), Track Analysis 와 Track Gain 을 QThread 워커로 연결한다.
+
+Track Gain(원본 RadioGain 재현): 대상 행마다 (a) 미분석이면 먼저 분석 →
+(b) 변동 스텝이 0 이면 분석까지만 → (c) 스텝이 있으면 실제 적용. 이 판단·
+수행은 전부 ApplyWorker(QThread) 안에서 이루어진다(분석·적용 모두 무겁다).
 
 GUI 무계산 원칙: 수치는 gaindb.api 가 계산한 것만 표시한다.
 정렬 순서는 프록시(뷰) 좌표, 실제 데이터는 원본 모델 좌표이므로
-삭제·더블클릭 시 mapToSource 로 반드시 변환한다.
+삭제·더블클릭·워커 결과 반영 시 반드시 좌표를 구분한다.
 
-워커 규칙: 무거운 분석(ffmpeg 디코딩)은 AnalyzeWorker(QThread)에서 돌리고,
+워커 규칙: 무거운 작업(ffmpeg 디코딩·파일 적용)은 워커에서 돌리고,
 워커는 시그널만 방출한다. 모델 변경은 전부 메인 스레드의 슬롯에서 수행한다.
 태그 읽기는 가벼워(디코딩 없음) 추가 흐름 안에서 동기로 처리한다(원본도 동기).
 """
@@ -33,7 +37,7 @@ from PySide6.QtGui import QAction
 
 from gui.model import FileTableModel, SORT_ROLE
 from gui.columns import Col
-from gui.workers import AnalyzeWorker
+from gui.workers import AnalyzeWorker, ApplyWorker
 from gaindb.api import DEFAULT_TARGET_DB, read_file_tags, recompute_target
 
 
@@ -236,9 +240,11 @@ class MainWindow(QMainWindow):
         self.proxy = NaturalSortProxy(self)
         self.proxy.setSourceModel(self.model)
 
-        self._worker: AnalyzeWorker | None = None  # 실행 중 워커 보유(GC 방지)
-        self._analyzed_count = 0                   # 이번 분석에서 성공한 개수
-        self._failed_count = 0                     # 이번 분석에서 실패한 개수
+        # 실행 중 워커 보유(GC 방지). 분석·적용 중 한 종류만 동시에 돈다.
+        self._worker: AnalyzeWorker | ApplyWorker | None = None
+        self._analyzed_count = 0   # 이번 작업에서 분석/적용 성공 개수
+        self._applied_count = 0    # 이번 Track Gain 에서 실제 적용된 개수
+        self._failed_count = 0     # 이번 작업에서 실패한 개수
 
         self._build_toolbar()
         self._build_central()
@@ -462,9 +468,48 @@ class MainWindow(QMainWindow):
         self._worker.start()
 
     def _on_gain(self):
-        self.statusBar().showMessage(
-            "Track Gain will be connected in the next step."
-        )
+        """Track Gain 적용(원본 RadioGain 재현). ApplyWorker 로 위임한다.
+
+        대상: 선택 있으면 선택·없으면 전체(원본 mnuSelectedFiles 분기 대응).
+        Analysis 와 달리 값 있는 행도 대상에 포함한다 — 워커가 파일별로
+        (미분석이면 분석 → 스텝 0이면 분석까지만 → 스텝 있으면 적용)을
+        판단·수행한다. 씨앗으로 각 행의 기존 result 를 함께 넘겨, 이미 값이
+        있으면 재분석을 피한다(원본이 RadiodBGain 보유 시 재분석 안 함과 일치).
+        """
+        if self._is_busy():
+            return
+
+        rows = self._target_source_rows()
+        paths = []
+        seed_results = {}
+        for r in rows:
+            fr = self.model.get_row(r)
+            if fr is None:
+                continue
+            paths.append(fr.path)
+            seed_results[fr.path] = fr.result  # None 이면 워커가 분석함
+
+        if not paths:
+            self.statusBar().showMessage("No files to apply gain to")
+            return
+
+        target_db = self.spin_target.value()
+        self._analyzed_count = 0
+        self._applied_count = 0
+        self._failed_count = 0
+        self._worker = ApplyWorker(paths, target_db, seed_results, self)
+        self._worker.progress.connect(self._on_apply_progress)
+        self._worker.row_analyzed.connect(self._on_apply_analyzed)
+        self._worker.row_applied.connect(self._on_apply_applied)
+        self._worker.failed.connect(self._on_worker_failed)
+        self._worker.done.connect(self._on_apply_finished)
+
+        self.progress.setRange(0, len(paths))
+        self.progress.setValue(0)
+        self.btn_cancel.setEnabled(True)
+        self._update_action_states()
+        self.statusBar().showMessage(f"Applying gain to {len(paths)} file(s)...")
+        self._worker.start()
 
     def _on_clear(self):
         if self._is_busy():
@@ -479,7 +524,7 @@ class MainWindow(QMainWindow):
         """Delete 키: 선택 행만 삭제(원본 ClearFiles). 선택 없으면 무동작.
 
         _on_clear 와 달리 선택이 없을 때 전체 삭제하지 않는다(원본 동작).
-        분석 중에는 목록 변경을 잠근다.
+        분석/적용 중에는 목록 변경을 잠근다.
         """
         if self._is_busy():
             return
@@ -526,7 +571,7 @@ class MainWindow(QMainWindow):
             self.btn_cancel.setEnabled(False)
             self.statusBar().showMessage("Cancelling after current file...")
 
-    # --- 워커 슬롯(전부 메인 스레드에서 실행: 모델 변경은 여기서만) ---
+    # --- 분석 워커 슬롯(전부 메인 스레드에서 실행: 모델 변경은 여기서만) ---
 
     def _on_worker_progress(self, done: int, total: int):
         self.progress.setValue(done)
@@ -563,6 +608,47 @@ class MainWindow(QMainWindow):
             )
         else:
             self.statusBar().showMessage(f"Analyzed {done} file(s)")
+
+    # --- 적용 워커 슬롯(Track Gain, 전부 메인 스레드에서 실행) ---
+
+    def _on_apply_progress(self, done: int, total: int):
+        self.progress.setValue(done)
+        self.statusBar().showMessage(f"Processed {done}/{total}")
+
+    def _on_apply_analyzed(self, path: str, result: dict):
+        """스텝이 0이라 적용하지 않고 분석 결과만 반영(원본 "분석까지만")."""
+        self._analyzed_count += 1
+        r = self.model.find_row_by_path(path)
+        if r is None:
+            return
+        fr = self.model.get_row(r)
+        fr.set_result(result)  # status="analyzed": 재분석 대상에서 제외됨
+        self.model.row_changed(r)
+
+    def _on_apply_applied(self, path: str, result: dict):
+        """실제 게인이 적용된 행. shift 반영된 표시 dict 로 갱신."""
+        self._applied_count += 1
+        r = self.model.find_row_by_path(path)
+        if r is None:
+            return
+        fr = self.model.get_row(r)
+        fr.mark_applied(result)  # status="applied"
+        self.model.row_changed(r)
+
+    def _on_apply_finished(self):
+        self._worker = None
+        self.btn_cancel.setEnabled(False)
+        self.progress.setValue(0)
+        self._update_action_states()
+        applied = self._applied_count
+        analyzed_only = self._analyzed_count
+        failed = self._failed_count
+        parts = [f"Applied gain to {applied} file(s)"]
+        if analyzed_only:
+            parts.append(f"{analyzed_only} already at target")
+        if failed:
+            parts.append(f"{failed} failed")
+        self.statusBar().showMessage(", ".join(parts))
 
     # --- 드래그 앤 드롭(원본 lstvMain_OLEDragDrop 대응) ---
 

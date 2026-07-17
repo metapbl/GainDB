@@ -1,4 +1,4 @@
-"""gui/main_window.py — 메인 창(8단계 MVP + 태그 스캔 워커 + Analysis/Gain 워커).
+r"""gui/main_window.py — 메인 창(8단계 MVP + 태그 스캔 워커 + Analysis/Gain 워커).
 
 원본 MP3GainGUI frmMain 의 화면 구성·동작을 관찰해 독립 구현한다(clean-room).
 파일/폴더 추가(버튼 + 드래그앤드롭)·Clear·헤더 클릭 자연 정렬·Delete 키 선택
@@ -11,15 +11,27 @@
 Rescan 으로 바뀐다(같은 자리에서 상태 전환). Track Analysis/Track Gain 진행
 중에는 같은 버튼이 Cancel 이다(작업 성격상 이어가기 개념이 없어 Rescan 없음).
 
-작업 중 상태바에는 "작업 k/N — 파일명"을 표시한다(current 시그널; 경로 없이
-basename 만 — 전체 경로는 리스트 행 툴팁으로 확인 가능).
+취소·진행률(정책 갱신): 취소는 이제 청크 경계에서 반영된다 — 워커가 decode
+계층에 취소 콜백을 넘겨 진행 중 ffmpeg 를 즉시 kill 하므로, 초장시간 곡에서도
+수백 ms 이내에 멈춘다(예전 '파일 경계에서만' 정책을 대체). 또한 긴 곡 디코딩
+중 파일 내부 진행률(file_progress, 0~1)을 받아 상태바 텍스트("파일명 — NN.N%")
+와 진행바 세분 합산에 반영해, 한 곡이 오래 걸려도 UI 가 살아있음을 보인다.
+
+작업 중 상태바에는 "작업 k/N — 파일명 — NN.N%"를 표시한다(current +
+file_progress; 경로 없이 basename 만 — 전체 경로는 리스트 행 툴팁으로 확인).
+
+진행바 세분 합산: 분석/적용 진행바는 파일 단위가 아니라 파일 내부 진행까지
+합산해 부드럽게 흐른다. 정수 진행바에 소수 진행을 싣기 위해 _PROGRESS_SCALE
+(=1000)을 곱한 스케일을 쓴다: 값 = (완료 파일수 + 현재 파일 fraction) * 1000.
+태그 스캔 진행바는 성격이 달라(누적 오프셋·Pause/Rescan) 세분 합산을 쓰지
+않고 기존 파일 단위 방식을 유지한다.
 
 Path\File 컬럼은 PathElideDelegate 로 그린다: 경로를 먼저 접고(C:\…\MUSIC\)
 파일명을 최후까지 보존하며, 그래도 좁으면 그때만 파일명을 elide 한다.
 
 겸용 버튼(진행바 옆) 규칙 — _update_action_states 에서 결정:
   - 태그 스캔 워커 실행 중          → "Pause" (활성)   : 파일 경계에서 스캔 중단
-  - 분석/적용 워커 실행 중          → "Cancel"(활성)   : 파일 경계에서 작업 중단
+  - 분석/적용 워커 실행 중          → "Cancel"(활성)   : 청크 경계에서 작업 중단
   - 멈춤 + 미스캔(pending) 행 있음  → "Rescan"(활성)   : 남은 pending 이어 스캔
   - 멈춤 + pending 없음             → "Cancel"(비활성) : 동작 없음(기본 상태)
 클릭 핸들러는 하나이며 위 상태에 따라 pause/cancel/rescan 으로 분기한다.
@@ -59,6 +71,10 @@ from gui.model import FileTableModel, SORT_ROLE
 from gui.columns import Col
 from gui.workers import TagScanWorker, AnalyzeWorker, ApplyWorker
 from gaindb.api import DEFAULT_TARGET_DB, recompute_target
+
+# 진행바 세분 합산 스케일. 정수 진행바에 소수 진행(파일 내부 fraction)을 싣기
+# 위한 배율. 1000 이면 0.1% 단위(소수점 한 자리)까지 표현된다.
+_PROGRESS_SCALE = 1000
 
 
 def collect_mp3_paths(paths, recurse: bool = True) -> list[str]:
@@ -104,17 +120,17 @@ def open_with_default_app(path: str) -> None:
 
 
 class PathElideDelegate(QStyledItemDelegate):
-    """Path\\File 컬럼 전용 델리게이트: 경로를 먼저 접고 파일명을 최후까지 보존.
+    r"""Path\File 컬럼 전용 델리게이트: 경로를 먼저 접고 파일명을 최후까지 보존.
 
     표준 elide 모드(ElideLeft/Middle/Right)는 문자열을 한 지점에서만 접어
     "경로만 접고 파일명은 보존, 그래도 좁으면 파일명 자름"이라는 2단계 규칙을
     표현할 수 없다. 그래서 직접 그린다. 셀 폭에 맞춰 단계적으로 축소한다:
 
       1) 전체 경로가 다 들어가면 그대로.
-      2) 안 들어가면 경로를 접는다: 드라이브(첫 요소) + \\…\\ + 마지막 폴더 +
-         \\ + 파일명. 예: C:\\Users\\...\\MUSIC\\104.mp3 → C:\\…\\MUSIC\\104.mp3.
+      2) 안 들어가면 경로를 접는다: 드라이브(첫 요소) + \…\ + 마지막 폴더 +
+         \ + 파일명. 예: C:\Users\...\MUSIC\104.mp3 → C:\…\MUSIC\104.mp3.
       3) 그렇게 최소로 접어도 넘치면, 그때만 파일명을 뒤에서 elide 한다
-         (C:\\…\\MUSIC\\some very long na…). 즉 파일명이 최후까지 보호된다.
+         (C:\…\MUSIC\some very long na…). 즉 파일명이 최후까지 보호된다.
 
     그리기만 커스터마이즈하고 배경·선택 하이라이트는 기본 스타일에 맡겨
     다크테마 팔레트(진척 11)를 깨지 않는다. 전체 경로 툴팁·정렬은 모델의
@@ -129,7 +145,7 @@ class PathElideDelegate(QStyledItemDelegate):
         if fm.horizontalAdvance(text) <= avail:
             return text
 
-        # 경로를 구분자로 분해. 이 앱은 Windows 절대경로(\\)를 저장한다.
+        # 경로를 구분자로 분해. 이 앱은 Windows 절대경로(\)를 저장한다.
         sep = "\\" if "\\" in text else "/"
         parts = text.split(sep)
         # parts = [드라이브(또는 첫 요소), ..., 마지막폴더, 파일명]
@@ -363,6 +379,9 @@ class MainWindow(QMainWindow):
         self._applied_count = 0    # 이번 Track Gain 에서 실제 적용된 개수
         self._failed_count = 0     # 이번 작업에서 실패한 개수
         self._batch_total = 0      # 이번 분석/적용 작업의 대상 수(상태바 표시용)
+        # 진행바 세분 합산·상태바 %용: 현재 처리 중 파일명과 그 내부 진행률.
+        self._current_name = ""       # 지금 처리 중 파일의 basename(상태바 표시)
+        self._current_fraction = 0.0  # 지금 처리 중 파일의 내부 진행률(0~1)
 
         self._build_toolbar()
         self._build_central()
@@ -495,6 +514,27 @@ class MainWindow(QMainWindow):
     def _build_statusbar(self):
         self.statusBar().showMessage("Ready")
 
+    # --- 진행바 세분 합산 헬퍼 ---
+
+    def _set_batch_progress(self, done: int, fraction: float):
+        """분석/적용 진행바를 세분 합산 값으로 설정한다.
+
+        진행바 range 는 시작 시 (0, total*_PROGRESS_SCALE)로 잡혀 있다. 값은
+        완료 파일 수(done)에 현재 파일 내부 진행(fraction, 0~1)을 더해 스케일을
+        곱한다: (done + fraction) * _PROGRESS_SCALE. fraction 은 안전하게 0~1
+        로 클램프한다.
+        """
+        frac = 0.0 if fraction < 0.0 else (1.0 if fraction > 1.0 else fraction)
+        self.progress.setValue(int((done + frac) * _PROGRESS_SCALE))
+
+    def _batch_status(self, verb: str, done: int) -> str:
+        """작업 중 상태바 문구: "verb k/N — 파일명 — NN.N%" (파일명·%는 있을 때만)."""
+        msg = f"{verb} {done}/{self._batch_total}"
+        if self._current_name:
+            msg += f" — {self._current_name}"
+            msg += f" — {self._current_fraction * 100.0:.1f}%"
+        return msg
+
     # --- 상태 갱신 ---
 
     def _is_busy(self) -> bool:
@@ -554,7 +594,7 @@ class MainWindow(QMainWindow):
         """진행바 옆 겸용 버튼. 현재 상태에 따라 pause/cancel/rescan.
 
         - 태그 스캔 실행 중  : Pause  → 스캔 중단 요청(파일 경계에서 멈춤).
-        - 분석/적용 실행 중  : Cancel → 작업 중단 요청(파일 경계에서 멈춤).
+        - 분석/적용 실행 중  : Cancel → 작업 중단 요청(청크 경계에서 멈춤).
         - 멈춤 + pending 있음 : Rescan → 남은 pending 행을 이어서 태그 스캔.
         """
         if self._is_busy():
@@ -565,8 +605,7 @@ class MainWindow(QMainWindow):
                 if self._worker_kind == "scan":
                     self.statusBar().showMessage("Pausing after current file...")
                 else:
-                    self.statusBar().showMessage(
-                        "Cancelling after current file...")
+                    self.statusBar().showMessage("Cancelling...")
             return
         # 멈춰 있으면 Rescan: pending 행 태그 스캔 재개.
         self._start_tag_scan(self._pending_paths())
@@ -614,6 +653,7 @@ class MainWindow(QMainWindow):
         Rescan 으로 이어가므로). 범위 = 전체 행 수, 오프셋 = 이번 스캔 시작
         시점에 이미 스캔돼 있던 행 수(전체 − 이번 대상). 진행 시 오프셋을
         더한 값을 표시해, 재개·추가가 전체에서 이어지는 것이 드러난다.
+        (태그 스캔은 디코딩이 없어 파일 내부 진행률·세분 합산을 쓰지 않는다.)
         """
         if self._is_busy() or not paths:
             self._update_action_states()
@@ -699,15 +739,19 @@ class MainWindow(QMainWindow):
         self._analyzed_count = 0
         self._failed_count = 0
         self._batch_total = len(paths)
+        self._current_name = ""
+        self._current_fraction = 0.0
         self._worker = AnalyzeWorker(paths, target_db, self)
         self._worker_kind = "analyze"
         self._worker.current.connect(self._on_analyze_current)
+        self._worker.file_progress.connect(self._on_analyze_file_progress)
         self._worker.progress.connect(self._on_worker_progress)
         self._worker.row_done.connect(self._on_worker_row_done)
         self._worker.failed.connect(self._on_worker_failed)
         self._worker.done.connect(self._on_worker_finished)
 
-        self.progress.setRange(0, len(paths))
+        # 세분 합산: range 를 total*scale 로 잡는다.
+        self.progress.setRange(0, len(paths) * _PROGRESS_SCALE)
         self.progress.setValue(0)
         self._update_action_states()  # 버튼을 Cancel 로
         self.statusBar().showMessage(f"Analyzing {len(paths)} file(s)...")
@@ -758,16 +802,19 @@ class MainWindow(QMainWindow):
         self._applied_count = 0
         self._failed_count = 0
         self._batch_total = len(paths)
+        self._current_name = ""
+        self._current_fraction = 0.0
         self._worker = ApplyWorker(paths, target_db, seed_results, self)
         self._worker_kind = "apply"
         self._worker.current.connect(self._on_apply_current)
+        self._worker.file_progress.connect(self._on_apply_file_progress)
         self._worker.progress.connect(self._on_apply_progress)
         self._worker.row_analyzed.connect(self._on_apply_analyzed)
         self._worker.row_applied.connect(self._on_apply_applied)
         self._worker.failed.connect(self._on_worker_failed)
         self._worker.done.connect(self._on_apply_finished)
 
-        self.progress.setRange(0, len(paths))
+        self.progress.setRange(0, len(paths) * _PROGRESS_SCALE)
         self.progress.setValue(0)
         self._update_action_states()  # 버튼을 Cancel 로
         self.statusBar().showMessage(f"Applying gain to {len(paths)} file(s)...")
@@ -879,12 +926,23 @@ class MainWindow(QMainWindow):
     # --- 분석 워커 슬롯 ---
 
     def _on_analyze_current(self, path: str):
-        done = self._analyzed_count
+        # 새 파일 시작: 파일명 저장, 내부 진행률 리셋.
+        self._current_name = os.path.basename(path)
+        self._current_fraction = 0.0
         self.statusBar().showMessage(
-            f"Analyzing {done}/{self._batch_total} — {os.path.basename(path)}")
+            self._batch_status("Analyzing", self._analyzed_count))
+
+    def _on_analyze_file_progress(self, fraction: float):
+        # 현재 파일 내부 진행률 갱신 → 진행바 세분 합산 + 상태바 % 갱신.
+        self._current_fraction = fraction
+        self._set_batch_progress(self._analyzed_count, fraction)
+        self.statusBar().showMessage(
+            self._batch_status("Analyzing", self._analyzed_count))
 
     def _on_worker_progress(self, done: int, total: int):
-        self.progress.setValue(done)
+        # 파일 하나 완료: 완료 수 기준으로 진행바를 딱 맞춰 놓고 내부 진행 리셋.
+        self._current_fraction = 0.0
+        self._set_batch_progress(done, 0.0)
 
     def _on_worker_row_done(self, path: str, result: dict):
         self._analyzed_count += 1
@@ -910,6 +968,8 @@ class MainWindow(QMainWindow):
         self._worker = None
         self._worker_kind = None
         self.progress.setValue(0)
+        self._current_name = ""
+        self._current_fraction = 0.0
         self._update_action_states()
         done = self._analyzed_count
         failed = self._failed_count
@@ -922,12 +982,20 @@ class MainWindow(QMainWindow):
     # --- 적용 워커 슬롯(Track Gain) ---
 
     def _on_apply_current(self, path: str):
+        self._current_name = os.path.basename(path)
+        self._current_fraction = 0.0
         done = self._applied_count + self._analyzed_count
-        self.statusBar().showMessage(
-            f"Applying {done}/{self._batch_total} — {os.path.basename(path)}")
+        self.statusBar().showMessage(self._batch_status("Applying", done))
+
+    def _on_apply_file_progress(self, fraction: float):
+        self._current_fraction = fraction
+        done = self._applied_count + self._analyzed_count
+        self._set_batch_progress(done, fraction)
+        self.statusBar().showMessage(self._batch_status("Applying", done))
 
     def _on_apply_progress(self, done: int, total: int):
-        self.progress.setValue(done)
+        self._current_fraction = 0.0
+        self._set_batch_progress(done, 0.0)
 
     def _on_apply_analyzed(self, path: str, result: dict):
         """스텝이 0이라 적용하지 않고 분석 결과만 반영(원본 "분석까지만")."""
@@ -955,6 +1023,8 @@ class MainWindow(QMainWindow):
         self._worker = None
         self._worker_kind = None
         self.progress.setValue(0)
+        self._current_name = ""
+        self._current_fraction = 0.0
         self._update_action_states()
         applied = self._applied_count
         analyzed_only = self._analyzed_count
@@ -992,3 +1062,23 @@ class MainWindow(QMainWindow):
             event.acceptProposedAction()
         else:
             event.ignore()
+
+    # --- 창 닫기: 실행 중 워커 안전 종료 ---
+
+    def closeEvent(self, event):
+        """창을 닫을 때 실행 중인 워커를 취소·대기시킨 뒤 닫는다.
+
+        워커가 도는 중에 MainWindow 가 파괴되면 Qt 가
+        'QThread: Destroyed while thread is still running' 경고를 내고 크래시
+        위험도 있다. 취소를 요청하고(청크/파일 경계에서 반영) wait() 로 스레드
+        종료를 보장한 뒤 닫는다. 분석·적용은 취소가 청크 경계라 즉시는 아니나
+        진행 중 ffmpeg 를 kill 하므로 곧 끝난다.
+        """
+        w = self._worker
+        if w is not None:
+            w.request_cancel()
+            # 완료 슬롯(_worker=None)이 돌기 전일 수 있으니 객체로 직접 대기.
+            if not w.wait(10000):  # 최대 10초 대기
+                w.terminate()      # 그래도 안 끝나면 강제 종료(최후 수단)
+                w.wait()
+        super().closeEvent(event)

@@ -196,9 +196,9 @@ GaindB/
 5. CLI(`mp3gain_cli.py`) — 원본 옵션 전부 재현(직접 게인·분석·적용·클립·database·태그·출력). recalc 비트마스크(FULL/AMP/MIN_MAX)로 디코딩 스킵(결과 수치는 원본 동일). CLI I/O 는 영문만 출력(다국어는 GUI tr() 책임). min/max 스캔 버그 수정: `need_scan = recalc & (FULL|AMP|MIN_MAX)`.
 6. 샘플레이트 확장 — 32k / 24k·22.05k·16k / 12k·11.025k·8k 코어 추가·검증. frame.py MPEG2/2.5 분기 실측 재검증(수정 불필요, exe 대조 min/max 전부 일치).
 7. 배포 라이선스 1차 점검 — 원본 C 소스와 직접 대조해 전 모듈 clean-room 부합 확인, 도움말 산문 재작성·계수 출처 정직 기재·주석 정리, git 분리 확인, 의존성 매트릭스 정리(numpy·scipy=BSD, PySide6=LGPLv3 동적링크, ffmpeg=외부 호출 전파 없음/동봉 시 LGPL 빌드만). 산출물 `docs/LICENSE_REVIEW.md`.
-8. GUI(PySide6, `gui/`) — 파일/폴더 추가·태그 스캔·자연 정렬·다크색상·유니코드·리스트 UX(Delete/더블클릭/고무줄)·Track Analysis(AnalyzeWorker)·Track Gain(ApplyWorker, 원본 RadioGain 재현)·단축키·Clear·취소(청크 경계 즉시 kill)·파일 내부 진행률·스트리밍 분석(수 시간 곡 대응)·창 닫기 안전. 표시값은 원본 exe 실측과 일치(CurrMaxAmp·Volume·Track Gain·clip). `api.analyze_file`(비파괴·무출력)이 CLI --show/GUI/AVD 공유.
+8. GUI(PySide6, `gui/`) — 파일/폴더 추가·태그 스캔·자연 정렬·다크색상·유니코드·리스트 UX(Delete/더블클릭/고무줄)·Track Analysis(AnalyzeWorker)·Track Gain(ApplyWorker, 원본 RadioGain 재현)·단축키·Clear·취소(청크 경계 즉시 kill)·파일 내부 진행률·스트리밍 분석(수 시간 곡 대응)·창 닫기 안전. 표시값은 원본 exe 실측과 일치(CurrMaxAmp·Volume·Track Gain·clip). `api.analyze_file`(비파괴·무출력)이 CLI --show/GUI/AVD 공유. 대량 추가 성능: 모델에 path→row 딕셔너리 인덱스 도입해 `find_row_by_path` 를 O(1) 로(대량 스캔 O(N²) 제거), 태그 스캔 카운트를 워커 progress 기준으로 통일(읽기 실패 파일 있어도 표시 안 어긋남).
 
-**검증 인프라.** 통합 테스트 스위트(`tests/`, unittest, 외부 의존 없음) — `python -m unittest discover -s tests` 전부 PASS(86건 기준). 모든 테스트는 원본 음원 불간섭(tempfile 사본, `FixtureGuard` 오염 감시, 무결성은 `audio_body_sha256`). `_support.py`(BaseGainTest·run_cli·해시), 도메인별 test 모듈(roundtrip/analysis/tag/options/recalc/clip/useid3/samplerate 등). fixture 는 Debussy(44.1k)·10cm(48k) 원본 + ffmpeg 변형 다수(mono/stereo·전 샘플레이트). mutagen 상호운용·원본 exe dB 대조는 skip 오염 방지를 위해 `manual_checks/`(git 제외)에서 로컬 수동 실행. exe 는 MSYS2+MinGW-w64(UCRT64)로 빌드한 1.6.2, 사본에 `-o -s s` 로만 정답 추출(원본 오염 방지).
+**검증 인프라.** 통합 테스트 스위트(`tests/`, unittest, 외부 의존 없음) — `python -m unittest discover -s tests` 전부 PASS(112건 기준). 모든 테스트는 원본 음원 불간섭(tempfile 사본, `FixtureGuard` 오염 감시, 무결성은 `audio_body_sha256`). `_support.py`(BaseGainTest·run_cli·해시), 도메인별 test 모듈(roundtrip/analysis/tag/options/recalc/clip/useid3/samplerate + GUI 순수 함수부 `test_gui_pure`·스트리밍 동일성 `test_streaming_analysis`). `test_gui_pure` 는 collect_mp3_paths·모델 path→row 인덱스 불변식·표시 수식(recompute_target/shift_after_apply)을 원본 음원·ffmpeg 없이 검증. `test_streaming_analysis` 는 TrackAnalyzer 스트리밍 누적 = 통짜(analyze_track/track_peak/track_histogram) 결과가 비트 단위 동일함을 여러 청크 크기·샘플레이트로 검증(진척 로그 diff=0 을 정식 고정). fixture 는 Debussy(44.1k)·10cm(48k) 원본 + ffmpeg 변형 다수(mono/stereo·전 샘플레이트). mutagen 상호운용·원본 exe dB 대조는 skip 오염 방지를 위해 `manual_checks/`(git 제외)에서 로컬 수동 실행. exe 는 MSYS2+MinGW-w64(UCRT64)로 빌드한 1.6.2, 사본에 `-o -s s` 로만 정답 추출(원본 오염 방지).
 
 ### 10.2. 확정된 정책·결정 (구현 중 새로 정해진 것)
 
@@ -217,9 +217,8 @@ GaindB/
 
 ### 10.3. 다음 세션 시작점
 
-**8단계 GUI MVP 완료(초장시간 곡 포함 실사용 가능).** 다음은 잔여 항목 택일 — 우선순위는 사용자 결정.
+**8단계 GUI MVP 완료(초장시간 곡 포함 실사용 가능).** 이전 (a)·(b)는 완료 — (a) 대량 추가 버벅임의 병목(`find_row_by_path` 선형 탐색 O(N²))은 모델 path→row 인덱스로 해소하고 태그 스캔 카운트 표시 불일치도 수정, 진행바·Cancel/Pause/Rescan 은 코드 레벨 진단으로 로직 결함 없음 확인(실제 GUI 클릭 확인은 사용자 몫으로 남김). (b) GUI 순수 함수부·스트리밍=통짜 동일성 테스트 편입 완료(86→112건). 다음은 잔여 항목 택일 — 우선순위는 사용자 결정.
 
-- (a) **진행바·Cancel/Pause/Rescan 실동작 최종 확인** + 대량 추가 시 태그 스캔 버벅임 여부 점검. 오염된 목록은 Clear 후 재추가로 태그 재스캔.
-- (b) **GUI 순수 함수부 tests 편입** — `collect_mp3_paths`·표시 수식·shift/recompute·`TrackAnalyzer` 스트리밍=통짜 대조를 정식 테스트로. 파괴적 적용은 fixture 사본만·원본 불간섭(9). 대상: `tests/_support.py`·`gaindb/api.py`·`gaindb/analysis.py`.
-- (c) **후순위 기능 착수** — 우클릭 팝업(Album/Undo/RemoveTags/Play), 컬럼폭·정렬 저장, Album/Constant/Max No-clip, 트레이·로그·언어메뉴. 착수 시 해당 원본 폼(frmMain 팝업·frmOptions·frmGetGain 등)을 붙여 제공.
-- (d) **진행률 시그널 스로틀**(초장시간 곡에서 file_progress emit 폭주 시 "직전값과 0.1%↑ 차이날 때만 emit") — 현재 체감 문제 없으면 보류.
+- (a) **후순위 기능 착수** — 우클릭 팝업(Album/Undo/RemoveTags/Play), 컬럼폭·정렬 저장, Album/Constant/Max No-clip, 트레이·로그·언어메뉴. 착수 시 해당 원본 폼(frmMain 팝업·frmOptions·frmGetGain 등)을 붙여 제공.
+- (b) **진행률 시그널 스로틀**(초장시간 곡에서 file_progress emit 폭주 시 "직전값과 0.1%↑ 차이날 때만 emit") — 현재 체감 문제 없으면 보류.
+- (c) **진행바·Cancel/Pause/Rescan 실동작 최종 확인(사용자 실클릭)** — 대량 폴더로 Add/Pause/Rescan/Cancel 을 실제로 눌러 상태 전이·ffmpeg kill·진행바 이어짐을 눈으로 확인. 오염된 목록은 Clear 후 재추가로 태그 재스캔.

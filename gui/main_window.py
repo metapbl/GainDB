@@ -1,21 +1,35 @@
-r"""gui/main_window.py — 메인 창(8단계 MVP + 태그 스캔 워커 + Analysis/Gain 워커).
+r"""gui/main_window.py — 메인 창(8단계 MVP + 태그 스캔 워커 + Analysis/Gain 워커 + 우클릭 팝업).
 
 원본 MP3GainGUI frmMain 의 화면 구성·동작을 관찰해 독립 구현한다(clean-room).
 파일/폴더 추가(버튼 + 드래그앤드롭)·Clear·헤더 클릭 자연 정렬·Delete 키 선택
 삭제·더블클릭 재생에 더해, 파일 추가 시 태그를 백그라운드 워커로 읽어 표시
 (원본 AddSingleFile), Track Analysis 와 Track Gain 도 QThread 워커로 연결한다.
+우클릭 팝업(원본 mnuPopup)으로 Clear Analysis·Undo·Remove Tags·Play 를 제공한다.
 
 태그 스캔 워커화(대량 추가 프리징 해소): 파일 추가 시 행은 메인에서 즉시 만들고
 (빈칸 상태로 목록에 바로 보임), 태그는 TagScanWorker 가 백그라운드로 채운다.
 스캔 진행 중에는 겸용 버튼이 Pause 로, 멈춘 뒤 미스캔(pending) 행이 남으면
-Rescan 으로 바뀐다(같은 자리에서 상태 전환). Track Analysis/Track Gain 진행
-중에는 같은 버튼이 Cancel 이다(작업 성격상 이어가기 개념이 없어 Rescan 없음).
+Rescan 으로 바뀐다(같은 자리에서 상태 전환). Track Analysis/Track Gain/파일
+액션 진행 중에는 같은 버튼이 Cancel 이다(작업 성격상 이어가기 개념이 없어
+Rescan 없음).
+
+우클릭 팝업(원본 mnuPopup 재현, MVP 범위):
+  원본은 우클릭 시 mnuSelectedFiles 를 강제로 켜서 "선택 파일 한정"으로 액션을
+  돌리고, 팝업 항목 Enabled 를 메뉴 상태에서 복사했다. 우리는 그 취지를 따라
+  "선택 한정"으로 동작하되, 우클릭한 행이 선택에 없으면 그 행만 선택한 뒤 메뉴를
+  띄운다(데스크톱 관례). 항목은 원본 팝업 순서에서 MVP 것만 추린다:
+    Clear Analysis    — 선택 행 표시값만 리셋(파일 미변경, 원본 ResetAnalysis).
+    Undo Gain changes — 선택 행 undo(파일 변경, 원본 UndoFileGain).
+    Remove Tags       — 선택 행 태그 제거(파일 변경, 원본 DeleteFileTags).
+    Play mp3 file     — 선택 행 기본앱 재생(원본 lstvMain_DblClick).
+  Album/Constant/Max No-clip 계열은 MVP 제외라 팝업에 넣지 않는다.
 
 취소·진행률(정책 갱신): 취소는 이제 청크 경계에서 반영된다 — 워커가 decode
 계층에 취소 콜백을 넘겨 진행 중 ffmpeg 를 즉시 kill 하므로, 초장시간 곡에서도
 수백 ms 이내에 멈춘다(예전 '파일 경계에서만' 정책을 대체). 또한 긴 곡 디코딩
 중 파일 내부 진행률(file_progress, 0~1)을 받아 상태바 텍스트("파일명 — NN.N%")
 와 진행바 세분 합산에 반영해, 한 곡이 오래 걸려도 UI 가 살아있음을 보인다.
+undo·태그 제거는 디코딩이 없어 파일 내부 진행률이 없고 취소는 파일 경계다.
 
 작업 중 상태바에는 "작업 k/N — 파일명 — NN.N%"를 표시한다(current +
 file_progress; 경로 없이 basename 만 — 전체 경로는 리스트 행 툴팁으로 확인).
@@ -23,15 +37,14 @@ file_progress; 경로 없이 basename 만 — 전체 경로는 리스트 행 툴
 진행바 세분 합산: 분석/적용 진행바는 파일 단위가 아니라 파일 내부 진행까지
 합산해 부드럽게 흐른다. 정수 진행바에 소수 진행을 싣기 위해 _PROGRESS_SCALE
 (=1000)을 곱한 스케일을 쓴다: 값 = (완료 파일수 + 현재 파일 fraction) * 1000.
-태그 스캔 진행바는 성격이 달라(누적 오프셋·Pause/Rescan) 세분 합산을 쓰지
-않고 기존 파일 단위 방식을 유지한다.
+태그 스캔·파일 액션 진행바는 성격이 달라(내부 진행 없음) 파일 단위 방식이다.
 
 Path\File 컬럼은 PathElideDelegate 로 그린다: 경로를 먼저 접고(C:\…\MUSIC\)
 파일명을 최후까지 보존하며, 그래도 좁으면 그때만 파일명을 elide 한다.
 
 겸용 버튼(진행바 옆) 규칙 — _update_action_states 에서 결정:
   - 태그 스캔 워커 실행 중          → "Pause" (활성)   : 파일 경계에서 스캔 중단
-  - 분석/적용 워커 실행 중          → "Cancel"(활성)   : 청크 경계에서 작업 중단
+  - 분석/적용/액션 워커 실행 중     → "Cancel"(활성)   : 청크/파일 경계에서 중단
   - 멈춤 + 미스캔(pending) 행 있음  → "Rescan"(활성)   : 남은 pending 이어 스캔
   - 멈춤 + pending 없음             → "Cancel"(비활성) : 동작 없음(기본 상태)
 클릭 핸들러는 하나이며 위 상태에 따라 pause/cancel/rescan 으로 분기한다.
@@ -46,8 +59,8 @@ GUI 무계산 원칙: 수치는 gaindb.api 가 계산한 것만 표시한다.
 
 워커 규칙: 무거운 작업(ffmpeg 디코딩·파일 적용)은 워커에서 돌리고,
 워커는 시그널만 방출한다. 모델 변경은 전부 메인 스레드의 슬롯에서 수행한다.
-태그 스캔도 워커로 돌리되(대량 추가 프리징 해소) 워커는 읽기만 하고 모델
-변경은 메인 슬롯이 담당한다.
+태그 스캔·파일 액션도 워커로 돌리되 워커는 읽기/쓰기만 하고 모델 변경은
+메인 슬롯이 담당한다.
 """
 
 from __future__ import annotations
@@ -62,15 +75,17 @@ from PySide6.QtCore import (
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox,
     QTableView, QToolBar, QProgressBar, QPushButton, QFileDialog,
-    QAbstractItemView, QHeaderView, QRubberBand, QStyledItemDelegate,
+    QAbstractItemView, QHeaderView, QRubberBand, QStyledItemDelegate, QMenu,
 )
 
 from PySide6.QtGui import QAction, QKeySequence
 
 from gui.model import FileTableModel, SORT_ROLE
 from gui.columns import Col
-from gui.workers import TagScanWorker, AnalyzeWorker, ApplyWorker
-from gaindb.api import DEFAULT_TARGET_DB, recompute_target
+from gui.workers import (
+    TagScanWorker, AnalyzeWorker, ApplyWorker, FileActionWorker,
+)
+from gaindb.api import DEFAULT_TARGET_DB, recompute_target, shift_after_apply
 
 # 진행바 세분 합산 스케일. 정수 진행바에 소수 진행(파일 내부 fraction)을 싣기
 # 위한 배율. 1000 이면 0.1% 단위(소수점 한 자리)까지 표현된다.
@@ -210,7 +225,7 @@ class PathElideDelegate(QStyledItemDelegate):
 
 
 class FileTableView(QTableView):
-    """Delete 키 삭제 + 빈 영역 고무줄(사각형) 선택을 지원하는 QTableView.
+    """Delete 키 삭제 + 빈 영역 고무줄 선택 + 우클릭 팝업을 지원하는 QTableView.
 
     - Delete 키(원본 lstvMain_KeyDown, KeyCode 46 → ClearFiles): 선택 행만 삭제
       요청 시그널을 낸다. 테이블 포커스 시에만 동작한다(전역 아님).
@@ -219,10 +234,14 @@ class FileTableView(QTableView):
       QListView/QTreeView 와 달리 setSelectionRectVisible 이 없어 직접 구현한다.
       행 위에서 시작한 클릭·드래그는 고무줄에 개입하지 않고 QTableView 기본
       동작(클릭 선택·행 드래그 선택·더블클릭)에 위임한다.
+    - 우클릭 팝업(원본 lstvMain_MouseUp Button=2): contextMenuEvent 에서 우클릭한
+      행이 선택에 없으면 그 행만 선택한 뒤 context_menu_requested 를 방출한다
+      (메뉴 구성·표시는 MainWindow 가 담당 — 액션이 모델·워커를 다루므로).
     - Ctrl+A 전체선택·doubleClicked 는 QTableView 기본 동작이라 손대지 않는다.
     """
 
     delete_requested = Signal()
+    context_menu_requested = Signal(QPoint)  # 전역 좌표
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -237,6 +256,25 @@ class FileTableView(QTableView):
             event.accept()
             return
         super().keyPressEvent(event)
+
+    def contextMenuEvent(self, event):
+        """우클릭: 그 행이 선택에 없으면 그 행만 선택한 뒤 메뉴 요청을 방출.
+
+        원본 lstvMain_MouseUp 이 우클릭 시 선택 한정으로 액션을 돌린 취지를
+        따른다. 빈 영역 우클릭이면(행 없음) 선택을 비운다(액션 전부 비활성).
+        메뉴 자체는 MainWindow._show_context_menu 가 만든다.
+        """
+        pos = event.pos()
+        index = self.indexAt(pos)
+        if index.isValid():
+            sel = self.selectionModel()
+            if not sel.isRowSelected(index.row(), QModelIndex()):
+                # 선택에 없는 행을 우클릭하면 그 행만 선택(데스크톱 관례).
+                self.selectRow(index.row())
+        else:
+            self.clearSelection()
+        self.context_menu_requested.emit(event.globalPos())
+        event.accept()
 
     def mousePressEvent(self, event):
         # 좌클릭이고 빈 영역(행 없음)에서 시작할 때만 고무줄 선택 개시.
@@ -367,9 +405,9 @@ class MainWindow(QMainWindow):
         self.proxy.setSourceModel(self.model)
 
         # 실행 중 워커 보유(GC 방지). 한 번에 한 종류만 돈다(busy 잠금).
-        # _worker_kind: "scan" | "analyze" | "apply" | None.
+        # _worker_kind: "scan" | "analyze" | "apply" | "action" | None.
         #   겸용 버튼(Pause/Cancel/Rescan) 텍스트·동작이 이 종류에 따라 갈린다.
-        self._worker: TagScanWorker | AnalyzeWorker | ApplyWorker | None = None
+        self._worker = None
         self._worker_kind: str | None = None
         self._scanned_count = 0    # 이번 태그 스캔에서 처리한 개수
         self._scan_offset = 0      # 이번 스캔 시작 시점에 이미 스캔돼 있던 행 수
@@ -379,6 +417,8 @@ class MainWindow(QMainWindow):
         self._applied_count = 0    # 이번 Track Gain 에서 실제 적용된 개수
         self._failed_count = 0     # 이번 작업에서 실패한 개수
         self._batch_total = 0      # 이번 분석/적용 작업의 대상 수(상태바 표시용)
+        self._action_done = 0      # 이번 파일 액션에서 성공 처리한 개수
+        self._action_verb = ""     # 파일 액션 상태바 동사("Undoing"/"Removing tags")
         # 진행바 세분 합산·상태바 %용: 현재 처리 중 파일명과 그 내부 진행률.
         self._current_name = ""       # 지금 처리 중 파일의 basename(상태바 표시)
         self._current_fraction = 0.0  # 지금 처리 중 파일의 내부 진행률(0~1)
@@ -386,6 +426,7 @@ class MainWindow(QMainWindow):
         self._build_toolbar()
         self._build_central()
         self._build_statusbar()
+        self._build_context_menu()
         self._update_action_states()
 
     # --- UI 구성 ---
@@ -462,7 +503,7 @@ class MainWindow(QMainWindow):
         target_row.addStretch(1)
         layout.addLayout(target_row)
 
-        # 파일 목록 테이블 (프록시 경유, Delete 키 + 더블클릭 재생 지원)
+        # 파일 목록 테이블 (프록시 경유, Delete 키 + 더블클릭 재생 + 우클릭 지원)
         self.table = FileTableView(self)
         self.table.setModel(self.proxy)
         self.table.setSortingEnabled(True)  # 헤더 클릭 정렬
@@ -483,6 +524,7 @@ class MainWindow(QMainWindow):
         self.table.verticalHeader().setVisible(False)
         self.table.delete_requested.connect(self._on_delete_selected)
         self.table.doubleClicked.connect(self._on_double_click)
+        self.table.context_menu_requested.connect(self._show_context_menu)
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(
             int(Col.NAME), QHeaderView.ResizeMode.Stretch)
@@ -513,6 +555,35 @@ class MainWindow(QMainWindow):
 
     def _build_statusbar(self):
         self.statusBar().showMessage("Ready")
+
+    def _build_context_menu(self):
+        """우클릭 팝업(원본 mnuPopup 재현, MVP 항목)을 구성한다.
+
+        메뉴는 한 번만 만들고, 표시 직전 _show_context_menu 가 선택·busy 에 따라
+        각 액션의 enabled 를 갱신한다(원본이 팝업 항목 Enabled 를 메뉴 상태에서
+        복사한 것에 대응). 항목 순서는 원본 mnuPopup 순서에서 MVP 것만 추렸다.
+        """
+        self.ctx_menu = QMenu(self)
+
+        self.ctx_clear_analysis = QAction("Clear Analysis", self)
+        self.ctx_clear_analysis.triggered.connect(self._on_ctx_clear_analysis)
+        self.ctx_menu.addAction(self.ctx_clear_analysis)
+
+        self.ctx_menu.addSeparator()
+
+        self.ctx_undo = QAction("Undo Gain changes", self)
+        self.ctx_undo.triggered.connect(self._on_ctx_undo)
+        self.ctx_menu.addAction(self.ctx_undo)
+
+        self.ctx_remove_tags = QAction("Remove Tags from files", self)
+        self.ctx_remove_tags.triggered.connect(self._on_ctx_remove_tags)
+        self.ctx_menu.addAction(self.ctx_remove_tags)
+
+        self.ctx_menu.addSeparator()
+
+        self.ctx_play = QAction("Play mp3 file", self)
+        self.ctx_play.triggered.connect(self._on_ctx_play)
+        self.ctx_menu.addAction(self.ctx_play)
 
     # --- 진행바 세분 합산 헬퍼 ---
 
@@ -567,10 +638,10 @@ class MainWindow(QMainWindow):
         self.act_clear.setEnabled(has_rows and not busy)
 
         # 겸용 버튼 텍스트·활성 결정(설계 표 그대로):
-        #   태그 스캔 중  → Pause(활성)
-        #   분석/적용 중  → Cancel(활성)
-        #   멈춤+pending  → Rescan(활성)
-        #   멈춤+무pending→ Cancel(비활성)
+        #   태그 스캔 중       → Pause(활성)
+        #   분석/적용/액션 중  → Cancel(활성)
+        #   멈춤+pending       → Rescan(활성)
+        #   멈춤+무pending     → Cancel(비활성)
         if busy:
             if self._worker_kind == "scan":
                 self.btn_action.setText("Pause")
@@ -593,9 +664,9 @@ class MainWindow(QMainWindow):
     def _on_action_button(self):
         """진행바 옆 겸용 버튼. 현재 상태에 따라 pause/cancel/rescan.
 
-        - 태그 스캔 실행 중  : Pause  → 스캔 중단 요청(파일 경계에서 멈춤).
-        - 분석/적용 실행 중  : Cancel → 작업 중단 요청(청크 경계에서 멈춤).
-        - 멈춤 + pending 있음 : Rescan → 남은 pending 행을 이어서 태그 스캔.
+        - 태그 스캔 실행 중       : Pause  → 스캔 중단 요청(파일 경계에서 멈춤).
+        - 분석/적용/액션 실행 중  : Cancel → 작업 중단 요청(청크/파일 경계).
+        - 멈춤 + pending 있음      : Rescan → 남은 pending 행을 이어서 태그 스캔.
         """
         if self._is_busy():
             # 실행 중이면 종류 불문 중단 요청(Pause/Cancel 동작은 동일).
@@ -783,13 +854,14 @@ class MainWindow(QMainWindow):
             fr = self.model.get_row(r)
             if fr is None:
                 continue
-            res = fr.result
-            if (res and res.get("status") == "ok"
-                    and res.get("steps") is not None
-                    and res.get("steps") == 0):
-                continue
+            # steps=0 이라도 제외하지 않는다: 태그가 없거나 오래됐으면(dirty)
+            # 코어가 태그를 다시 써야 하기 때문(원본 mp3gain 동작). 태그 최신
+            # 여부는 GUI 가 알 수 없어(태그 삭제 후 분석한 행도 status=analyzed)
+            # 판단을 워커→코어(apply_file_track_gain)에 맡긴다. 이미 최신 태그면
+            # 코어가 디코딩 없이 no_change 로 빠르게 넘어간다.
             paths.append(fr.path)
             seed_results[fr.path] = fr.result  # None 이면 워커가 분석함
+
 
         if not paths:
             self.statusBar().showMessage(
@@ -854,6 +926,10 @@ class MainWindow(QMainWindow):
         if not index.isValid():
             return
         r = self.proxy.mapToSource(index).row()
+        self._play_row(r)
+
+    def _play_row(self, r: int):
+        """모델 행 r 의 파일을 기본 앱으로 연다(더블클릭·팝업 Play 공용)."""
         fr = self.model.get_row(r)
         if fr is None:
             return
@@ -877,6 +953,104 @@ class MainWindow(QMainWindow):
             fr.result = recompute_target(fr.result, value)
             self.model.row_changed(r)
         self.statusBar().showMessage(f"Target set to {value:.1f} dB")
+
+    # --- 우클릭 팝업 표시 + 항목 핸들러 ---
+
+    def _show_context_menu(self, global_pos):
+        """우클릭 팝업을 선택·busy 상태에 맞춰 활성화한 뒤 표시(원본 mnuPopup).
+
+        원본이 팝업 항목 Enabled 를 메뉴 상태에서 복사한 것에 대응한다. 우리는
+        "선택 한정"이므로 선택이 있어야 각 액션이 활성이고, 파일을 바꾸는
+        Undo/Remove Tags 는 busy 아님도 조건이다. Play·Clear Analysis 는 선택만
+        있으면 되지만, 일관성을 위해 busy 중에는 전부 잠근다(작업 중 팝업 액션
+        금지 — 워커 하나만 돌게 하는 busy 잠금과 정합).
+        """
+        has_sel = len(self.table.selectionModel().selectedRows()) > 0
+        busy = self._is_busy()
+        enable = has_sel and not busy
+        self.ctx_clear_analysis.setEnabled(enable)
+        self.ctx_undo.setEnabled(enable)
+        self.ctx_remove_tags.setEnabled(enable)
+        self.ctx_play.setEnabled(enable)
+        self.ctx_menu.exec(global_pos)
+
+    def _on_ctx_clear_analysis(self):
+        """선택 행의 표시값만 리셋(파일 미변경, 원본 ResetAnalysis).
+
+        clear_result 로 result 를 비워 미분석(빈칸) 상태로 되돌린다. 파일은
+        건드리지 않으므로 워커가 필요 없다. tag_scanned 도 꺼져 그 행이 다시
+        Rescan/분석 대상이 된다.
+        """
+        if self._is_busy():
+            return
+        rows = self._selected_source_rows()
+        for r in rows:
+            fr = self.model.get_row(r)
+            if fr is not None:
+                fr.clear_result()
+                self.model.row_changed(r)
+        self._update_action_states()  # pending 생겼으면 Rescan 로 반영
+        if rows:
+            self.statusBar().showMessage(
+                f"Cleared analysis of {len(rows)} file(s)")
+
+    def _on_ctx_undo(self):
+        """선택 행의 게인 변경을 undo(파일 변경, 원본 UndoFileGain)."""
+        self._start_file_action("undo")
+
+    def _on_ctx_remove_tags(self):
+        """선택 행의 mp3gain 태그 제거(파일 변경, 원본 DeleteFileTags)."""
+        self._start_file_action("remove_tags")
+
+    def _on_ctx_play(self):
+        """선택 행(들)을 기본 앱으로 연다(원본 mnuPopupPlayFile → lstvMain_DblClick).
+
+        원본 lstvMain_DblClick 은 선택된 항목을 모두 연다. 여기서도 선택 전부를
+        열되, 실무상 여러 곡 동시 재생은 과하므로 첫 선택 행만 연다면 관례에
+        더 맞다 — 다만 원본 충실 재현을 위해 선택 전부를 연다.
+        """
+        for r in self._selected_source_rows():
+            self._play_row(r)
+
+    # --- 파일 액션 워커(undo / remove_tags) 시작 ---
+
+    def _start_file_action(self, action: str):
+        """선택 행에 대해 FileActionWorker(undo|remove_tags)를 돌린다.
+
+        선택 한정(원본 우클릭 취지). busy 면 무시. 대상이 없으면 안내만.
+        디코딩이 없어 파일 내부 진행률·세분 합산을 쓰지 않고 파일 단위 진행바를
+        쓴다(태그 스캔과 같은 성격).
+        """
+        if self._is_busy():
+            return
+        rows = self._selected_source_rows()
+        paths = []
+        for r in rows:
+            fr = self.model.get_row(r)
+            if fr is not None:
+                paths.append(fr.path)
+        if not paths:
+            self.statusBar().showMessage("No files selected")
+            return
+
+        self._action_done = 0
+        self._failed_count = 0
+        self._batch_total = len(paths)
+        self._action_verb = "Undoing" if action == "undo" else "Removing tags"
+        self._worker = FileActionWorker(paths, action, use_id3=False, parent=self)
+        self._worker_kind = "action"
+        self._worker.current.connect(self._on_action_current)
+        self._worker.progress.connect(self._on_action_progress)
+        self._worker.row_undone.connect(self._on_action_undone)
+        self._worker.row_tags_removed.connect(self._on_action_tags_removed)
+        self._worker.failed.connect(self._on_worker_failed)
+        self._worker.done.connect(self._on_file_action_finished)
+
+        self.progress.setRange(0, len(paths))
+        self.progress.setValue(0)
+        self._update_action_states()  # 버튼을 Cancel 로
+        self.statusBar().showMessage(f"{self._action_verb} {len(paths)} file(s)...")
+        self._worker.start()
 
     # --- 태그 스캔 워커 슬롯(전부 메인 스레드: 모델 변경은 여기서만) ---
 
@@ -1037,6 +1211,64 @@ class MainWindow(QMainWindow):
         parts = [f"Applied gain to {applied} file(s)"]
         if analyzed_only:
             parts.append(f"{analyzed_only} already at target")
+        if failed:
+            parts.append(f"{failed} failed")
+        msg = ", ".join(parts)
+        self.statusBar().showMessage(f"Cancelled — {msg}" if cancelled else msg)
+
+    # --- 파일 액션 워커 슬롯(undo / remove_tags) ---
+
+    def _on_action_current(self, path: str):
+        self.statusBar().showMessage(
+            f"{self._action_verb} {self._action_done}/{self._batch_total} — "
+            f"{os.path.basename(path)}")
+
+    def _on_action_progress(self, done: int, total: int):
+        # 파일 단위 진행바(디코딩 없음 → 세분 합산 불필요).
+        self.progress.setValue(done)
+
+    def _on_action_undone(self, path: str, undo_steps: int):
+        """undo 성공: 되돌린 스텝으로 표시를 갱신(원본 UndoFileGain 의 AlterDb).
+
+        행에 유효한 result 가 있으면 shift_after_apply(result, undo_steps)로
+        undo 전 상태로 되돌린다(부호는 그대로 — undo_left 가 음수면 raw 가 다시
+        올라간다). 유효 result 가 없으면(태그만 있고 track_db 없음 등) 표시는
+        건드리지 않는다(합의된 예외).
+        """
+        self._action_done += 1
+        r = self.model.find_row_by_path(path)
+        if r is None:
+            return
+        fr = self.model.get_row(r)
+        if fr.result and fr.result.get("status") == "ok" \
+                and fr.result.get("track_db") is not None:
+            fr.result = shift_after_apply(fr.result, undo_steps)
+            self.model.row_changed(r)
+
+    def _on_action_tags_removed(self, path: str):
+        """태그 제거 성공: 행 result 를 비워 미분석(빈칸) 복귀(합의된 표시 정책).
+
+        태그를 지웠으므로 화면 값도 사라지는 게 실제 파일 상태와 일치한다.
+        clear_result 는 tag_scanned 도 꺼 그 행이 다시 Rescan/분석 대상이 된다.
+        """
+        self._action_done += 1
+        r = self.model.find_row_by_path(path)
+        if r is None:
+            return
+        fr = self.model.get_row(r)
+        fr.clear_result()
+        self.model.row_changed(r)
+
+    def _on_file_action_finished(self):
+        cancelled = self._worker.was_cancelled if self._worker else False
+        self._worker = None
+        self._worker_kind = None
+        self.progress.setValue(0)
+        self._update_action_states()  # 태그 제거로 pending 생겼으면 Rescan 로
+        done = self._action_done
+        failed = self._failed_count
+        verb_done = "Undone" if self._action_verb == "Undoing" else "Removed tags from"
+        parts = [f"{verb_done} {done} file(s)"]
         if failed:
             parts.append(f"{failed} failed")
         msg = ", ".join(parts)

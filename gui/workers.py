@@ -29,6 +29,12 @@ UI 프리징을 없애기 위해 추가 흐름에서 이 워커로 태그를 백
 행은 Rescan 으로 이어서 스캔한다(메인 창이 pending 행을 다시 넘긴다). 태그
 스캔은 디코딩이 없어 파일 내부 진행률이 무의미하므로 file_progress 를 쓰지
 않는다(시그널은 인터페이스 통일을 위해 정의만 둔다).
+
+파일 액션(FileActionWorker)도 태그 스캔처럼 가볍다: undo·태그 제거는 디코딩
+없이 태그·프레임 게인만 건드린다(원본 DoFileAction → UndoFileGain/DeleteFileTags
+대응). 하나의 워커가 action("undo"|"remove_tags")으로 분기해, 원본이 공통
+껍데기(DoFileAction) + 종류별 함수로 나눈 구조를 그대로 따른다. 취소는 파일
+경계에서 반영된다(각 곡이 빠르므로 실질 문제 없음).
 """
 
 from __future__ import annotations
@@ -41,6 +47,8 @@ from gaindb.api import (
     read_file_tags,
     recompute_target,
     shift_after_apply,
+    undo_file_gain,
+    remove_file_tags,
 )
 from gaindb.decode import DecodeCancelled
 
@@ -267,19 +275,99 @@ class ApplyWorker(QThread):
                     self.progress.emit(done, total)
                     continue
 
-                steps = result.get("steps") or 0
-                if steps == 0:
-                    # 원본: RadioMp3Gain=0 → /g 미실행, 분석까지만.
-                    self.row_analyzed.emit(path, result)
-                else:
-                    # 원본: /g <steps> 적용 후 dB 이동. 우리는 apply 후 shift.
-                    apply_res = apply_file_track_gain(path, self._target_db)
+                # steps 가 0 이어도 항상 apply_file_track_gain 을 호출한다.
+                # 태그 기록 여부(dirty 태그면 씀)는 코어가 판단한다(원본 -r 동일).
+                apply_res = apply_file_track_gain(path, self._target_db)
+                status = apply_res.get("status")
+                if status == "ok":
+                    # 실제 게인 적용됨: 적용된 상태의 표시 dict 방출.
                     applied_steps = apply_res.get("steps") or 0
                     shown = shift_after_apply(result, applied_steps)
                     self.row_applied.emit(path, shown)
+                elif status == "no_change":
+                    # steps=0. 오디오 미변경(태그만 갱신됐을 수 있음).
+                    self.row_analyzed.emit(path, result)
+                else:
+                    # not_enough_samples 등.
+                    self.failed.emit(path, "Not enough samples to analyze.")
             except DecodeCancelled:
                 # 취소는 실패가 아니다. 루프를 빠져나가 done 으로 마무리한다.
                 break
+            except Exception as exc:
+                self.failed.emit(path, str(exc))
+            done += 1
+            self.progress.emit(done, total)
+        self.done.emit()
+
+
+class FileActionWorker(QThread):
+    """undo·태그 제거를 파일별로 수행하는 워커(원본 DoFileAction 대응).
+
+    원본 MP3GainGUI 의 DoFileAction 은 공통 전후처리(진행바·취소·busy 잠금)를
+    한 껍데기에 두고 가운데에서 action(taUndoGain/taDeleteTags)으로 분기해
+    UndoFileGain / DeleteFileTags 를 불렀다. 이 워커도 같은 구조로, 하나의
+    run 이 action("undo"|"remove_tags")으로 분기한다.
+
+    undo·제거는 디코딩이 없어 가볍다(태그·프레임 게인만 건드림). 파일 내부
+    진행률이 무의미하므로 file_progress 를 쓰지 않는다(정의도 두지 않음).
+    취소는 파일 경계에서 반영된다(각 곡이 빠르므로 실질 문제 없음).
+
+    시그널:
+      current(path)              : 각 파일 처리 직전 방출(상태바 "처리 중" 표시).
+      progress(done, total)      : 한 파일 처리가 끝날 때마다 방출(성공/실패 무관).
+      row_undone(path, steps)    : undo 성공 시 되돌린 스텝과 함께 방출.
+                                   (호출자가 shift_after_apply 로 표시 갱신)
+      row_tags_removed(path)     : 태그 제거 성공 시 방출.
+                                   (호출자가 clear_result 로 미분석 복귀)
+      failed(path, msg)          : 처리 중 예외/불가 상황 방출(undo 정보 없음 등).
+      done()                     : 전체 종료(취소 포함).
+
+    파일을 실제로 변경한다(파괴적). action 은 생성 시 고정된다.
+    """
+
+    current = Signal(str)
+    progress = Signal(int, int)
+    row_undone = Signal(str, int)
+    row_tags_removed = Signal(str)
+    failed = Signal(str, str)
+    done = Signal()
+
+    def __init__(self, paths: list[str], action: str,
+                 use_id3: bool = False, parent=None) -> None:
+        super().__init__(parent)
+        self._paths = list(paths)
+        self._action = action          # "undo" | "remove_tags"
+        self._use_id3 = use_id3
+        self._cancel = False
+
+    def request_cancel(self) -> None:
+        """파일 경계에서 멈추도록 취소를 요청한다."""
+        self._cancel = True
+
+    @property
+    def was_cancelled(self) -> bool:
+        """취소 요청이 들어온 채로 종료됐는지. 완료 슬롯의 메시지 분기에 쓴다."""
+        return self._cancel
+
+    def run(self) -> None:
+        total = len(self._paths)
+        done = 0
+        for path in self._paths:
+            if self._cancel:
+                break
+            self.current.emit(path)  # 상태바 "처리 중" 표시용(처리 직전).
+            try:
+                if self._action == "undo":
+                    res = undo_file_gain(path, use_id3=self._use_id3)
+                    if res.get("status") == "ok":
+                        self.row_undone.emit(path, res.get("undo_steps", 0))
+                    elif res.get("status") == "nothing_to_undo":
+                        self.failed.emit(path, "No changes to undo.")
+                    else:  # no_undo
+                        self.failed.emit(path, "No undo information in file.")
+                else:  # "remove_tags"
+                    remove_file_tags(path, use_id3=self._use_id3)
+                    self.row_tags_removed.emit(path)
             except Exception as exc:
                 self.failed.emit(path, str(exc))
             done += 1

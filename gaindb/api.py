@@ -5,6 +5,16 @@
 GUI 편의를 위해 apply_file_track_gain 래퍼로 감싼다(목표 dB→offset 변환을
 이 계층에 가둔다).
 
+파괴적 파일 액션(undo·태그 제거)도 GUI 편의를 위해 얇게 감싼다:
+  undo_file_gain    : 원본 mp3gain -u / GUI UndoFileGain 대응. 태그의 undo
+                      정보로 프레임 게인을 되돌린다(디코딩 없음). 되돌린 스텝
+                      수를 반환해, 호출자가 shift_after_apply 로 표시를 갱신한다.
+  remove_file_tags  : 원본 mp3gain -s d / GUI DeleteFileTags 대응. APE(+use_id3
+                      면 ID3v2) mp3gain 태그를 제거한다(디코딩 없음).
+이 둘은 change_gain_and_tag/remove_* 를 그대로 부르므로 CLI(-u/-s d)와 동일
+결과를 낸다. 원본 DoFileAction 이 undo/deletetag 를 한 껍데기로 분기한 것과
+같은 성격의 통합 진입점이다.
+
 원본 MP3GainGUI 의 DispJunk / Mp3Info.cls 표시 로직을 재현하되 두 가지를
 의도적으로 조정한다(근거는 CLAUDE.md 10 진척 로그 참조):
   1) Track Gain 표시 제수는 원본 화면용 근사 1.505 대신 정밀값 5*log10(2) 사용.
@@ -22,12 +32,14 @@ GUI 무계산 원칙:
   하나를 공유하며, apply_track_gain 의 steps 도 동일한 offset·db_to_steps 를
   쓰므로 표시와 적용이 구조적으로 일치한다.
 
-  GUI 가 아는 함수는 다섯:
+  GUI 가 아는 함수는 일곱:
     read_file_tags(path, target_db)        # 추가 시 태그만 읽어 표시(가볍다)
     analyze_file(path, target_db, ...)     # 최초 분석(무겁다: decode+scan)
     recompute_target(result, target_db)    # 목표 변경 시 즉시 재표시(가볍다)
     apply_file_track_gain(path, target_db) # 실제 적용(무겁다)
-    shift_after_apply(result, steps)        # 적용 후 재표시(가볍다)
+    shift_after_apply(result, steps)        # 적용/undo 후 재표시(가볍다)
+    undo_file_gain(path, ...)               # 태그 기반 원복(가볍다: 디코딩 없음)
+    remove_file_tags(path, ...)             # mp3gain 태그 제거(가볍다)
 
 취소·진행률(GUI 대응):
   analyze_file 은 무거운 decode 단계에서 should_cancel(취소 콜백)과
@@ -51,7 +63,11 @@ from gaindb.analysis import (
     NOT_ENOUGH_SAMPLES,
 )
 from gaindb.writer import scan_gain
-from gaindb.tag import read_mp3gain_tags
+from gaindb.tag import (
+    read_mp3gain_tags,
+    change_gain_and_tag,
+    remove_mp3gain_ape_tag,
+)
 from apply_gain import apply_track_gain
 
 
@@ -265,21 +281,23 @@ def recompute_target(result: dict, target_db: float) -> dict:
 
 
 def shift_after_apply(result: dict, applied_steps: int) -> dict:
-    """게인 적용 후 표시값을 갱신한다(재분석 없음, 가볍다).
+    """게인 적용/undo 후 표시값을 갱신한다(재분석 없음, 가볍다).
 
     원본 RadioGain 이 적용 성공 후 `AlterDb(-steps * FIVELOG10TWO)` 로
-    수행하는 두 갱신을 재현한다:
+    수행하는 두 갱신을 재현한다(undo 도 원본 UndoFileGain 이 되돌린 스텝으로
+    같은 AlterDb 를 부른다 — applied_steps 에 undo 스텝을 넘기면 그대로 원복):
       1) mvarRadiodBGain += (-steps * FIVELOG10TWO) → raw track_db 를 낮춘다.
          raw 는 "89 로 맞추는 데 필요한 게인"이므로, 곡을 applied_steps 만큼
          키웠으면 그만큼 덜 필요하다(빼기). 낮춘 raw 로 재계산하면 steps 는 0,
-         Volume(=89-raw)은 목표로 수렴한다.
+         Volume(=89-raw)은 목표로 수렴한다. undo 로 음(-)의 스텝이 들어오면
+         raw 가 다시 올라가 undo 전 상태로 되돌아간다.
       2) mvarCurrMaxAmp *= 2^(steps/4) → peak(클립 기준)을 실제 적용에 맞춰
          갱신한다. 이걸 빠뜨리면 목표를 올렸다 내렸다 할 때 curr_max_amp 가
          이전 목표의 값으로 남아 clip 표시가 실제 파일과 어긋난다(원본은 매
          적용마다 정확히 갱신함).
 
     result: 적용 직전의 dict(target_db·track_db·curr_max_amp 포함).
-    applied_steps: 방금 적용된 정수 스텝.
+    applied_steps: 방금 적용된 정수 스텝(undo 면 되돌린 스텝, 부호 그대로).
     반환: "적용된 상태"를 반영한 새 dict(원본 dict 는 변경하지 않음).
     """
     updated = dict(result)
@@ -334,3 +352,58 @@ def apply_file_track_gain(path: str, target_db: float = DEFAULT_TARGET_DB,
     return apply_track_gain(path, db_gain_mod=db_gain_mod,
                             skip_tag=skip_tag, use_id3=use_id3)
 
+
+def undo_file_gain(path: str, use_id3: bool = False,
+                   save_timestamp: bool = False) -> dict:
+    """저장된 undo 태그로 이전 게인 변경을 되돌린다(파괴적, 가볍다: 디코딩 없음).
+
+    원본 mp3gain -u / MP3GainGUI UndoFileGain 대응. 태그를 읽어 undo 정보가
+    있고 값이 0 이 아니면 change_gain_and_tag(undo_left, undo_right, ...)로
+    프레임 게인을 되돌린다(CLI _run_undo 와 동일 경로). 디코딩이 없으므로
+    가볍다(9번 함정: "적용엔 디코딩 불필요").
+
+    되돌린 스텝(undo_left)을 반환해, 호출자가 shift_after_apply(result,
+    undo_steps)로 표시를 갱신하게 한다(원본 UndoFileGain 이 되돌린 gain 으로
+    AlterDb 를 부르는 것과 정합). 좌우가 다른(채널 분리) 경우에도 표시는
+    left 기준으로 이동한다(원본도 단일 dB 이동만 하고 좌우 분리는 표시에
+    반영하지 않음 — MVP 범위에선 좌우 동일 적용이 대부분).
+
+    반환 dict:
+      status     : "ok"            — 되돌림 완료(undo_steps 유효).
+                   "nothing_to_undo" — undo 태그는 있으나 값이 0(되돌릴 것 없음).
+                   "no_undo"       — undo 태그 자체가 없음.
+      undo_steps : 되돌린 정수 스텝(undo_left). "ok" 가 아니면 0.
+    """
+    info, file_tags = read_mp3gain_tags(path, use_id3)
+
+    if not info.have_undo:
+        return {"status": "no_undo", "undo_steps": 0}
+    if not (info.undo_left or info.undo_right):
+        return {"status": "nothing_to_undo", "undo_steps": 0}
+
+    undo_left = info.undo_left
+    undo_right = info.undo_right
+    change_gain_and_tag(path, undo_left, undo_right, info, file_tags,
+                        wrap=info.undo_wrap, save_timestamp=save_timestamp,
+                        use_id3=use_id3)
+    return {"status": "ok", "undo_steps": undo_left}
+
+
+def remove_file_tags(path: str, use_id3: bool = False,
+                     save_timestamp: bool = False) -> dict:
+    """파일의 mp3gain 태그를 제거한다(파괴적, 가볍다: 디코딩 없음).
+
+    원본 mp3gain -s d / MP3GainGUI DeleteFileTags 대응. APE mp3gain/ReplayGain
+    필드를 제거하고(다른 APE 필드·꼬리는 보존), use_id3 이면 ID3v2 mp3gain
+    프레임도 제거한다(CLI _run_delete_tag 와 동일 경로). 원래 mp3gain 태그가
+    없던 파일은 건드리지 않는다(remove_mp3gain_ape_tag 의 dirty 판정).
+
+    반환 dict: {"status": "ok"}. GUI 는 이후 해당 행 result 를 비워(clear_result)
+    미분석 상태로 되돌린다 — 태그를 지웠으므로 표시값도 사라지는 게 실제 파일
+    상태와 일치한다.
+    """
+    remove_mp3gain_ape_tag(path, save_timestamp)
+    if use_id3:
+        from gaindb.id3 import remove_mp3gain_id3_tag
+        remove_mp3gain_id3_tag(path, save_timestamp)
+    return {"status": "ok"}

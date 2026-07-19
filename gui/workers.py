@@ -183,10 +183,9 @@ class ApplyWorker(QThread):
     파일별 처리(원본 RadioGain 루프 대응):
       1) 미분석이면(기존 result 없음) analyze_file 로 먼저 분석한다.
          (원본: RadiodBGain=NOREALNUM 이면 RadioSingleFile 로 분석)
-      2) 그 결과의 steps 가 0 이면 적용하지 않고 분석 결과만 방출한다.
-         (원본: RadioMp3Gain=0 이면 /g 를 실행하지 않고 넘어감 — "분석까지만")
-      3) steps 가 0 이 아니면 apply_file_track_gain 으로 실제 적용하고,
-         shift_after_apply 로 "적용된 상태"의 표시 dict 를 만들어 방출한다.
+      2) 확보한 result 를 씨앗으로 apply_file_track_gain 에 넘겨 적용한다.
+         씨앗이 유효하면(track_db·peak 보유) 코어가 디코딩·분석·scan 을
+         건너뛴다(이중 디코딩 제거). steps==0 이면 코어가 no_change 로 넘긴다.
          (원본: /g <steps> 실행 후 AlterDb 로 dB 이동 → DispJunk)
 
     입력 seed_results 는 {path: 기존 result dict}. 이미 분석/태그로 값이 있는
@@ -194,22 +193,25 @@ class ApplyWorker(QThread):
     이미 있으면 재분석하지 않는 것과 일치). target_db 가 씨앗과 다르면
     recompute_target 으로 steps 를 목표에 맞춰 다시 계산한다.
 
-    취소·진행률: 미분석 곡을 내부에서 분석할 때 analyze_file 에 should_cancel·
-    on_progress 를 넘긴다. 취소되면 DecodeCancelled 를 받아 정상 종료한다.
-    이미 분석된 씨앗 재사용·적용 단계는 디코딩이 없어 진행률이 없다(적용은
-    빠르므로 file_progress 를 굳이 방출하지 않는다).
+    취소·진행률(정책 갱신 — 적용 단계까지 확장):
+      미분석 곡을 내부에서 분석할 때 analyze_file 에 should_cancel·on_progress
+      를 넘긴다(디코딩 진행률). 그에 더해, 실제 적용 단계(scan_gain·apply_gain·
+      change_gain_and_tag 의 프레임 순회)에도 같은 콜백을 넘긴다 — 초장시간
+      곡에서 '분석 100% 이후' 순수 파이썬 순회에 갇혀 취소가 안 먹던 문제를
+      해소한다. 취소 시 DecodeCancelled(분석 중) 또는 GainCancelled(적용 중)를
+      받아 정상 종료한다. 두 예외 모두 그 시점에 파일이 원본 그대로다.
 
     시그널:
       current(path)             : 각 파일 처리 직전 방출(상태바 "처리 중" 표시).
       progress(done, total)     : 파일 하나 처리가 끝날 때마다 방출.
-      file_progress(fraction)   : 미분석 곡 분석 시 디코딩 내부 진행률(0~1).
+      file_progress(fraction)   : 분석/적용 단계의 파일 내부 진행률(0~1).
       row_analyzed(path, result): 분석만 하고 적용 안 함(steps=0). 표시 dict.
       row_applied(path, result) : 적용까지 함. shift_after_apply 반영된 표시 dict.
       failed(path, msg)         : 분석/적용 중 (취소가 아닌) 예외 발생.
       done()                    : 전체 종료(취소 포함).
 
-    적용은 파일을 실제로 변경한다(파괴적). 취소는 청크(분석 중)·파일(적용 중)
-    경계에서 반영된다.
+    적용은 파일을 실제로 변경한다(파괴적). 취소는 청크(분석)·프레임 순회
+    간격(적용) 경계에서 수백 ms 이내 반영된다.
     """
 
     current = Signal(str)
@@ -259,6 +261,8 @@ class ApplyWorker(QThread):
         )
 
     def run(self) -> None:
+        from gaindb.writer import GainCancelled
+
         total = len(self._paths)
         done = 0
         for path in self._paths:
@@ -275,9 +279,15 @@ class ApplyWorker(QThread):
                     self.progress.emit(done, total)
                     continue
 
-                # steps 가 0 이어도 항상 apply_file_track_gain 을 호출한다.
-                # 태그 기록 여부(dirty 태그면 씀)는 코어가 판단한다(원본 -r 동일).
-                apply_res = apply_file_track_gain(path, self._target_db)
+                # 확보한 result 를 씨앗으로 넘겨 이중 디코딩을 막는다. 적용 단계
+                # 프레임 순회의 취소·진행률도 콜백으로 연결한다(100% 이후 정지·
+                # 취소 불가 해소). steps 가 0 이어도 항상 호출한다(dirty 태그면
+                # 코어가 태그를 다시 씀 — 원본 -r 동일).
+                apply_res = apply_file_track_gain(
+                    path, self._target_db, seed=result,
+                    should_cancel=lambda: self._cancel,
+                    on_progress=self.file_progress.emit,
+                )
                 status = apply_res.get("status")
                 if status == "ok":
                     # 실제 게인 적용됨: 적용된 상태의 표시 dict 방출.
@@ -290,7 +300,7 @@ class ApplyWorker(QThread):
                 else:
                     # not_enough_samples 등.
                     self.failed.emit(path, "Not enough samples to analyze.")
-            except DecodeCancelled:
+            except (DecodeCancelled, GainCancelled):
                 # 취소는 실패가 아니다. 루프를 빠져나가 done 으로 마무리한다.
                 break
             except Exception as exc:

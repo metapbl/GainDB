@@ -328,6 +328,7 @@ def shift_after_apply(result: dict, applied_steps: int) -> dict:
 
 def apply_file_track_gain(path: str, target_db: float = DEFAULT_TARGET_DB,
                           skip_tag: bool = False, use_id3: bool = False,
+                          seed: dict | None = None,
                           should_cancel: Callable[[], bool] | None = None,
                           on_progress: Callable[[float], None] | None = None
                           ) -> dict:
@@ -340,17 +341,33 @@ def apply_file_track_gain(path: str, target_db: float = DEFAULT_TARGET_DB,
 
     path: 대상 MP3. target_db: 목표 음량(89dB 기준 상대).
     skip_tag / use_id3: apply_track_gain 으로 그대로 전달(원본 -s s / -s i).
-    should_cancel / on_progress: 시그니처 정합용 인자(현재 apply_track_gain 은
-      디코딩이 없어 사용하지 않는다 — 미분석 곡 분석은 워커가 analyze_file 에
-      직접 콜백을 넘겨 처리한다). 향후 확장 여지를 위해 받아둔다.
+    seed: 이미 분석된 표시 result dict(analyze_file/read_file_tags 산출).
+      track_db·peak·min_gain·max_gain 이 있으면 apply_track_gain 에 씨앗으로
+      넘겨 디코딩·분석·scan 을 건너뛴다(이중 디코딩 제거). None 이면 종전대로
+      apply_track_gain 이 직접 디코딩·분석한다.
+    should_cancel / on_progress: 적용 단계(scan/apply/change_gain_and_tag)의
+      프레임 순회로 통과한다. 초장시간 곡의 취소·진행률을 위해서다.
 
     반환: apply_track_gain 의 결과 dict(status·db_gain·steps·frames_changed·
           tag_written)를 그대로 돌려준다. GUI 는 status·steps 로 행 상태를
           갱신하고, steps 로 shift_after_apply 를 호출해 재표시한다.
     """
     db_gain_mod = target_db - DEFAULT_TARGET_DB
+
+    seed_db_gain = seed_peak = seed_min_gain = seed_max_gain = None
+    if seed and seed.get("status") == "ok" and seed.get("track_db") is not None:
+        seed_db_gain = seed.get("track_db")
+        seed_peak = seed.get("peak")
+        seed_min_gain = seed.get("min_gain")
+        seed_max_gain = seed.get("max_gain")
+
     return apply_track_gain(path, db_gain_mod=db_gain_mod,
-                            skip_tag=skip_tag, use_id3=use_id3)
+                            skip_tag=skip_tag, use_id3=use_id3,
+                            seed_db_gain=seed_db_gain, seed_peak=seed_peak,
+                            seed_min_gain=seed_min_gain,
+                            seed_max_gain=seed_max_gain,
+                            should_cancel=should_cancel,
+                            on_progress=on_progress)
 
 
 def undo_file_gain(path: str, use_id3: bool = False,

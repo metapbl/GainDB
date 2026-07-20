@@ -255,6 +255,17 @@ class FileTableView(QTableView):
             self.delete_requested.emit()
             event.accept()
             return
+        # Esc: 선택을 비운다(원본에 없는 편의 개선). 빈 선택은 "전체 대상"
+        # 사양(_target_source_rows)이므로, 한 번 클릭해 만든 선택을 Esc 로
+        # 해제하면 개별 선택 ↔ 전체 대상을 오가는 깔끔한 토글이 된다. 게인
+        # 계산·태그·출력 등 원본 재현 대상(결과)은 건드리지 않는 순수 GUI 조작.
+        # 테이블 포커스일 때만 개입하고(다른 위젯의 Esc 기본 동작 보존),
+        # 선택이 이미 비어 있으면 event 를 넘겨 기본 처리에 맡긴다.
+        if event.key() == Qt.Key.Key_Escape:
+            if self.selectionModel() and self.selectionModel().hasSelection():
+                self.clearSelection()
+                event.accept()
+                return
         super().keyPressEvent(event)
 
     def contextMenuEvent(self, event):

@@ -193,26 +193,29 @@ class ApplyWorker(QThread):
     이미 있으면 재분석하지 않는 것과 일치). target_db 가 씨앗과 다르면
     recompute_target 으로 steps 를 목표에 맞춰 다시 계산한다.
 
-    취소·진행률(정책 갱신 — 적용 단계까지 확장):
-      미분석 곡을 내부에서 분석할 때 analyze_file 에 should_cancel·on_progress
-      를 넘긴다(디코딩 진행률). 그에 더해, 실제 적용 단계(scan_gain·apply_gain·
-      change_gain_and_tag 의 프레임 순회)에도 같은 콜백을 넘긴다 — 초장시간
-      곡에서 '분석 100% 이후' 순수 파이썬 순회에 갇혀 취소가 안 먹던 문제를
-      해소한다. 취소 시 DecodeCancelled(분석 중) 또는 GainCancelled(적용 중)를
-      받아 정상 종료한다. 두 예외 모두 그 시점에 파일이 원본 그대로다.
+    취소(정책 갱신 — 적용 단계까지 확장):
+      미분석 곡을 내부에서 분석할 때 analyze_file 에 should_cancel 을 넘긴다
+      (디코딩 청크 경계 취소). 그에 더해, 실제 적용 단계(scan_gain·apply_gain·
+      change_gain_and_tag 의 프레임 순회)에도 should_cancel 을 넘긴다 — 초장
+      시간 곡에서 '분석 100% 이후' 순수 파이썬 순회에 갇혀 취소가 안 먹던 문제
+      를 해소한다. 취소 시 DecodeCancelled(분석 중) 또는 GainCancelled(적용 중)
+      를 받아 정상 종료한다. 두 예외 모두 그 시점에 파일이 원본 그대로다.
 
-    파일 내부 진행률 매핑(한 파일 = 한 번의 0→100%):
-      미분석 곡은 분석·적용 두 단계를 거치므로, 그냥 두면 file_progress 가
-      0→1 을 두 번 그린다(진행바 역행처럼 보임). 그래서 워커가 단계별로 구간을
-      나눠 매핑해 방출한다 — 분석은 0~_ANALYZE_SPLIT, 적용은 _ANALYZE_SPLIT~1.
-      씨앗 재사용 곡은 분석 단계가 없으므로 적용을 0~1 전체로 매핑한다. 이
-      매핑은 '어느 곡이 씨앗 재사용인가'(워커만 아는 정보)에 달렸으므로 워커가
-      담당한다. 메인 창은 매핑된 fraction 을 세분 합산에 쓰기만 한다(무계산).
+    파일 내부 진행률(분석 단계 전담):
+      실측상 적용(scan_gain+apply_gain: 디코딩 없는 순수 프레임 순회)은 1시간
+      곡도 1초 미만으로, 전체 소요의 1% 에도 못 미친다. 반면 분석(ffmpeg PCM
+      디코딩)은 수 분이다. 그래서 진행바는 분석 진행률만 0~1 그대로 표시하고
+      (file_progress), 적용 단계는 진행률을 방출하지 않는다(on_progress 미전달).
+      미분석 곡은 분석이 0~100% 를 온전히 쓰고, 적용은 100% 에서 1초 미만
+      머문 뒤 완료된다 — 가장 정직한 표현이다. 취소만은 적용 단계에도 계속
+      연결되므로(should_cancel), 진행률을 빼도 취소 즉시성은 유지된다.
+      (씨앗 재사용 곡은 분석이 없어 file_progress 를 안 받지만, 전체가 1초
+       미만이라 진행바가 잠깐 0 에 머물다 완료로 넘어갈 뿐이다.)
 
     시그널:
       current(path)             : 각 파일 처리 직전 방출(상태바 "처리 중" 표시).
       progress(done, total)     : 파일 하나 처리가 끝날 때마다 방출.
-      file_progress(fraction)   : 분석+적용을 한 구간으로 합친 파일 내부 진행률.
+      file_progress(fraction)   : 분석 단계의 파일 내부 진행률(0~1).
       row_analyzed(path, result): 분석만 하고 적용 안 함(steps=0). 표시 dict.
       row_applied(path, result) : 적용까지 함. shift_after_apply 반영된 표시 dict.
       failed(path, msg)         : 분석/적용 중 (취소가 아닌) 예외 발생.
@@ -221,16 +224,6 @@ class ApplyWorker(QThread):
     적용은 파일을 실제로 변경한다(파괴적). 취소는 청크(분석)·프레임 순회
     간격(적용) 경계에서 수백 ms 이내 반영된다.
     """
-
-    # 미분석 곡에서 파일 내부 진행률을 분석/적용에 배분하는 분할점.
-    # 실측상 적용(scan_gain+apply_gain: 디코딩 없는 순수 프레임 순회)은 1시간
-    # 곡도 1초 미만, 분석(ffmpeg PCM 디코딩)은 수 분이라 실제 시간 비중이
-    # 분석 99%↑ : 적용 1%↓ 다. 그래서 분석에 0~0.99, 적용에 0.99~1.0 을 준다.
-    # 진행바가 실제 소요에 비례해 99% 까지 꾸준히 오르고 마지막 1%(적용)가
-    # 순식간에 닫힌다 — "99% 에서 잠깐 머물다 완료"라는 자연스러운 흐름.
-    # (씨앗 재사용 곡은 분석이 없어 적용을 0~1 전체로 매핑하지만, 그 자체가
-    #  1초 미만이라 빠르게 차는 게 정직한 표현이다.)
-    _ANALYZE_SPLIT = 0.99
 
     current = Signal(str)
     progress = Signal(int, int)
@@ -257,22 +250,12 @@ class ApplyWorker(QThread):
         """취소 요청이 들어온 채로 종료됐는지. 완료 슬롯의 메시지 분기에 쓴다."""
         return self._cancel
 
-    def _seed_is_reusable(self, path: str) -> bool:
-        """이 곡이 씨앗 재사용(분석 단계 생략) 대상인지.
-
-        _ensure_analysis 의 재사용 조건과 반드시 동일해야 진행률 매핑이 실제
-        실행 단계와 어긋나지 않는다(track_db 보유 = 분석 결과 유효).
-        """
-        seed = self._seed.get(path)
-        return bool(seed and seed.get("status") == "ok"
-                    and seed.get("track_db") is not None)
-
     def _ensure_analysis(self, path: str):
         """이 파일의 분석 result 를 확보한다(없거나 미분석이면 새로 분석).
 
         반환: 목표(target_db)에 맞춰 계산된 표시 result dict.
         예외(DecodeCancelled 포함)는 호출자(run)가 처리한다.
-        분석 진행률은 analyze_progress 콜백(run 이 구간 매핑해 넘김)으로 방출.
+        분석 진행률은 file_progress 로 0~1 그대로 방출한다(진행바 전담 구간).
         """
         seed = self._seed.get(path)
         # 씨앗이 유효한 분석 결과면(track_db 보유) 재분석 없이 재사용한다
@@ -286,12 +269,8 @@ class ApplyWorker(QThread):
         return analyze_file(
             path, self._target_db,
             should_cancel=lambda: self._cancel,
-            on_progress=self._analyze_progress,
+            on_progress=self.file_progress.emit,
         )
-
-    def _analyze_progress(self, fraction: float) -> None:
-        """분석 단계 진행률(0~1)을 0~_ANALYZE_SPLIT 구간으로 매핑해 방출."""
-        self.file_progress.emit(fraction * self._ANALYZE_SPLIT)
 
     def run(self) -> None:
         from gaindb.writer import GainCancelled
@@ -302,19 +281,6 @@ class ApplyWorker(QThread):
             if self._cancel:
                 break
             self.current.emit(path)  # 상태바 "처리 중" 표시용(처리 직전).
-
-            # 이 곡이 씨앗 재사용인지 먼저 판정해 적용 진행률 매핑을 정한다.
-            # 재사용 곡은 분석 단계가 없어 적용을 0~1 전체로, 미분석 곡은
-            # 분석(0~SPLIT) 뒤라 적용을 SPLIT~1 로 매핑한다.
-            reuse = self._seed_is_reusable(path)
-            if reuse:
-                def apply_progress(g, _emit=self.file_progress.emit):
-                    _emit(g)
-            else:
-                def apply_progress(g, _emit=self.file_progress.emit,
-                                   _split=self._ANALYZE_SPLIT):
-                    _emit(_split + g * (1.0 - _split))
-
             try:
                 result = self._ensure_analysis(path)
 
@@ -326,13 +292,14 @@ class ApplyWorker(QThread):
                     continue
 
                 # 확보한 result 를 씨앗으로 넘겨 이중 디코딩을 막는다. 적용 단계
-                # 프레임 순회의 취소·진행률도 콜백으로 연결한다(100% 이후 정지·
-                # 취소 불가 해소). steps 가 0 이어도 항상 호출한다(dirty 태그면
-                # 코어가 태그를 다시 씀 — 원본 -r 동일).
+                # 프레임 순회의 취소를 should_cancel 로 연결한다(100% 이후 정지·
+                # 취소 불가 해소). 진행률은 넘기지 않는다 — 적용은 1초 미만이라
+                # 진행바 전담을 분석에 몰아준다(on_progress 미전달). steps 가 0
+                # 이어도 항상 호출한다(dirty 태그면 코어가 태그를 다시 씀 —
+                # 원본 -r 동일).
                 apply_res = apply_file_track_gain(
                     path, self._target_db, seed=result,
                     should_cancel=lambda: self._cancel,
-                    on_progress=apply_progress,
                 )
                 status = apply_res.get("status")
                 if status == "ok":

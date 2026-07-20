@@ -49,10 +49,22 @@ class FileRow:
         self.error_msg = msg
 
     def clear_result(self) -> None:
+        """표시값·status 를 리셋해 미분석(빈칸) 상태로 되돌린다(파일 미변경).
+
+        우클릭 Clear Analysis 와 태그 제거(Remove Tags) 후 호출된다. 두 경우
+        모두 그 행은 "값 없음(다시 Track Analysis 대상)"이 되지만, 태그 스캔
+        (Rescan) 대상은 아니다 — Clear Analysis 는 파일 태그를 안 지웠고,
+        Remove Tags 는 방금 태그를 지워 읽을 태그가 없기 때문이다. 그래서
+        tag_scanned 는 True 로 유지한다(예전엔 False 로 되돌려, 태그 삭제 후
+        의미 없는 Rescan 이 뜨던 버그가 있었다). Rescan 은 대량 추가 시 태그
+        스캔 Pause→재개 용도로만 남는다.
+        """
         self.result = None
         self.status = "pending"
         self.error_msg = ""
-        self.tag_scanned = False
+        # tag_scanned 는 건드리지 않는다(True 유지). status="pending" 이라
+        # needs_analysis()==True(Track Analysis 대상)이지만, tag_scanned=True
+        # 라 needs_tag_scan()==False(Rescan 대상 아님)이다.
 
     def set_tag_result(self, result: dict) -> None:
         """파일 추가 시 태그 스캔 결과를 반영한다(원본 AddSingleFile 대응).

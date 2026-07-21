@@ -15,6 +15,20 @@ GUI 편의를 위해 apply_file_track_gain 래퍼로 감싼다(목표 dB→offse
 결과를 낸다. 원본 DoFileAction 이 undo/deletetag 를 한 껍데기로 분기한 것과
 같은 성격의 통합 진입점이다.
 
+Album 계층(GUI Album Analysis/Album Gain 배선용):
+  group_by_album         : 경로들을 폴더(또는 전체) 단위 앨범으로 묶는다.
+  analyze_album_file     : 곡 하나를 스트리밍 분석해 그룹 누적용 원재료(히스토
+                           그램·peak·min/max·track_db·sample_rate)를 반환한다.
+  album_gain_from_files  : 곡별 원재료를 모아 앨범 dB·peak·min/max 를 산출한다
+                           (원본 apply_album_gain 누적부와 동일 로직).
+  compute_album_display  : 곡별 result 에 album_* 표시 키를 추가한다.
+  apply_file_album_gain  : 한 곡에 그룹 공통 스텝을 적용하며 track+album 태그를
+                           둘 다 기록한다(원본 앨범 게인 곡별 루프 재현).
+Album 은 그룹 전체를 한 번에 다뤄야 해(히스토그램 누적→단일 dB→전 곡 동일
+스텝) Track 처럼 파일 단위로 못 쪼갠다. 그래서 워커가 그룹의 곡을 하나씩
+analyze_album_file 로 스트리밍 분석해 원재료를 모으고, album_gain_from_files
+로 앨범 dB 를 낸 뒤 apply_file_album_gain 을 곡마다 호출하는 구조다.
+
 원본 MP3GainGUI 의 DispJunk / Mp3Info.cls 표시 로직을 재현하되 두 가지를
 의도적으로 조정한다(근거는 CLAUDE.md 10 진척 로그 참조):
   1) Track Gain 표시 제수는 원본 화면용 근사 1.505 대신 정밀값 5*log10(2) 사용.
@@ -28,28 +42,20 @@ GUI 무계산 원칙:
   GUI 는 계산하지 않는다. 목표 dB 와 경로만 넘기고, 돌려받은 dict 를 표시만
   한다. 89·offset·db_to_steps·clip 판정식은 전부 이 모듈 내부(특히
   _compute_display)에만 존재한다. 표시값을 만드는 진입점(analyze_file,
-  read_file_tags, recompute_target, shift_after_apply)은 모두 _compute_display
-  하나를 공유하며, apply_track_gain 의 steps 도 동일한 offset·db_to_steps 를
-  쓰므로 표시와 적용이 구조적으로 일치한다.
-
-  GUI 가 아는 함수는 일곱:
-    read_file_tags(path, target_db)        # 추가 시 태그만 읽어 표시(가볍다)
-    analyze_file(path, target_db, ...)     # 최초 분석(무겁다: decode+scan)
-    recompute_target(result, target_db)    # 목표 변경 시 즉시 재표시(가볍다)
-    apply_file_track_gain(path, target_db) # 실제 적용(무겁다)
-    shift_after_apply(result, steps)        # 적용/undo 후 재표시(가볍다)
-    undo_file_gain(path, ...)               # 태그 기반 원복(가볍다: 디코딩 없음)
-    remove_file_tags(path, ...)             # mp3gain 태그 제거(가볍다)
+  read_file_tags, recompute_target, shift_after_apply, compute_album_display)은
+  모두 _compute_display 하나를 공유하며, apply_track_gain 의 steps 도 동일한
+  offset·db_to_steps 를 쓰므로 표시와 적용이 구조적으로 일치한다.
 
 취소·진행률(GUI 대응):
-  analyze_file 은 무거운 decode 단계에서 should_cancel(취소 콜백)과
-  on_progress(파일 내부 진행률 콜백, 0~1)를 그대로 decode_pcm 에 넘긴다.
-  취소되면 decode 계층이 DecodeCancelled(=DecodeError 하위)를 던지므로,
-  호출자(워커)는 이를 실패가 아닌 정상 취소로 구분해 처리한다.
+  analyze_file / analyze_album_file 은 무거운 decode 단계에서 should_cancel
+  (취소 콜백)과 on_progress(파일 내부 진행률 콜백, 0~1)를 그대로 decode 계층
+  에 넘긴다. 취소되면 decode 계층이 DecodeCancelled(=DecodeError 하위)를
+  던지므로, 호출자(워커)는 이를 실패가 아닌 정상 취소로 구분해 처리한다.
 """
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Callable
 
@@ -61,6 +67,7 @@ from gaindb.analysis import (
     db_to_steps,
     DB_PER_STEP,
     NOT_ENOUGH_SAMPLES,
+    gain_from_histograms,
 )
 from gaindb.writer import scan_gain
 from gaindb.tag import (
@@ -68,7 +75,7 @@ from gaindb.tag import (
     change_gain_and_tag,
     remove_mp3gain_ape_tag,
 )
-from apply_gain import apply_track_gain
+from apply_gain import apply_track_gain, _apply_one_album_file
 
 
 # 목표 음량 기준: mp3gain 내부 89 dB ReplayGain 레퍼런스.
@@ -257,6 +264,9 @@ def recompute_target(result: dict, target_db: float) -> dict:
     유지한다. 원본 DispJunk 가 target 변경 시 재분석 없이 다시 그리던 동작과
     정합적이다.
 
+    앨범 표시값(album_* 키)도 있으면 함께 재계산한다(원본 DispJunk 가 target
+    변경 시 Album Volume/Gain/clip 도 같이 다시 그림).
+
     result: analyze_file/read_file_tags(또는 이전 recompute/shift)가 돌려준 dict.
     target_db: 새 목표 음량.
 
@@ -277,6 +287,16 @@ def recompute_target(result: dict, target_db: float) -> dict:
     updated["steps"] = disp["steps"]
     updated["track_gain_db"] = disp["track_gain_db"]
     updated["clip_state"] = disp["clip_state"]
+
+    # 앨범 표시값이 있으면 같은 target 기준으로 다시 그린다.
+    if result.get("album_db") is not None:
+        adisp = _compute_display(result["album_db"],
+                                 None if cma is None else float(cma),
+                                 target_db)
+        updated["album_volume"] = adisp["volume"]
+        updated["album_steps"] = adisp["steps"]
+        updated["album_gain_db"] = adisp["track_gain_db"]
+        updated["album_clip_state"] = adisp["clip_state"]
     return updated
 
 
@@ -295,6 +315,10 @@ def shift_after_apply(result: dict, applied_steps: int) -> dict:
          갱신한다. 이걸 빠뜨리면 목표를 올렸다 내렸다 할 때 curr_max_amp 가
          이전 목표의 값으로 남아 clip 표시가 실제 파일과 어긋난다(원본은 매
          적용마다 정확히 갱신함).
+
+    앨범 표시값(album_* 키)도 있으면 같은 방식으로 이동한다 — 앨범 게인은 전
+    곡에 같은 스텝을 적용하므로, 곡별 표시도 applied_steps 만큼 이동해야 한다.
+    album_db 를 함께 낮추고 갱신된 curr_max_amp 로 album 표시를 다시 그린다.
 
     result: 적용 직전의 dict(target_db·track_db·curr_max_amp 포함).
     applied_steps: 방금 적용된 정수 스텝(undo 면 되돌린 스텝, 부호 그대로).
@@ -323,6 +347,16 @@ def shift_after_apply(result: dict, applied_steps: int) -> dict:
     updated["steps"] = disp["steps"]
     updated["track_gain_db"] = disp["track_gain_db"]
     updated["clip_state"] = disp["clip_state"]
+
+    # 앨범 표시값이 있으면 album_db 도 같은 스텝만큼 이동해 다시 그린다.
+    if result.get("album_db") is not None:
+        new_album_db = result["album_db"] - applied_steps * DB_PER_STEP
+        updated["album_db"] = new_album_db
+        adisp = _compute_display(new_album_db, new_cma, target_db)
+        updated["album_volume"] = adisp["volume"]
+        updated["album_steps"] = adisp["steps"]
+        updated["album_gain_db"] = adisp["track_gain_db"]
+        updated["album_clip_state"] = adisp["clip_state"]
     return updated
 
 
@@ -410,10 +444,9 @@ def remove_file_tags(path: str, use_id3: bool = False,
                      save_timestamp: bool = False) -> dict:
     """파일의 mp3gain 태그를 제거한다(파괴적, 가볍다: 디코딩 없음).
 
-    원본 mp3gain -s d / MP3GainGUI DeleteFileTags 대응. APE mp3gain/ReplayGain
-    필드를 제거하고(다른 APE 필드·꼬리는 보존), use_id3 이면 ID3v2 mp3gain
-    프레임도 제거한다(CLI _run_delete_tag 와 동일 경로). 원래 mp3gain 태그가
-    없던 파일은 건드리지 않는다(remove_mp3gain_ape_tag 의 dirty 판정).
+    원본 mp3gain -s d / MP3GainGUI DeleteFileTags 대응. APE(+use_id3 면 ID3v2)
+    mp3gain/ReplayGain 필드를 제거하고(다른 APE 필드·꼬리는 보존). 원래 mp3gain
+    태그가 없던 파일은 건드리지 않는다(remove_mp3gain_ape_tag 의 dirty 판정).
 
     반환 dict: {"status": "ok"}. GUI 는 이후 해당 행 result 를 비워(clear_result)
     미분석 상태로 되돌린다 — 태그를 지웠으므로 표시값도 사라지는 게 실제 파일
@@ -424,3 +457,220 @@ def remove_file_tags(path: str, use_id3: bool = False,
         from gaindb.id3 import remove_mp3gain_id3_tag
         remove_mp3gain_id3_tag(path, save_timestamp)
     return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# Album 계층 (GUI Album Analysis / Album Gain 배선용)
+# ---------------------------------------------------------------------------
+
+# 그룹 전체를 한 앨범으로 묶을 때 쓰는 그룹 키(폴더=앨범이 아닐 때).
+_ALL_ALBUM_KEY = "<all>"
+
+
+def group_by_album(paths, each_folder_is_album: bool = True) -> dict:
+    """경로들을 앨범 그룹으로 묶어 {album_key: [paths]} 를 반환한다(순수 함수).
+
+    원본 mnuEachAlbum(Each folder is album) 토글 재현:
+      each_folder_is_album=True  : 파일이 든 폴더(os.path.dirname)별로 묶는다.
+      each_folder_is_album=False : 전체를 단일 그룹(_ALL_ALBUM_KEY)으로 묶는다.
+
+    입력 순서를 그룹 안에서 보존한다(dict 삽입 순서). 앨범 dB 는 그룹 내 곡
+    순서와 무관(히스토그램 합)하지만, 표시·진행 순서를 위해 순서를 유지한다.
+    """
+    groups: dict[str, list[str]] = {}
+    for p in paths:
+        if each_folder_is_album:
+            key = os.path.dirname(os.path.abspath(p))
+        else:
+            key = _ALL_ALBUM_KEY
+        groups.setdefault(key, []).append(p)
+    return groups
+
+
+def analyze_album_file(
+    path: str,
+    should_cancel: Callable[[], bool] | None = None,
+    on_progress: Callable[[float], None] | None = None,
+) -> dict:
+    """곡 하나를 스트리밍 분석해 앨범 그룹 누적용 원재료를 반환한다(비파괴).
+
+    analyze_file 과 같은 스트리밍 경로(TrackAnalyzer + decode_pcm_streaming)를
+    쓰되, 앨범 dB 산출에 필요한 히스토그램을 보존한다(analyze_file 은 히스토
+    그램을 버리고 track_db 만 남긴다). 곡별 track_peak·min/max 도 함께 모은다.
+
+    should_cancel/on_progress: analyze_file 과 동일하게 decode 계층으로 통과.
+    취소 시 decode 계층이 DecodeCancelled 를 던진다(호출자가 정상 취소로 처리).
+
+    반환 dict:
+      status      : "ok" | "not_enough_samples"
+      path        : 곡 경로.
+      track_db    : 89dB 기준 곡 raw dB(not_enough 면 NOT_ENOUGH_SAMPLES).
+      peak        : 정규화 track peak.
+      min_gain,max_gain : scan_gain 결과(프레임 global_gain min/max).
+      histogram   : 곡의 0.01dB 라우드니스 히스토그램(np.ndarray). 그룹 누적용.
+      sample_rate : 곡 샘플레이트(참고용).
+
+    주의: 여기서 track_db 가 not_enough 여도(단곡 판정) 히스토그램은 유효할 수
+    있어 그대로 반환한다 — 앨범 판정은 그룹 누적 히스토그램으로 하기 때문
+    (원본 album 도 곡별 not_enough 를 따지지 않고 누적 후 한 번만 판정).
+    """
+    sample_rate, _channels, _duration = _probe_stream_info(Path(path))
+    analyzer = TrackAnalyzer(sample_rate)
+
+    decode_pcm_streaming(
+        path, on_chunk=analyzer.feed,
+        should_cancel=should_cancel, on_progress=on_progress)
+
+    track_db = analyzer.result()  # 단곡 판정(그룹 판정과는 별개)
+    peak = analyzer.peak_normalized()
+    histogram = analyzer.histogram()
+    min_gain, max_gain = scan_gain(path)
+
+    return {
+        "status": "ok",
+        "path": path,
+        "track_db": track_db,  # NOT_ENOUGH_SAMPLES 일 수 있음(그대로 보존)
+        "peak": peak,
+        "min_gain": min_gain,
+        "max_gain": max_gain,
+        "histogram": histogram,
+        "sample_rate": sample_rate,
+    }
+
+
+def album_gain_from_files(per_file_results: list[dict]) -> dict:
+    """곡별 원재료(analyze_album_file 결과)를 모아 앨범 집계를 산출한다.
+
+    원본 apply_album_gain 의 누적부와 동일 로직:
+      album_db   = gain_from_histograms(곡별 histogram 합).
+      album_peak = 곡별 peak 의 max(정규화).
+      album_min/max = 곡별 min/max 의 min/max(global_gain 0~255).
+
+    per_file_results: analyze_album_file 이 돌려준 dict 들의 리스트(한 앨범).
+
+    반환 dict:
+      status    : "ok" | "not_enough_samples"
+      album_db  : 앨범 89dB 기준 raw dB(not_enough 면 None).
+      album_peak, album_min, album_max : 앨범 집계값(not_enough 면 그대로 둠).
+    """
+    histograms = [r["histogram"] for r in per_file_results]
+    album_db = gain_from_histograms(histograms)
+
+    if album_db is NOT_ENOUGH_SAMPLES:
+        return {
+            "status": "not_enough_samples",
+            "album_db": None, "album_peak": None,
+            "album_min": None, "album_max": None,
+        }
+
+    album_peak = 0.0
+    album_max = 0
+    album_min = 255
+    for r in per_file_results:
+        if r["peak"] > album_peak:
+            album_peak = r["peak"]
+        if r["max_gain"] is not None and r["max_gain"] > album_max:
+            album_max = r["max_gain"]
+        if r["min_gain"] is not None and r["min_gain"] < album_min:
+            album_min = r["min_gain"]
+
+    return {
+        "status": "ok",
+        "album_db": album_db,
+        "album_peak": album_peak,
+        "album_min": album_min,
+        "album_max": album_max,
+    }
+
+
+def compute_album_display(result: dict, album_db: float,
+                          target_db: float = DEFAULT_TARGET_DB) -> dict:
+    """곡별 표시 result 에 앨범 표시값(album_* 키)을 추가한다(재분석 없음).
+
+    원본 DispJunk 가 AlbumdBGain 이 있을 때 Album Volume/Album Gain/clip(Album)
+    을 Track 과 같은 수식(입력만 앨범 dB)으로 계산하던 동작을 재현한다. Track
+    표시 키는 그대로 두고(원본도 한 행에 Track/Album 을 나란히 표시), 앨범 키만
+    보탠다. clip 판정에 쓰는 curr_max_amp 는 곡별 값을 그대로 쓴다(원본 동일:
+    앨범 dB 는 그룹 공통이지만 clip·peak 는 곡별).
+
+    result: analyze_album_file 로 얻은 track 원재료가 아니라, 표시용 track result
+      (compute_track_display 상당)여야 한다 — 앨범 워커는 곡별로 track 표시
+      result 를 먼저 만든 뒤(analyze_file 과 같은 키) 이 함수로 album 키를 얹는다.
+    album_db: 그룹 앨범 raw dB(89dB 기준).
+    target_db: 목표 음량.
+
+    반환: album_* 키가 추가된 새 dict(원본 dict 는 변경하지 않음).
+    """
+    updated = dict(result)
+    updated["album_db"] = album_db
+
+    cma = result.get("curr_max_amp")
+    disp = _compute_display(album_db,
+                            None if cma is None else float(cma),
+                            target_db)
+    updated["album_volume"] = disp["volume"]
+    updated["album_steps"] = disp["steps"]
+    updated["album_gain_db"] = disp["track_gain_db"]
+    updated["album_clip_state"] = disp["clip_state"]
+    return updated
+
+
+def apply_file_album_gain(
+    path: str,
+    album_db: float,
+    album_peak: float,
+    album_min: int,
+    album_max: int,
+    track_seed: dict,
+    target_db: float = DEFAULT_TARGET_DB,
+    skip_tag: bool = False,
+    use_id3: bool = False,
+    should_cancel: Callable[[], bool] | None = None,
+    on_progress: Callable[[float], None] | None = None,
+) -> dict:
+    """한 곡에 앨범 게인을 적용한다(파괴적). track+album 태그를 둘 다 기록한다.
+
+    원본 앨범 게인 곡별 루프 재현: 그룹 공통 스텝(db_to_steps(album_db + mod))
+    을 이 곡에 적용하면서, 태그에 track 값(씨앗의 곡별 track_db·peak·min/max)과
+    album 값(그룹 album_db·album_peak·album_min/max)을 둘 다 채운다. 실제 적용
+    본체는 apply_gain._apply_one_album_file 을 그대로 호출해 CLI album 경로와
+    태그 결과가 정확히 일치한다.
+
+    씨앗 재사용(이중 디코딩 제거): track_seed 로 곡을 재디코딩하지 않는다.
+    track_seed 는 analyze_album_file(또는 analyze_file/read_file_tags)이 준 dict
+    로, track_db·peak·min_gain·max_gain 을 담는다. GUI 워커가 Album Analysis 로
+    이미 확보했으므로 적용 시 다시 디코딩할 필요가 없다.
+
+    album_db: 그룹 앨범 raw dB. album_peak/min/max: 그룹 집계값.
+    target_db: 목표 음량(offset = target_db - 89).
+    skip_tag/use_id3/should_cancel/on_progress: 하위 본체로 통과.
+
+    반환 dict:
+      status        : "ok" | "no_change"
+      steps         : 적용한 그룹 공통 정수 스텝.
+      album_db      : 앨범 raw dB(그대로 반환, 호출자 표시 이동용).
+      frames_changed: _apply_one_album_file 결과(변경 프레임 수 또는 None).
+      tag_written   : 태그 기록 여부.
+    """
+    db_gain_mod = target_db - DEFAULT_TARGET_DB
+    steps = db_to_steps(album_db + db_gain_mod)
+
+    track_db = track_seed.get("track_db")
+    peak = track_seed.get("peak")
+    min_gain = track_seed.get("min_gain")
+    max_gain = track_seed.get("max_gain")
+
+    res = _apply_album_file_core(
+        path, steps, album_db, album_db, track_db, peak, min_gain, max_gain,
+        album_peak, album_min, album_max,
+        wrap=False, skip_tag=skip_tag, use_id3=use_id3,
+        should_cancel=should_cancel, on_progress=on_progress,
+    )
+
+    return {
+        "status": "no_change" if steps == 0 else "ok",
+        "steps": steps,
+        "album_db": album_db,
+        "frames_changed": res.get("frames_changed"),
+        "tag_written": res.get("tag_written", False),
+    }

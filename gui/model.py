@@ -20,11 +20,8 @@ class FileRow:
     """One entry in the file list.
 
     `result` holds the full dict returned by api.analyze_file / read_file_tags
-    (or None until scanned). GUI-only bookkeeping lives in the other fields.
-
-    `tag_scanned` marks whether a tag scan has been attempted for this row
-    (원본 AddSingleFile 의 태그 조회 시도 여부). "태그가 없어서 값이 없는 행"과
-    "아직 태그를 안 읽은 행"을 구분해 Rescan 대상(미시도 행)을 정확히 좁힌다.
+    / compute_album_display (or None until scanned). Album 표시값(album_* 키)은
+    Album Analysis 후에만 채워진다(그 전엔 Album 컬럼이 빈칸).
     """
 
     path: str
@@ -37,7 +34,7 @@ class FileRow:
         self.result = result
         self.status = "analyzed"
         self.error_msg = ""
-        self.tag_scanned = True  # 분석까지 됐으면 태그 스캔도 불필요.
+        self.tag_scanned = True
 
     def mark_applied(self, result: dict) -> None:
         self.result = result
@@ -51,52 +48,40 @@ class FileRow:
     def clear_result(self) -> None:
         """표시값·status 를 리셋해 미분석(빈칸) 상태로 되돌린다(파일 미변경).
 
-        우클릭 Clear Analysis 와 태그 제거(Remove Tags) 후 호출된다. 두 경우
-        모두 그 행은 "값 없음(다시 Track Analysis 대상)"이 되지만, 태그 스캔
-        (Rescan) 대상은 아니다 — Clear Analysis 는 파일 태그를 안 지웠고,
-        Remove Tags 는 방금 태그를 지워 읽을 태그가 없기 때문이다. 그래서
-        tag_scanned 는 True 로 유지한다(예전엔 False 로 되돌려, 태그 삭제 후
-        의미 없는 Rescan 이 뜨던 버그가 있었다). Rescan 은 대량 추가 시 태그
-        스캔 Pause→재개 용도로만 남는다.
+        우클릭 Clear Analysis 와 태그 제거(Remove Tags) 후 호출된다. tag_scanned
+        는 True 로 유지한다(Rescan 은 대량 추가 태그 스캔 Pause→재개 전용).
         """
         self.result = None
         self.status = "pending"
         self.error_msg = ""
-        # tag_scanned 는 건드리지 않는다(True 유지). status="pending" 이라
-        # needs_analysis()==True(Track Analysis 대상)이지만, tag_scanned=True
-        # 라 needs_tag_scan()==False(Rescan 대상 아님)이다.
 
     def set_tag_result(self, result: dict) -> None:
-        """파일 추가 시 태그 스캔 결과를 반영한다(원본 AddSingleFile 대응).
-
-        태그에서 값을 읽었으면(status="ok") 분석 불필요 상태로, 태그가 없으면
-        (status="no_tag") 분석 필요 상태로 둔다. 어느 쪽이든 result 는 보관해
-        표시(빈칸 또는 값)에 쓴다. 태그 스캔은 시도됐으므로 tag_scanned 를
-        세워 Rescan 대상(미시도 행)에서 제외한다 — 태그 없는 행이 영원히
-        Rescan 대상으로 남던 문제를 막는다.
-        """
+        """파일 추가 시 태그 스캔 결과를 반영한다(원본 AddSingleFile 대응)."""
         self.result = result
         self.error_msg = ""
         self.status = "analyzed" if result.get("status") == "ok" else "pending"
         self.tag_scanned = True
 
     def needs_tag_scan(self) -> bool:
-        """태그 스캔(또는 Rescan) 대상인지. 아직 태그 스캔을 시도하지 않은 행.
-
-        태그가 없어서 값이 없는 행(tag_scanned=True, status="pending")과
-        아직 태그를 안 읽은 행(tag_scanned=False)을 구분한다. 전자는 대상이
-        아니고 후자만 대상이다.
-        """
+        """태그 스캔(또는 Rescan) 대상인지. 아직 태그 스캔을 시도하지 않은 행."""
         return not self.tag_scanned
 
     def needs_analysis(self) -> bool:
-        """Track Analysis 대상인지(값이 아직 없는지). 원본 RadiodBGain=NOREALNUM.
-
-        이미 분석/적용됐거나 태그에서 값을 읽었으면(status="analyzed"/"applied")
-        대상이 아니다. 그 외(pending/no_tag/error)는 분석이 필요하다. 태그 스캔
-        시도 여부와는 무관하다(태그가 없던 행도 분석하면 값이 나오므로 대상).
-        """
+        """Track Analysis 대상인지(값이 아직 없는지). 원본 RadiodBGain=NOREALNUM."""
         return self.status not in ("analyzed", "applied")
+
+    def needs_album_analysis(self) -> bool:
+        """Album Analysis 대상인지(앨범 표시값 album_* 이 아직 없는지).
+
+        원본 AlbumdBGain=NOREALNUM 대응. result 가 있고 status 가 ok 여도
+        album_db 가 없으면 앨범 분석이 필요하다(Track 분석만 된 상태). 태그에서
+        album_gain 을 읽은 경우는 read_file_tags 확장 시 album_db 가 채워진다
+        (그 배선은 4단계 GUI 에서). 지금은 album_db 유무로만 판정한다.
+        """
+        r = self.result
+        if not r or r.get("status") != "ok":
+            return True
+        return r.get("album_db") is None
 
 
 def _fmt_db(value: Optional[float]) -> str:
@@ -126,12 +111,7 @@ class FileTableModel(QAbstractTableModel):
         super().__init__(parent)
         self._rows: list[FileRow] = []
         self._seen: set[str] = set()
-        # path -> row index. 워커 시그널의 path→행 역참조를 O(1) 로 만든다.
-        # 예전 find_row_by_path 는 리스트를 선형 탐색해, 대량 스캔 시 슬롯이
-        # 파일마다 O(N) 을 돌아 전체가 O(N^2) 였다(수천 곡에서 후반 UI 지연의
-        # 주범). 추가는 append-only 라 O(1) 로 등록하고, 삭제 시에만 뒤 인덱스가
-        # 밀리므로 이 맵을 재빌드한다(삭제 자체가 이미 리스트 del 로 O(N) 이라
-        # 차수는 그대로, 삭제는 드물어 실질 이득이 크다).
+        # path -> row index. 워커 시그널의 path->행 역참조를 O(1) 로.
         self._index: dict[str, int] = {}
 
     # ---- Qt required overrides -------------------------------------------
@@ -161,8 +141,12 @@ class FileTableModel(QAbstractTableModel):
             return self._sort_value(row, col.index)
 
         if role == Qt.ItemDataRole.ForegroundRole:
-            if col.index == Col.CLIP and row.result:
-                return _CLIP_COLORS.get(row.result.get("clip_state"))
+            # Track clip 은 clip_state, Album clip 은 album_clip_state 로 색칠.
+            if row.result:
+                if col.index == Col.CLIP:
+                    return _CLIP_COLORS.get(row.result.get("clip_state"))
+                if col.index == Col.ALBUM_CLIP:
+                    return _CLIP_COLORS.get(row.result.get("album_clip_state"))
             return None
 
         if role == Qt.ItemDataRole.TextAlignmentRole:
@@ -192,6 +176,12 @@ class FileTableModel(QAbstractTableModel):
             return _fmt_db(r.get("track_gain_db"))
         if key == Col.CLIP:
             return _CLIP_TEXT.get(r.get("clip_state"), "")
+        if key == Col.ALBUM_VOLUME:
+            return _fmt_db(r.get("album_volume"))
+        if key == Col.ALBUM_GAIN:
+            return _fmt_db(r.get("album_gain_db"))
+        if key == Col.ALBUM_CLIP:
+            return _CLIP_TEXT.get(r.get("album_clip_state"), "")
         if key == Col.MAX_AMP:
             return _fmt_int(r.get("curr_max_amp"))
         return ""
@@ -210,19 +200,19 @@ class FileTableModel(QAbstractTableModel):
             return r.get("track_gain_db")
         if key == Col.CLIP:
             return r.get("clip_state", "")
+        if key == Col.ALBUM_VOLUME:
+            return r.get("album_volume")
+        if key == Col.ALBUM_GAIN:
+            return r.get("album_gain_db")
+        if key == Col.ALBUM_CLIP:
+            return r.get("album_clip_state", "")
         if key == Col.MAX_AMP:
             return r.get("curr_max_amp")
         return None
 
     # ---- row management --------------------------------------------------
     def add_paths(self, paths: list[str]) -> list[int]:
-        """새 경로를 행으로 추가하고, 추가된 행들의 모델 인덱스 목록을 반환한다.
-
-        반환값(추가된 행 인덱스)은 호출자가 곧바로 태그 스캔 결과를 채우는 데
-        쓴다(원본 AddSingleFile 이 추가 직후 DispJunk 하던 동작 대응). 추가는
-        append-only 라 _index 에 O(1) 로 등록한다(뒤 인덱스가 밀리지 않으므로
-        재빌드 불필요).
-        """
+        """새 경로를 행으로 추가하고, 추가된 행들의 모델 인덱스 목록을 반환한다."""
         new = [p for p in paths if p not in self._seen]
         if not new:
             return []
@@ -244,8 +234,6 @@ class FileTableModel(QAbstractTableModel):
                 del self._rows[r]
                 self.endRemoveRows()
                 removed = True
-        # 삭제로 뒤 행 인덱스가 밀렸으므로 path->index 맵을 다시 세운다.
-        # 삭제는 이미 리스트 del 로 O(N) 이라 재빌드를 얹어도 차수는 그대로다.
         if removed:
             self._rebuild_index()
 
@@ -274,13 +262,7 @@ class FileTableModel(QAbstractTableModel):
         return None
 
     def find_row_by_path(self, path: str) -> Optional[int]:
-        """경로로 모델 행 인덱스를 찾는다(워커 시그널의 path→행 역참조용).
-
-        정렬 프록시·삭제로 뷰 인덱스가 흔들려도 path 는 안정적이므로,
-        워커는 path 로 결과를 돌려주고 여기서 원본 모델 행을 되찾는다.
-        _index(path->row) 로 O(1) 조회한다(예전엔 선형 탐색 O(N)). 없으면
-        None(그 사이 삭제된 경우).
-        """
+        """경로로 모델 행 인덱스를 찾는다(워커 시그널의 path->행 역참조용, O(1))."""
         return self._index.get(path)
 
     def row_count(self) -> int:

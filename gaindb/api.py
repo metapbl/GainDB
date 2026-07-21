@@ -446,3 +446,47 @@ def apply_file_album_gain(
         "frames_changed": res.get("frames_changed"),
         "tag_written": res.get("tag_written", False),
     }
+
+
+def result_from_album_raw(raw: dict, target_db: float = DEFAULT_TARGET_DB) -> dict:
+    """analyze_album_file 원재료(dict)를 track 표시 result 로 변환한다(재분석 없음).
+
+    analyze_album_file 은 그룹 누적용 원재료(track_db·peak·min/max·histogram)를
+    준다. 앨범 워커는 그룹 dB 를 얻은 뒤, 각 곡의 이 원재료로 track 표시
+    result(analyze_file 과 같은 키 구조)를 만들고 compute_album_display 로 album
+    키를 얹는다. 이 함수는 그 앞 단계 — 원재료 → track 표시 result 변환이다.
+    재분석·재디코딩 없이 _compute_display 만 부르므로 가볍다.
+
+    raw 의 track_db 가 NOT_ENOUGH_SAMPLES 면(단곡 판정 실패) track 표시값을
+    만들 수 없으므로 status="not_enough_samples" 로 돌려준다. 이 경우에도 앨범
+    표시는 그룹 dB 로 별도로 얹을 수 있으나(원본은 track 실패해도 album 진행),
+    MVP 에서는 track 표시가 없는 곡은 그대로 둔다(합의된 단순화).
+
+    반환: analyze_file 과 동일 키 구조의 track 표시 result dict.
+    """
+    track_db = raw.get("track_db")
+    if track_db is None or track_db is NOT_ENOUGH_SAMPLES:
+        return {
+            "status": "not_enough_samples", "target_db": target_db,
+            "track_db": None, "volume": None, "steps": None,
+            "track_gain_db": None, "peak": None, "curr_max_amp": None,
+            "min_gain": None, "max_gain": None, "clip_state": "none",
+        }
+
+    peak = raw.get("peak")
+    curr_max_amp = None if peak is None else peak * 32768.0
+    disp = _compute_display(track_db, curr_max_amp, target_db)
+
+    return {
+        "status": "ok",
+        "target_db": target_db,
+        "track_db": track_db,
+        "volume": disp["volume"],
+        "steps": disp["steps"],
+        "track_gain_db": disp["track_gain_db"],
+        "peak": peak,
+        "curr_max_amp": None if curr_max_amp is None else round(curr_max_amp),
+        "min_gain": raw.get("min_gain"),
+        "max_gain": raw.get("max_gain"),
+        "clip_state": disp["clip_state"],
+    }

@@ -1240,7 +1240,8 @@ class MainWindow(QMainWindow):
             self._batch_status("Applying", done))
 
     def _on_apply_analyzed(self, path: str, result: dict):
-        """스텝이 0이라 적용하지 않고 분석 결과만 반영."""
+        """워커가 no_change 로 넘긴 행(코어가 이미 최신 태그로 판단해 파일을
+        기록하지 않음). 파일 변경 없이 분석 결과 표시만 반영한다."""
         self._analyzed_count += 1
         r = self.model.find_row_by_path(path)
         if r is None:

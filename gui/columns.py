@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Callable
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QT_TRANSLATE_NOOP
 
 
 class Col(IntEnum):
@@ -71,21 +71,21 @@ _CENTER = Qt.AlignmentFlag.AlignCenter
 
 
 COLUMNS: tuple[ColumnDef, ...] = (
-    ColumnDef(Col.NAME, "Path\\File", _LEFT, 480,
+    ColumnDef(Col.NAME, QT_TRANSLATE_NOOP("FileTableModel", "Path\\File"), _LEFT, 480,
               lambda row: str(getattr(row, "path", "")).lower()),
-    ColumnDef(Col.VOLUME, "Volume", _RIGHT, 80,
+    ColumnDef(Col.VOLUME, QT_TRANSLATE_NOOP("FileTableModel", "Volume"), _RIGHT, 80,
               lambda row: _num_or_min(None)),
-    ColumnDef(Col.TRACK_GAIN, "Track Gain", _RIGHT, 90,
+    ColumnDef(Col.TRACK_GAIN, QT_TRANSLATE_NOOP("FileTableModel", "Track Gain"), _RIGHT, 90,
               lambda row: _num_or_min(None)),
-    ColumnDef(Col.CLIP, "clipping", _CENTER, 70,
+    ColumnDef(Col.CLIP, QT_TRANSLATE_NOOP("FileTableModel", "clipping"), _CENTER, 70,
               lambda row: ""),
-    ColumnDef(Col.ALBUM_VOLUME, "Album Volume", _RIGHT, 100,
+    ColumnDef(Col.ALBUM_VOLUME, QT_TRANSLATE_NOOP("FileTableModel", "Album Volume"), _RIGHT, 100,
               lambda row: _num_or_min(None)),
-    ColumnDef(Col.ALBUM_GAIN, "Album Gain", _RIGHT, 90,
+    ColumnDef(Col.ALBUM_GAIN, QT_TRANSLATE_NOOP("FileTableModel", "Album Gain"), _RIGHT, 90,
               lambda row: _num_or_min(None)),
-    ColumnDef(Col.ALBUM_CLIP, "clip(Album)", _CENTER, 80,
+    ColumnDef(Col.ALBUM_CLIP, QT_TRANSLATE_NOOP("FileTableModel", "clip(Album)"), _CENTER, 80,
               lambda row: ""),
-    ColumnDef(Col.MAX_AMP, "Curr Max Amp", _RIGHT, 110,
+    ColumnDef(Col.MAX_AMP, QT_TRANSLATE_NOOP("FileTableModel", "Curr Max Amp"), _RIGHT, 110,
               lambda row: _num_or_min(None)),
 )
 

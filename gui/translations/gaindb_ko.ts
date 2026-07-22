@@ -2,6 +2,49 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="ko_KR">
 <context>
+    <name>FileTableModel</name>
+    <message>
+        <location filename="../columns.py" line="74"/>
+        <source>Path\File</source>
+        <translation>경로\파일</translation>
+    </message>
+    <message>
+        <location filename="../columns.py" line="76"/>
+        <source>Volume</source>
+        <translation>볼륨</translation>
+    </message>
+    <message>
+        <location filename="../columns.py" line="78"/>
+        <source>Track Gain</source>
+        <translation>트랙 게인</translation>
+    </message>
+    <message>
+        <location filename="../columns.py" line="80"/>
+        <source>clipping</source>
+        <translation>클리핑</translation>
+    </message>
+    <message>
+        <location filename="../columns.py" line="82"/>
+        <source>Album Volume</source>
+        <translation>앨범 볼륨</translation>
+    </message>
+    <message>
+        <location filename="../columns.py" line="84"/>
+        <source>Album Gain</source>
+        <translation>앨범 게인</translation>
+    </message>
+    <message>
+        <location filename="../columns.py" line="86"/>
+        <source>clip(Album)</source>
+        <translation>클립(앨범)</translation>
+    </message>
+    <message>
+        <location filename="../columns.py" line="88"/>
+        <source>Curr Max Amp</source>
+        <translation>현재 최대 진폭</translation>
+    </message>
+</context>
+<context>
     <name>MainWindow</name>
     <message>
         <location filename="../main_window.py" line="493"/>

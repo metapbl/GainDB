@@ -125,7 +125,10 @@ class FileTableModel(QAbstractTableModel):
         if role != Qt.ItemDataRole.DisplayRole:
             return None
         if orientation == Qt.Orientation.Horizontal:
-            return COLUMNS[section].header
+            # 헤더 원문은 columns.py 에 영문 상수로 두고, 표시 시점에 tr() 로
+            # 번역한다(원문=상수, 번역=표시 시점). 언어 전환 시 main_window 가
+            # headerDataChanged 를 방출하면 뷰가 이 함수를 다시 불러 갱신된다.
+            return self.tr(COLUMNS[section].header)
         return None
 
     def data(self, index: QModelIndex, role=Qt.ItemDataRole.DisplayRole) -> Any:

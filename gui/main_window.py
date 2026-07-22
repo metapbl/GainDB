@@ -12,6 +12,15 @@ gui/dialogs/logs_dialog.py). 각 워커 완료 슬롯에서 이미 보유한 결
 포맷해 파일에 append 한다(원본은 subprocess stdout 파싱, 우리는 코어 직접 결과라
 더 단순). 로그 실패는 _safe_log 가 잡아 상태바로만 안내하고 본작업을 막지 않는다.
 
+트레이(원본 frmSysTray + frmMain mnuSysTray 재현): Options → "Minimize to tray"
+체크 시, 창을 최소화하면 창을 숨기고 시스템 트레이 아이콘을 띄운다(changeEvent
+로 WindowMinimized 감지 — 원본 Form_Resize 대응). 트레이 아이콘 좌클릭/더블클릭
+은 창 복원, 우클릭은 팝업(Restore/Exit)이다(원본 frmSysTray.Form_MouseMove +
+mPopupSys). X(닫기)는 원본대로 실제 종료다(트레이로 보내지 않음). macOS 는
+창을 Dock 으로 최소화하는 OS 관례가 있어 "자동 최소화→트레이"만 비활성하고
+트레이 아이콘·메뉴 자체는 동작한다(플랫폼 가드). 옵션 상태는 QSettings 에
+tray/minimize_to_tray 로 영속화한다(로그 설정과 같은 매체).
+
 메뉴바 + 툴바 공존(원본 frmMain 도 메뉴+툴바 병존). Track 액션의 QAction 을
 메뉴에도 재사용해 단축키·enabled 관리를 한 곳으로 통일한다. Album 은 신규
 QAction(Album Analysis=Ctrl+U / Album Gain=Ctrl+B / Each folder is album 체크).
@@ -56,7 +65,8 @@ Path\File 컬럼은 PathElideDelegate 로 그린다: 경로를 먼저 접고(C:\
 시작 시 복원한다. 원본 frmMain 의 Form_Load/Form_Unload(GetSetting/SaveSetting
 으로 Column01..·FormWidth/Height·WindowState 저장)을 관찰해 독립 구현한 것으로,
 저장 매체(QSettings)·키 문자열은 원본과 무관하고 "재기동 시 폭·창 크기·정렬
-복원" 동작만 재현한다. 로그 설정(logs/*)도 같은 QSettings 에 함께 영속화한다.
+복원" 동작만 재현한다. 로그 설정(logs/*)·트레이 설정(tray/*)도 같은 QSettings
+에 함께 영속화한다.
 컬럼 폭은 원본 ListView 처럼 전 컬럼 Interactive(사용자 드래그로 개별 조절,
 창 밖으로 넘치면 가로 스크롤 — 창 크기와 독립)로 두고, "Reset Column Widths"
 (원본 mnuResetColumns)는 columns.py 의 default_width 로 되돌린다. 정렬 상태
@@ -83,12 +93,13 @@ import sys
 
 from PySide6.QtCore import (
     Qt, QSortFilterProxyModel, QCollator, QModelIndex, Signal, QRect, QPoint,
-    QSettings, QByteArray,
+    QSettings, QByteArray, QEvent,
 )
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox,
     QTableView, QToolBar, QProgressBar, QPushButton, QFileDialog,
     QAbstractItemView, QHeaderView, QRubberBand, QStyledItemDelegate, QMenu,
+    QSystemTrayIcon, QStyle,
 )
 
 from PySide6.QtGui import QAction, QKeySequence
@@ -104,6 +115,7 @@ from gui.logging import (
     log_error, log_analysis_track, log_analysis_album, log_change,
 )
 from gui.dialogs.logs_dialog import LogsDialog
+from gui.resources import app_icon
 from gaindb.api import (
     DEFAULT_TARGET_DB, recompute_target, shift_after_apply, group_by_album,
 )
@@ -409,6 +421,11 @@ class MainWindow(QMainWindow):
         self._settings = QSettings(_SETTINGS_ORG, _SETTINGS_APP)
         self._log_config = LogConfig()
         self._load_log_config()
+        # 트레이: 지연 생성(트레이 아이콘은 최소화 시 처음 필요). _tray 는
+        # QSystemTrayIcon 또는 None. _minimize_to_tray 는 옵션 상태(기본 꺼짐).
+        self._tray: QSystemTrayIcon | None = None
+        self._minimize_to_tray = False
+        self._load_tray_config()
 
         self.model = FileTableModel(self)
         self.proxy = NaturalSortProxy(self)
@@ -446,6 +463,7 @@ class MainWindow(QMainWindow):
         self._build_central()
         self._build_statusbar()
         self._build_context_menu()
+        self._build_tray()
         self._restore_settings()
         self._update_action_states()
 
@@ -495,6 +513,14 @@ class MainWindow(QMainWindow):
         self.act_each_folder_album.setToolTip(
             "Treat each folder as a separate album (else all files = one album)")
 
+        # Minimize to tray(원본 mnuSysTray) — 체크 액션, 기본 꺼짐.
+        self.act_minimize_to_tray = QAction("Minimize to tray", self)
+        self.act_minimize_to_tray.setCheckable(True)
+        self.act_minimize_to_tray.setChecked(self._minimize_to_tray)
+        self.act_minimize_to_tray.setToolTip(
+            "When minimized, hide the window and show a system tray icon")
+        self.act_minimize_to_tray.toggled.connect(self._on_toggle_tray_option)
+
         # Logs...(원본 mnuLogs) — 로그 설정 다이얼로그 열기.
         self.act_logs = QAction("Logs...", self)
         self.act_logs.setToolTip(
@@ -525,6 +551,7 @@ class MainWindow(QMainWindow):
         self.menu_modify.addAction(self.act_undo)
 
         self.menu_options.addAction(self.act_each_folder_album)
+        self.menu_options.addAction(self.act_minimize_to_tray)
         self.menu_options.addSeparator()
         self.menu_options.addAction(self.act_logs)
         self.menu_options.addAction(self.act_reset_columns)
@@ -677,7 +704,86 @@ class MainWindow(QMainWindow):
         self.ctx_play.triggered.connect(self._on_ctx_play)
         self.ctx_menu.addAction(self.ctx_play)
 
-    # --- 설정(컬럼폭·정렬·창 기하·로그) 저장/복원 ---
+    # --- 트레이(원본 frmSysTray + mnuSysTray 재현) ---
+
+    def _build_tray(self):
+        """시스템 트레이 아이콘과 팝업 메뉴를 구성한다(숨김 상태로 시작).
+
+        트레이 아이콘 자체는 지금 만들어 두되, 최소화→트레이 옵션이 켜져
+        실제 최소화가 일어날 때만 show() 한다. 트레이 미지원 환경(드묾)에서는
+        옵션이 무효가 되도록 isSystemTrayAvailable 로 방어한다.
+        """
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            self._tray = None
+            return
+
+        icon = app_icon()
+        if icon.isNull():
+            # 아이콘 파일이 없으면 표준 스타일 아이콘으로 대체(트레이가 비어
+            # 보이지 않도록). 기능은 동일.
+            icon = self.style().standardIcon(
+                QStyle.StandardPixmap.SP_ComputerIcon)
+
+        self._tray = QSystemTrayIcon(icon, self)
+        self._tray.setToolTip("Gain dB")
+
+        tray_menu = QMenu()
+        self.tray_act_restore = QAction("Restore", self)
+        self.tray_act_restore.triggered.connect(self._restore_from_tray)
+        tray_menu.addAction(self.tray_act_restore)
+        tray_menu.addSeparator()
+        self.tray_act_exit = QAction("Exit", self)
+        self.tray_act_exit.triggered.connect(self.close)
+        tray_menu.addAction(self.tray_act_exit)
+        self._tray.setContextMenu(tray_menu)
+
+        # 좌클릭/더블클릭 = 복원(원본 frmSysTray.Form_MouseMove 의 LBUTTONUP/
+        # DBLCLK). 우클릭은 setContextMenu 가 자동 처리(원본 RBUTTONUP).
+        self._tray.activated.connect(self._on_tray_activated)
+
+    def _on_tray_activated(self, reason):
+        """트레이 아이콘 클릭. 좌클릭/더블클릭이면 창을 복원한다."""
+        if reason in (
+            QSystemTrayIcon.ActivationReason.Trigger,
+            QSystemTrayIcon.ActivationReason.DoubleClick,
+        ):
+            self._restore_from_tray()
+
+    def _restore_from_tray(self):
+        """트레이에서 창을 복원한다: 트레이 아이콘 숨김 + 창 표시·활성화."""
+        if self._tray is not None:
+            self._tray.hide()
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def _on_toggle_tray_option(self, checked: bool):
+        """Options → Minimize to tray 토글. 상태만 갱신(다음 최소화부터 적용)."""
+        self._minimize_to_tray = bool(checked)
+        if not checked and self._tray is not None and self._tray.isVisible():
+            # 옵션을 끄는 순간 창이 트레이에 숨어 있으면 되돌린다(잠김 방지).
+            self._restore_from_tray()
+
+    def changeEvent(self, event):
+        """창 상태 변화 감지(원본 frmMain.Form_Resize 대응).
+
+        옵션이 켜져 있고 창이 최소화되면 창을 숨기고 트레이 아이콘을 띄운다.
+        macOS 는 Dock 최소화 관례가 있어 자동 트레이 이동을 하지 않는다(트레이
+        아이콘·메뉴 자체는 다른 경로로 동작). 트레이가 없으면(미지원) 무동작.
+        """
+        if event.type() == QEvent.Type.WindowStateChange:
+            if (self._minimize_to_tray
+                    and self._tray is not None
+                    and not sys.platform.startswith("darwin")
+                    and self.isMinimized()):
+                # 최소화 순간 트레이로: 아이콘 표시 후 창 숨김. hide 는 다음
+                # 이벤트 루프로 미뤄 상태 전이 도중 충돌을 피한다.
+                self._tray.show()
+                from PySide6.QtCore import QTimer
+                QTimer.singleShot(0, self.hide)
+        super().changeEvent(event)
+
+    # --- 설정(컬럼폭·정렬·창 기하·로그·트레이) 저장/복원 ---
 
     def _load_log_config(self):
         """QSettings 에서 로그 on/off·경로를 복원한다(원본 frmMain Form_Load 대응)."""
@@ -689,6 +795,11 @@ class MainWindow(QMainWindow):
         c.analysis_path = s.value("logs/analysis_path", "", type=str)
         c.change_enabled = s.value("logs/change_enabled", False, type=bool)
         c.change_path = s.value("logs/change_path", "", type=str)
+
+    def _load_tray_config(self):
+        """QSettings 에서 트레이 옵션(minimize_to_tray)을 복원한다(기본 꺼짐)."""
+        self._minimize_to_tray = self._settings.value(
+            "tray/minimize_to_tray", False, type=bool)
 
     def _on_open_logs(self):
         """Options → Logs...: 로그 설정 다이얼로그를 연다(원본 mnuLogs_Click)."""
@@ -755,7 +866,7 @@ class MainWindow(QMainWindow):
             self.table.sortByColumn(sort_col, order)
 
     def _save_settings(self):
-        """창 기하·컬럼폭·정렬·로그 설정을 QSettings 에 저장한다(창 닫기 시).
+        """창 기하·컬럼폭·정렬·로그·트레이 설정을 QSettings 에 저장한다(창 닫기 시).
 
         원본 frmMain.Form_Unload 의 SaveSetting 저장에 대응(매체·키는 독립).
         """
@@ -779,6 +890,9 @@ class MainWindow(QMainWindow):
         self._settings.setValue("logs/analysis_path", c.analysis_path)
         self._settings.setValue("logs/change_enabled", c.change_enabled)
         self._settings.setValue("logs/change_path", c.change_path)
+
+        self._settings.setValue(
+            "tray/minimize_to_tray", self._minimize_to_tray)
 
     def _reset_column_widths(self):
         """모든 컬럼폭을 columns.py 의 default_width 로 되돌린다(원본 mnuResetColumns)."""
@@ -1554,8 +1668,14 @@ class MainWindow(QMainWindow):
     # --- 창 닫기: 설정 저장 + 실행 중 워커 안전 종료 ---
 
     def closeEvent(self, event):
-        """창을 닫을 때 설정을 저장하고 실행 중인 워커를 취소·대기시킨 뒤 닫는다."""
+        """창을 닫을 때 설정을 저장하고 실행 중인 워커를 취소·대기시킨 뒤 닫는다.
+
+        X(닫기)는 원본대로 실제 종료다(트레이로 보내지 않음). 트레이 아이콘이
+        떠 있으면 함께 정리한다.
+        """
         self._save_settings()
+        if self._tray is not None:
+            self._tray.hide()
         w = self._worker
         if w is not None:
             w.request_cancel()

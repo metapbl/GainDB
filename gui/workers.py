@@ -1,4 +1,4 @@
-"""gui/workers.py — 백그라운드 워커(QThread) 계층. (진단 로그 임시 삽입본)"""
+"""gui/workers.py — 백그라운드 워커(QThread) 계층."""
 
 from __future__ import annotations
 
@@ -19,14 +19,6 @@ from gaindb.api import (
     result_from_album_raw,
 )
 from gaindb.decode import DecodeCancelled
-
-
-def _dlog(msg):  # DEBUGLOG
-    try:
-        with open("debug.log", "a", encoding="utf-8") as f:
-            f.write(msg + "\n")
-    except Exception:
-        pass
 
 
 class TagScanWorker(QThread):
@@ -150,7 +142,6 @@ class ApplyWorker(QThread):
     def run(self):
         from gaindb.writer import GainCancelled
 
-        _dlog("TRACK_APPLY_RUN_START n=" + str(len(self._paths)))  # DEBUGLOG
         total = len(self._paths)
         done = 0
         for path in self._paths:
@@ -159,7 +150,6 @@ class ApplyWorker(QThread):
             self.current.emit(path)
             try:
                 result = self._ensure_analysis(path)
-                _dlog("TRACK_ENSURE " + path + " status=" + str(result.get("status")))  # DEBUGLOG
 
                 if result.get("status") != "ok":
                     self.failed.emit(path, "Not enough samples to analyze.")
@@ -172,7 +162,6 @@ class ApplyWorker(QThread):
                     should_cancel=lambda: self._cancel,
                 )
                 status = apply_res.get("status")
-                _dlog("TRACK_APPLY " + path + " status=" + str(status) + " steps=" + str(apply_res.get("steps")) + " tag_written=" + str(apply_res.get("tag_written")))  # DEBUGLOG
                 if status == "ok":
                     applied_steps = apply_res.get("steps") or 0
                     shown = shift_after_apply(result, applied_steps)
@@ -262,7 +251,6 @@ class AlbumAnalyzeWorker(QThread):
         return self._cancel
 
     def run(self):
-        _dlog("ALBUM_RUN_START groups=" + repr(list(self._groups.keys())))  # DEBUGLOG
         total = sum(len(v) for v in self._groups.values())
         done = 0
         try:
@@ -280,13 +268,11 @@ class AlbumAnalyzeWorker(QThread):
                             should_cancel=lambda: self._cancel,
                             on_progress=self.file_progress.emit,
                         )
-                        _dlog("RAW_OK " + path + " track_db=" + repr(raw.get("track_db")) + " hist=" + str(len(raw.get("histogram") if raw.get("histogram") is not None else [])))  # DEBUGLOG
                         raws.append(raw)
                         self.row_raw.emit(path, raw)
                     except DecodeCancelled:
                         raise
                     except Exception as exc:
-                        _dlog("ROW_EXC " + path + " " + repr(exc))  # DEBUGLOG
                         self.failed.emit(path, str(exc))
                     done += 1
                     self.progress.emit(done, total)
@@ -295,7 +281,6 @@ class AlbumAnalyzeWorker(QThread):
                     continue
 
                 agg = album_gain_from_files(raws)
-                _dlog("AGG key=" + str(key) + " status=" + str(agg.get("status")) + " album_db=" + repr(agg.get("album_db")) + " n=" + str(len(raws)))  # DEBUGLOG
                 if agg.get("status") != "ok":
                     for raw in raws:
                         self.failed.emit(raw["path"], "Not enough samples in album.")
@@ -306,15 +291,13 @@ class AlbumAnalyzeWorker(QThread):
                 for raw in raws:
                     track_res = result_from_album_raw(raw, self._target_db)
                     if track_res.get("status") != "ok":
-                        _dlog("TRACK_RES_SKIP " + raw["path"] + " status=" + str(track_res.get("status")))  # DEBUGLOG
                         continue
                     shown = compute_album_display(track_res, album_db, self._target_db)
-                    _dlog("ROW_EMIT " + raw["path"] + " album_db=" + repr(shown.get("album_db")))  # DEBUGLOG
                     self.row_done.emit(raw["path"], shown)
         except DecodeCancelled:
             pass
-        except Exception as _exc:
-            _dlog("RUN_FATAL " + repr(_exc))  # DEBUGLOG
+        except Exception:
+            pass
         self.done.emit()
 
 
@@ -343,18 +326,14 @@ class AlbumApplyWorker(QThread):
         return self._cancel
 
     def _ensure_group_raws(self, paths, count_state):
-        _dlog("ENSURE_GROUP n_paths=" + str(len(paths)))  # DEBUGLOG
         raws = {}
         for path in paths:
             if self._cancel:
-                _dlog("ENSURE_CANCEL at " + path)  # DEBUGLOG
                 break
             seed = self._seed.get(path)
             if seed and "histogram" in seed:
-                _dlog("ENSURE_SEED_HIT " + path)  # DEBUGLOG
                 raws[path] = seed
                 continue
-            _dlog("ENSURE_ANALYZE " + path)  # DEBUGLOG
             self.current.emit(path)
             raw = analyze_album_file(
                 path,
@@ -367,28 +346,22 @@ class AlbumApplyWorker(QThread):
             # 잠깐 0 에 머물다 완료되는 게 의도된 동작.
             count_state[0] += 1
             self.progress.emit(count_state[0], count_state[1])
-        _dlog("ENSURE_DONE got=" + str(len(raws)) + " of " + str(len(paths)))  # DEBUGLOG
         return raws
 
     def run(self):
         from gaindb.writer import GainCancelled
 
-        _dlog("ALBUM_APPLY_RUN_START groups=" + repr(list(self._groups.keys())))  # DEBUGLOG
         total = sum(len(v) for v in self._groups.values())
         count_state = [0, total]
         try:
             for key, paths in self._groups.items():
                 if self._cancel:
                     break
-                _dlog("GROUP_START key=" + str(key) + " n=" + str(len(paths)))  # DEBUGLOG
                 raws = self._ensure_group_raws(paths, count_state)
-                _dlog("GROUP_RAWS got=" + str(len(raws)) + " cancel=" + str(self._cancel))  # DEBUGLOG
                 if self._cancel or not raws:
-                    _dlog("GROUP_SKIP (cancel or empty)")  # DEBUGLOG
                     continue
 
                 agg = album_gain_from_files(list(raws.values()))
-                _dlog("APPLY_AGG key=" + str(key) + " status=" + str(agg.get("status")))  # DEBUGLOG
                 if agg.get("status") != "ok":
                     for path in raws:
                         self.failed.emit(path, "Not enough samples in album.")
@@ -402,13 +375,10 @@ class AlbumApplyWorker(QThread):
                 # 적용 구간 진행을 다시 1부터 세기 위해 카운트 리셋
                 # (분석 1~N, 적용 1~N 두 번 왕복). 분모는 곡 수 그대로.
                 count_state[0] = 0
-                _dlog("APPLY_LOOP n_raws=" + str(len(raws)))  # DEBUGLOG
                 for path, raw in raws.items():
                     if self._cancel:
-                        _dlog("APPLY_LOOP_CANCEL at " + path)  # DEBUGLOG
                         break
                     self.current.emit(path)
-                    _dlog("APPLY_TRY " + path)  # DEBUGLOG
                     try:
                         apply_res = apply_file_album_gain(
                             path, album_db, album_peak, album_min, album_max,
@@ -422,7 +392,6 @@ class AlbumApplyWorker(QThread):
                             shown = shift_after_apply(shown, steps)
                         else:
                             shown = track_res
-                        _dlog("ALBUM_APPLY " + path + " status=" + str(apply_res.get("status")) + " steps=" + str(apply_res.get("steps")) + " tag_written=" + str(apply_res.get("tag_written")))  # DEBUGLOG
                         if apply_res.get("status") == "ok":
                             self.row_applied.emit(path, shown)
                         else:
@@ -430,13 +399,11 @@ class AlbumApplyWorker(QThread):
                     except (DecodeCancelled, GainCancelled):
                         raise
                     except Exception as exc:
-                        _dlog("APPLY_ROW_EXC " + path + " " + repr(exc))  # DEBUGLOG
                         self.failed.emit(path, str(exc))
                     count_state[0] += 1
                     self.apply_progress.emit(count_state[0], count_state[1])
         except (DecodeCancelled, GainCancelled):
             pass
-        except Exception as _exc:
-            _dlog("APPLY_RUN_FATAL " + repr(_exc))  # DEBUGLOG
+        except Exception:
+            pass
         self.done.emit()
-

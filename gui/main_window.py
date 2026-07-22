@@ -819,17 +819,14 @@ class MainWindow(QMainWindow):
             return
 
         rows = self._target_source_rows()
-        self._dlog("TRACK_GAIN_CLICK rows=" + str(len(rows)) + " total_rows=" + str(self.model.row_count()))  # DEBUGLOG
         paths = []
         seed_results = {}
         for r in rows:
             fr = self.model.get_row(r)
             if fr is None:
-                self._dlog("TRACK_GAIN row " + str(r) + " -> None (SKIPPED)")  # DEBUGLOG
                 continue
             paths.append(fr.path)
             seed_results[fr.path] = fr.result
-        self._dlog("TRACK_GAIN paths=" + str(len(paths)))  # DEBUGLOG
 
         if not paths:
             self.statusBar().showMessage(
@@ -864,12 +861,6 @@ class MainWindow(QMainWindow):
 
     # --- Album Analysis / Album Gain 핸들러 ---
 
-    def _dlog(self, msg):  # DEBUGLOG
-        try:
-            open("debug.log","a",encoding="utf-8").write(msg + "\n")
-        except Exception:
-            pass
-
     def _on_album_analyze(self):
         """Album Analysis(원본 album 모드 재현). 선택(없으면 전체) 전부 분석.
 
@@ -878,7 +869,6 @@ class MainWindow(QMainWindow):
         (Track 값이 있어도 Album 값은 없을 수 있어 재분석이 옳다). 진행/카운트
         슬롯은 Track 분석과 동일한 것을 재사용하고, 앨범 고유 시그널만 새 슬롯.
         """
-        self._dlog("ALBUM_ANALYZE_CLICK busy=" + str(self._is_busy()))  # DEBUGLOG
         if self._is_busy():
             return
 
@@ -888,7 +878,6 @@ class MainWindow(QMainWindow):
             fr = self.model.get_row(r)
             if fr is not None:
                 paths.append(fr.path)
-        self._dlog("ALBUM_ANALYZE rows=" + str(len(rows)) + " paths=" + str(len(paths)))  # DEBUGLOG
 
         if not paths:
             self.statusBar().showMessage("No files to analyze")
@@ -919,12 +908,10 @@ class MainWindow(QMainWindow):
         self.progress.setRange(0, len(paths) * _PROGRESS_SCALE)
         self.progress.setValue(0)
         self._update_action_states()
-        self._dlog("ALBUM_ANALYZE_START groups=" + str(len(groups)))  # DEBUGLOG
         self.statusBar().showMessage(
             "Analyzing " + str(len(paths)) + " file(s) in "
             + str(len(groups)) + " album(s)...")
         self._worker.start()
-
 
     def _on_album_gain(self):
         """Album Gain 적용(원본 AlbumGain 재현). AlbumApplyWorker 위임.
@@ -938,13 +925,11 @@ class MainWindow(QMainWindow):
             return
 
         rows = self._target_source_rows()
-        self._dlog("ALBUM_GAIN_CLICK rows=" + str(len(rows)) + " total_rows=" + str(self.model.row_count()))  # DEBUGLOG
         paths = []
         for r in rows:
             fr = self.model.get_row(r)
             if fr is not None:
                 paths.append(fr.path)
-        self._dlog("ALBUM_GAIN paths=" + str(len(paths)))  # DEBUGLOG
 
         if not paths:
             self.statusBar().showMessage("No files to apply")
@@ -955,7 +940,6 @@ class MainWindow(QMainWindow):
         # 대상 경로에 해당하는 씨앗만 추려 넘긴다(나머지는 워커가 분석).
         seed_raws = {p: self._album_raws[p]
                      for p in paths if p in self._album_raws}
-        self._dlog("ALBUM_GAIN seeds=" + str(len(seed_raws)) + " groups=" + str(len(groups)))  # DEBUGLOG
 
         target_db = self.spin_target.value()
         self._analyzed_count = 0
@@ -1380,6 +1364,3 @@ class MainWindow(QMainWindow):
                 w.terminate()
                 w.wait()
         super().closeEvent(event)
-
-
-

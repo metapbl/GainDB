@@ -54,8 +54,8 @@ Rescan 으로 바뀐다(같은 자리에서 상태 전환). 분석/게인/파일
 같은 버튼이 Cancel 이다(작업 성격상 이어가기 개념이 없어 Rescan 없음).
 
 우클릭 팝업(원본 mnuPopup 재현, MVP 범위): Clear Analysis(표시 리셋·파일 미변경,
-원본 ResetAnalysis) / Undo Gain changes(파일 변경, UndoFileGain) / Remove Tags
-(파일 변경, DeleteFileTags) / Play mp3 file(기본앱 재생). 우클릭한 행이 선택에
+원본 ResetAnalysis) / Undo Gain Changes(파일 변경, UndoFileGain) / Remove Tags
+(파일 변경, DeleteFileTags) / Play MP3 file(기본앱 재생). 우클릭한 행이 선택에
 없으면 그 행만 선택한 뒤 메뉴를 띄운다(데스크톱 관례 + 원본 "선택 한정" 취지).
 
 취소·진행률: 취소는 청크 경계에서 반영된다(워커가 decode 계층에 취소 콜백을
@@ -516,7 +516,7 @@ class MainWindow(QMainWindow):
         self.act_clear_analysis.triggered.connect(self._on_ctx_clear_analysis)
 
         # Undo(선택 행 게인 되돌리기) — 팝업 핸들러 재사용.
-        self.act_undo = QAction(self.tr("Undo Gain changes"), self)
+        self.act_undo = QAction(self.tr("Undo Gain Changes"), self)
         self.act_undo.setToolTip(self.tr("Undo gain changes of selected files"))
         self.act_undo.triggered.connect(self._on_ctx_undo)
 
@@ -646,7 +646,7 @@ class MainWindow(QMainWindow):
             "Analyze track gain without applying (Ctrl+T)"))
         self.act_gain.setText(self.tr("Track Gain"))
         self.act_gain.setToolTip(self.tr("Apply track gain to files (Ctrl+G)"))
-        self.act_clear.setText(self.tr("Clear"))
+        self.act_clear.setText(self.tr("Clear All"))
         self.act_clear.setToolTip(self.tr(
             "Clear all files from the list (Ctrl+Shift+Delete)"))
 
@@ -662,7 +662,7 @@ class MainWindow(QMainWindow):
         self.act_clear_analysis.setText(self.tr("Clear Analysis"))
         self.act_clear_analysis.setToolTip(self.tr(
             "Clear analysis values of selected files (does not change files)"))
-        self.act_undo.setText(self.tr("Undo Gain changes"))
+        self.act_undo.setText(self.tr("Undo Gain Changes"))
         self.act_undo.setToolTip(self.tr("Undo gain changes of selected files"))
         self.act_each_folder_album.setText(self.tr("Each folder is album"))
         self.act_each_folder_album.setToolTip(self.tr(
@@ -680,7 +680,7 @@ class MainWindow(QMainWindow):
         # target 라벨/노트.
         self.lbl_target.setText(self.tr("Target Volume:"))
         self.lbl_target_note.setText(self.tr(
-            "(ReplayGain 89 dB reference, not absolute SPL)"))
+            "(ReplayGain 89 dB reference)"))
         self.lbl_target_note.setToolTip(self.tr(
             "This target is relative to mp3gain's internal 89 dB ReplayGain "
             "reference. It is not an absolute SPL or LUFS level."))
@@ -688,9 +688,9 @@ class MainWindow(QMainWindow):
 
         # 컨텍스트 메뉴.
         self.ctx_clear_analysis.setText(self.tr("Clear Analysis"))
-        self.ctx_undo.setText(self.tr("Undo Gain changes"))
-        self.ctx_remove_tags.setText(self.tr("Remove Tags from files"))
-        self.ctx_play.setText(self.tr("Play mp3 file"))
+        self.ctx_undo.setText(self.tr("Undo Gain Changes"))
+        self.ctx_remove_tags.setText(self.tr("Remove Tags from Files"))
+        self.ctx_play.setText(self.tr("Play MP3 file"))
 
         # 트레이 메뉴.
         if self._tray is not None:
@@ -746,7 +746,7 @@ class MainWindow(QMainWindow):
 
         tb.addSeparator()
 
-        self.act_clear = QAction(self.tr("Clear"), self)
+        self.act_clear = QAction(self.tr("Clear All"), self)
         self.act_clear.setShortcut(QKeySequence("Ctrl+Shift+Delete"))
         self.act_clear.setToolTip(self.tr(
             "Clear all files from the list (Ctrl+Shift+Delete)"
@@ -773,7 +773,7 @@ class MainWindow(QMainWindow):
         self.spin_target.valueChanged.connect(self._on_target_changed)
         target_row.addWidget(self.spin_target)
         self.lbl_target_note = QLabel(self.tr(
-            "(ReplayGain 89 dB reference, not absolute SPL)"))
+            "(ReplayGain 89 dB reference)"))
         self.lbl_target_note.setToolTip(self.tr(
             "This target is relative to mp3gain's internal 89 dB ReplayGain "
             "reference. It is not an absolute SPL or LUFS level."
@@ -844,17 +844,17 @@ class MainWindow(QMainWindow):
 
         self.ctx_menu.addSeparator()
 
-        self.ctx_undo = QAction(self.tr("Undo Gain changes"), self)
+        self.ctx_undo = QAction(self.tr("Undo Gain Changes"), self)
         self.ctx_undo.triggered.connect(self._on_ctx_undo)
         self.ctx_menu.addAction(self.ctx_undo)
 
-        self.ctx_remove_tags = QAction(self.tr("Remove Tags from files"), self)
+        self.ctx_remove_tags = QAction(self.tr("Remove Tags from Files"), self)
         self.ctx_remove_tags.triggered.connect(self._on_ctx_remove_tags)
         self.ctx_menu.addAction(self.ctx_remove_tags)
 
         self.ctx_menu.addSeparator()
 
-        self.ctx_play = QAction(self.tr("Play mp3 file"), self)
+        self.ctx_play = QAction(self.tr("Play MP3 file"), self)
         self.ctx_play.triggered.connect(self._on_ctx_play)
         self.ctx_menu.addAction(self.ctx_play)
 

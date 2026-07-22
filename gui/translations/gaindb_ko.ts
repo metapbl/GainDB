@@ -66,14 +66,6 @@
         <translation>선택한 파일의 분석 값을 지웁니다 (파일은 변경되지 않음)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="519"/>
-        <location filename="../main_window.py" line="665"/>
-        <location filename="../main_window.py" line="691"/>
-        <location filename="../main_window.py" line="847"/>
-        <source>Undo Gain changes</source>
-        <translation>게인 변경 되돌리기</translation>
-    </message>
-    <message>
         <location filename="../main_window.py" line="520"/>
         <location filename="../main_window.py" line="666"/>
         <source>Undo gain changes of selected files</source>
@@ -182,12 +174,6 @@
         <translation>트랙 게인을 파일에 적용합니다 (Ctrl+G)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="649"/>
-        <location filename="../main_window.py" line="749"/>
-        <source>Clear</source>
-        <translation>모두 지우기</translation>
-    </message>
-    <message>
         <location filename="../main_window.py" line="651"/>
         <location filename="../main_window.py" line="752"/>
         <source>Clear all files from the list (Ctrl+Shift+Delete)</source>
@@ -198,12 +184,6 @@
         <location filename="../main_window.py" line="765"/>
         <source>Target Volume:</source>
         <translation>목표 볼륨:</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="683"/>
-        <location filename="../main_window.py" line="776"/>
-        <source>(ReplayGain 89 dB reference, not absolute SPL)</source>
-        <translation>(ReplayGain 89 dB 기준, 절대 SPL 아님)</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="685"/>
@@ -218,16 +198,36 @@
         <translation>진행률:</translation>
     </message>
     <message>
+        <location filename="../main_window.py" line="519"/>
+        <location filename="../main_window.py" line="665"/>
+        <location filename="../main_window.py" line="691"/>
+        <location filename="../main_window.py" line="847"/>
+        <source>Undo Gain Changes</source>
+        <translation>게인 변경 되돌리기</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="649"/>
+        <location filename="../main_window.py" line="749"/>
+        <source>Clear All</source>
+        <translation>모두 지우기</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="683"/>
+        <location filename="../main_window.py" line="776"/>
+        <source>(ReplayGain 89 dB reference)</source>
+        <translation>(ReplayGain 89 dB 기준)</translation>
+    </message>
+    <message>
         <location filename="../main_window.py" line="692"/>
         <location filename="../main_window.py" line="851"/>
-        <source>Remove Tags from files</source>
+        <source>Remove Tags from Files</source>
         <translation>파일에서 태그 제거</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="693"/>
         <location filename="../main_window.py" line="857"/>
-        <source>Play mp3 file</source>
-        <translation>mp3 파일 재생</translation>
+        <source>Play MP3 file</source>
+        <translation>MP3 파일 재생</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="697"/>

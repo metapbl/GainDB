@@ -225,7 +225,7 @@ GaindB/
 
 ### 10.3. 현재 상태 · 완료 이력 · 다음 할 일
 
-**현재 상태.** 1~7단계 완료, 8단계 GUI MVP + Track/Album 계열 모두 실사용 완료. HEAD=`da5ecf6`. GUI 는 Track 분석/게인, Album 분석/게인, 우클릭 팝업, 취소, 스트리밍까지 실사용 가능하다. 메뉴바(File/Analysis/Modify/Options)와 툴바가 같은 QAction 을 공유한다. 단축키: Track Analysis=Ctrl+T·Track Gain=Ctrl+G·Album Analysis=Ctrl+U·Album Gain=Ctrl+B. 진행 UI 는 2안 확정(진행바 1회 0→100%, 카운트 분석/적용 2회 왕복 1..N, 문구 Analyzing→Applying — 상세 10.2). 통합 테스트 118건 전부 PASS.
+**현재 상태.** 1~7단계 완료, 8단계 GUI MVP + Track/Album 계열 모두 실사용 완료. HEAD=`c83b9f1`. GUI 는 Track 분석/게인, Album 분석/게인, 우클릭 팝업, 취소, 스트리밍까지 실사용 가능하다. 메뉴바(File/Analysis/Modify/Options)와 툴바가 같은 QAction 을 공유한다. 단축키: Track Analysis=Ctrl+T·Track Gain=Ctrl+G·Album Analysis=Ctrl+U·Album Gain=Ctrl+B. 진행 UI 는 2안 확정(진행바 1회 0→100%, 카운트 분석/적용 2회 왕복 1..N, 문구 Analyzing→Applying — 상세 10.2). 통합 테스트 118건 전부 PASS. 후순위 GUI 항목 중 컬럼폭·정렬 상태 저장을 완료했다(창 기하·컬럼폭·정렬을 QSettings("GaindB","GaindB")로 영속화, 원본 ListView 처럼 전 컬럼 Interactive + 넘치면 가로 스크롤, Reset Column Widths 액션=원본 mnuResetColumns, 선택 하이라이트가 컬럼 경계 없이 행 전체로 이어짐 + 헤더 border-right 세로 구분선, 최초 실행 시 전 컬럼 default_width 합계 기준 초기 창 폭 자동).
 
 **완료 이력(커밋순).**
 - `e82a79a` feat: 앨범 게인 코어 경로(공유 본체 `_apply_one_album_file` + 스트리밍 api 레이어).
@@ -237,11 +237,12 @@ GaindB/
 - `f59b1b2` chore: 진단 DEBUGLOG 제거(`gui/workers.py`·`gui/main_window.py`, 이전 세션 `d805095` 에 임시 삽입했던 `_dlog` 전량 삭제).
 - `ce5c18c` docs: `_on_apply_analyzed` docstring 을 no_change 정책에 맞게 정정(옛 steps==0 제외 흔적 제거).
 - `da5ecf6` test: 앨범 게인 후 peak 이동 검증(`AlbumPeakShiftTest`). **결론: 앨범 peak 이동은 트랙·앨범이 공유하는 `change_gain_and_tag`(left==right 일 때 track/album peak 둘 다 x2^(steps/4))가 구조적으로 보장한다.** 이전 세션에서 의심됐던 "앨범 게인 후 트랙 게인 클리핑"은 peak 계산 결함이 아니라 표시·배선 층 문제였고 앨범 경로 정상화로 해소됐음이 확증됨(회귀 테스트로 고정). — 이 항목으로 이전 "현재 재현 안 됨" 미결이 종결됨.
+- `c83b9f1` feat(gui): 컬럼폭·정렬·창 기하 QSettings 영속화 + 리셋 액션 + 선택 하이라이트 이어짐 + 헤더 세로 구분선 + 초기 창폭 자동. 저장 키: `window/geometry`·`columns/width_N`(+스키마 방어 `columns/count`)·`sort/column`·`sort/order`(정렬 저장은 원본에 없는 확장). 전 컬럼 Interactive + `setStretchLastSection(False)`로 원본 ListView 동작(드래그 경계만 이동, 넘치면 가로 스크롤). `ColumnDef.default_width` 신설, `_reset_column_widths`(원본 mnuResetColumns)로 복원. `_TABLE_QSS` 스타일시트로 셀 테두리 제거(선택 하이라이트 행 전체 이어짐)·`QHeaderView::section` `border-right`로 세로 구분선 유지. `_default_window_size` 로 최초 실행 시 default_width 합계 기준 창 폭 자동(저장 geometry 있으면 그대로 복원). 세로선이 안 보이면 `palette(mid)` 대비 문제이므로 고정색(라이트 `#b0b0b0`/다크 `#5a5a5a`)으로 교체.
 
 **다음 할 일(남은 것만).**
 
 - **후순위 기능 GUI(착수 시 해당 원본 폼 붙여 제공).**
-  - 컬럼폭·정렬 상태 저장, 트레이·로그파일·언어메뉴(원본 basLocalizer 대응, tr()/번역파일).
+  - 트레이·로그파일·언어메뉴(원본 basLocalizer 대응, tr()/번역파일). (컬럼폭·정렬 상태 저장은 `c83b9f1` 로 완료.)
 - **실클릭 회귀 — 해시 무결성만 남음(반복 점검).** 취소 후 파일 원본 무결성을 `audio_body_sha256` 로 실측 비교. GUI 를 건드릴 때마다 재확인하는 체크리스트로 존치.
 - **보류·점검 항목(성격이 각각 달라 완료로 옮기지 않고 존치).**
   - **비가역(255 클램프) 사전 경고 — 보류 확정(합의).** 원본은 경고 없이 조용히 클램프(원본 동일 재현)라 사전 경고는 원본에 없는 추가 기능. 재론하려면 원본 이탈 감수 가치의 사용자 합의 필요.

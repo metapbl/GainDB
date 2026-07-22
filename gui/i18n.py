@@ -26,7 +26,7 @@ from __future__ import annotations
 import os
 import sys
 
-from PySide6.QtCore import QLocale, QSettings, QTranslator
+from PySide6.QtCore import QLibraryInfo, QLocale, QSettings, QTranslator
 
 # QSettings 조직/앱 이름(main_window 와 동일 매체를 써 설정을 한곳에 모은다).
 _SETTINGS_ORG = "GaindB"
@@ -39,6 +39,7 @@ DEFAULT_LANGUAGE = "en"
 # 설치된 QTranslator 를 모듈 전역으로 보유(GC 방지 + 재설치 시 제거용).
 # QApplication 은 translator 를 약참조만 잡으므로 파이썬 측에서 살려둬야 한다.
 _active_translator: QTranslator | None = None
+_qt_translator: QTranslator | None = None
 
 
 def _base_dir() -> str:
@@ -83,18 +84,47 @@ def save_language(lang: str) -> None:
     settings.setValue("i18n/language", lang)
 
 
+def _install_qt_base(app, lang: str) -> None:
+    """Qt 표준 위젯(예: QDialogButtonBox 의 OK/Cancel, 파일 대화상자 기본 버튼)
+    의 텍스트를 해당 언어로 바꾸기 위해 Qt 내장 번역(qtbase_<lang>.qm)을 설치한다.
+
+    이 문자열들은 우리 .qm 이 아니라 Qt 가 자체 제공하므로 별도 translator 가
+    필요하다. en 이거나 로드 실패면 조용히 원문(영문)으로 둔다.
+    """
+    global _qt_translator
+
+    if _qt_translator is not None:
+        app.removeTranslator(_qt_translator)
+        _qt_translator = None
+
+    if lang == "en":
+        return
+
+    qt_dir = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    translator = QTranslator(app)
+    if translator.load(f"qtbase_{lang}", qt_dir):
+        app.installTranslator(translator)
+        _qt_translator = translator
+
+
 def install_translator(app, lang: str) -> str:
     """app 에 lang 번역을 설치한다. 반환값은 실제로 적용된 언어 코드.
 
     기존 translator 를 먼저 제거한 뒤(중첩 방지) 새 것을 설치한다. en 이거나
     .qm 로드 실패면 translator 없이 원문(영문)으로 동작한다 — 이때 반환은 "en".
     설치가 성공하면 Qt 가 활성 위젯에 LanguageChange 이벤트를 흘린다.
+
+    우리 앱 문자열(gaindb_<lang>.qm)과 함께 Qt 표준 위젯 문자열(qtbase_<lang>.qm)
+    도 설치해 OK/Cancel 등 표준 버튼까지 번역한다.
     """
     global _active_translator
 
     if _active_translator is not None:
         app.removeTranslator(_active_translator)
         _active_translator = None
+
+    # Qt 표준 위젯 번역은 우리 앱 번역 성공 여부와 독립적으로 설치한다.
+    _install_qt_base(app, lang)
 
     if lang == "en":
         return "en"

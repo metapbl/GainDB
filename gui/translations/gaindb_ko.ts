@@ -45,6 +45,90 @@
     </message>
 </context>
 <context>
+    <name>LogsDialog</name>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="41"/>
+        <source>Browse...</source>
+        <translation>찾아보기...</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="54"/>
+        <source>Choose %1 file</source>
+        <translation>%1 파일 선택</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="82"/>
+        <location filename="../dialogs/logs_dialog.py" line="137"/>
+        <source>Log options</source>
+        <translation>로그 옵션</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="89"/>
+        <source>Error Log</source>
+        <translation>오류 로그</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="90"/>
+        <source>Errors during processing are logged to this file</source>
+        <translation>처리 중 발생한 오류를 이 파일에 기록합니다</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="93"/>
+        <source>Analysis Log</source>
+        <translation>분석 로그</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="94"/>
+        <source>Analysis results are logged to this file</source>
+        <translation>분석 결과를 이 파일에 기록합니다</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="96"/>
+        <source>Change Log</source>
+        <translation>변경 로그</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="97"/>
+        <source>Gain changes are logged to this file</source>
+        <translation>게인 변경 내역을 이 파일에 기록합니다</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="119"/>
+        <source>Log files (*.log);;Text files (*.txt);;All files (*.*)</source>
+        <translation>로그 파일 (*.log);;텍스트 파일 (*.txt);;모든 파일 (*.*)</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="130"/>
+        <source>Error Log is enabled but no file path is set.</source>
+        <translation>오류 로그가 켜져 있지만 파일 경로가 설정되지 않았습니다.</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="131"/>
+        <source>Can&apos;t open or write to the Error log file:</source>
+        <translation>오류 로그 파일을 열거나 쓸 수 없습니다:</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="132"/>
+        <source>Analysis Log is enabled but no file path is set.</source>
+        <translation>분석 로그가 켜져 있지만 파일 경로가 설정되지 않았습니다.</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="133"/>
+        <source>Can&apos;t open or write to the Analysis log file:</source>
+        <translation>분석 로그 파일을 열거나 쓸 수 없습니다:</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="134"/>
+        <source>Change Log is enabled but no file path is set.</source>
+        <translation>변경 로그가 켜져 있지만 파일 경로가 설정되지 않았습니다.</translation>
+    </message>
+    <message>
+        <location filename="../dialogs/logs_dialog.py" line="135"/>
+        <source>Can&apos;t open or write to the Change log file:</source>
+        <translation>변경 로그 파일을 열거나 쓸 수 없습니다:</translation>
+    </message>
+</context>
+<context>
     <name>MainWindow</name>
     <message>
         <location filename="../main_window.py" line="493"/>

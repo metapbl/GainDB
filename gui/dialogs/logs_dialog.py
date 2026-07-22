@@ -12,19 +12,22 @@ r"""gui/dialogs/logs_dialog.py — 로그 설정 다이얼로그(원본 MP3GainG
 경로칸·Browse 버튼을 비활성화하되 경로 텍스트는 유지한다. OK 시 켜진 로그의
 경로가 실제로 쓰기 가능한지 검사하고(원본 CheckFile), 실패하면 경고 후 창을 닫지
 않는다. 검증을 통과하면 전달받은 LogConfig 를 갱신하고 accept.
+
+i18n: 사용자 노출 문자열은 tr() 로 감싼다(컨텍스트 "LogsDialog"). _LogRow 는
+QObject 가 아니므로 부모 다이얼로그의 tr() 로 번역된 문자열을 전달받거나
+self._parent.tr() 를 사용한다. 이 다이얼로그는 모달로 생성·종료되므로 생성
+시점 언어로 표시되면 충분하다(실시간 LanguageChange 처리 생략).
 """
 
 from __future__ import annotations
 
+from PySide6.QtCore import QCoreApplication
 from PySide6.QtWidgets import (
     QDialog, QGridLayout, QVBoxLayout, QHBoxLayout, QCheckBox, QLineEdit,
     QPushButton, QFileDialog, QMessageBox, QDialogButtonBox,
 )
 
 from gui.logging import LogConfig, check_writable
-
-
-_LOG_FILTER = "Log files (*.log);;Text files (*.txt);;All files (*.*)"
 
 
 class _LogRow:
@@ -35,7 +38,7 @@ class _LogRow:
         self.check.setToolTip(tooltip)
         self.edit = QLineEdit(parent)
         self.edit.setToolTip(tooltip)
-        self.browse = QPushButton("Browse...", parent)
+        self.browse = QPushButton(QCoreApplication.translate("LogsDialog", "Browse..."), parent)
         self.check.toggled.connect(self._on_toggled)
         self.browse.clicked.connect(self._on_browse)
         self._parent = parent
@@ -48,8 +51,9 @@ class _LogRow:
 
     def _on_browse(self):
         start = self.edit.text().strip()
+        caption = QCoreApplication.translate("LogsDialog", "Choose %1 file").arg(self._title)
         path, _ = QFileDialog.getSaveFileName(
-            self._parent, f"Choose {self._title} file", start, _LOG_FILTER)
+            self._parent, caption, start, self._parent.log_filter())
         if path:
             self.edit.setText(path)
 
@@ -75,19 +79,22 @@ class LogsDialog(QDialog):
 
     def __init__(self, config: LogConfig, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Log options")
+        self.setWindowTitle(self.tr("Log options"))
         self._config = config
 
         layout = QVBoxLayout(self)
         grid = QGridLayout()
 
         self._error = _LogRow(
-            "Error Log", "Errors during processing are logged to this file",
+            self.tr("Error Log"),
+            self.tr("Errors during processing are logged to this file"),
             self)
         self._analysis = _LogRow(
-            "Analysis Log", "Analysis results are logged to this file", self)
+            self.tr("Analysis Log"),
+            self.tr("Analysis results are logged to this file"), self)
         self._change = _LogRow(
-            "Change Log", "Gain changes are logged to this file", self)
+            self.tr("Change Log"),
+            self.tr("Gain changes are logged to this file"), self)
 
         for row, lr in enumerate((self._error, self._analysis, self._change)):
             grid.addWidget(lr.check, row, 0)
@@ -107,6 +114,10 @@ class LogsDialog(QDialog):
         self._load_from_config()
         self.resize(560, 160)
 
+    def log_filter(self) -> str:
+        """파일 선택 대화상자 필터(번역 대상). _LogRow 에서 호출."""
+        return self.tr("Log files (*.log);;Text files (*.txt);;All files (*.*)")
+
     def _load_from_config(self):
         c = self._config
         self._error.set_state(c.error_enabled, c.error_path)
@@ -115,19 +126,22 @@ class LogsDialog(QDialog):
 
     def _on_ok(self):
         # 켜진 로그마다 경로가 비어있지 않은지 + 쓰기 가능한지 검사(원본 CheckFile).
-        for lr, name in ((self._error, "Error"),
-                         (self._analysis, "Analysis"),
-                         (self._change, "Change")):
+        checks = (
+            (self._error, self.tr("Error Log is enabled but no file path is set."),
+             self.tr("Can't open or write to the Error log file:")),
+            (self._analysis, self.tr("Analysis Log is enabled but no file path is set."),
+             self.tr("Can't open or write to the Analysis log file:")),
+            (self._change, self.tr("Change Log is enabled but no file path is set."),
+             self.tr("Can't open or write to the Change log file:")),
+        )
+        title = self.tr("Log options")
+        for lr, empty_msg, write_msg in checks:
             if lr.enabled:
                 if not lr.path:
-                    QMessageBox.warning(
-                        self, "Log options",
-                        f"{name} Log is enabled but no file path is set.")
+                    QMessageBox.warning(self, title, empty_msg)
                     return
                 if not check_writable(lr.path):
-                    QMessageBox.warning(
-                        self, "Log options",
-                        f"Can't open or write to {name} log file:\n{lr.path}")
+                    QMessageBox.warning(self, title, f"{write_msg}\n{lr.path}")
                     return
 
         c = self._config

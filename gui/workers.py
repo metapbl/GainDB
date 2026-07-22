@@ -109,7 +109,7 @@ class ApplyWorker(QThread):
     progress = Signal(int, int)
     file_progress = Signal(float)
     row_analyzed = Signal(str, dict)
-    row_applied = Signal(str, dict)
+    row_applied = Signal(str, dict, int)  # path, 표시 dict, 적용 steps(로그용)
     failed = Signal(str, str)
     done = Signal()
 
@@ -165,7 +165,7 @@ class ApplyWorker(QThread):
                 if status == "ok":
                     applied_steps = apply_res.get("steps") or 0
                     shown = shift_after_apply(result, applied_steps)
-                    self.row_applied.emit(path, shown)
+                    self.row_applied.emit(path, shown, applied_steps)
                 elif status == "no_change":
                     self.row_analyzed.emit(path, result)
                 else:

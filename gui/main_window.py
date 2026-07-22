@@ -46,11 +46,19 @@ Rescan 으로 바뀐다(같은 자리에서 상태 전환). 분석/게인/파일
 Path\File 컬럼은 PathElideDelegate 로 그린다: 경로를 먼저 접고(C:\...\MUSIC\)
 파일명을 최후까지 보존하며, 그래도 좁으면 그때만 파일명을 elide 한다.
 
-겸용 버튼(진행바 옆) 규칙 — _update_action_states 에서 결정:
-  - 태그 스캔 워커 실행 중          -> "Pause" (활성)   : 파일 경계에서 스캔 중단
-  - 분석/적용/액션 워커 실행 중     -> "Cancel"(활성)   : 청크/파일 경계에서 중단
-  - 멈춤 + 미스캔(pending) 행 있음  -> "Rescan"(활성)   : 남은 pending 이어 스캔
-  - 멈춤 + pending 없음             -> "Cancel"(비활성) : 동작 없음(기본 상태)
+컬럼폭·정렬·창 기하 영속화(QSettings("GaindB","GaindB")): 창을 닫을 때 저장하고
+시작 시 복원한다. 원본 frmMain 의 Form_Load/Form_Unload(GetSetting/SaveSetting
+으로 Column01..·FormWidth/Height·WindowState 저장)을 관찰해 독립 구현한 것으로,
+저장 매체(QSettings)·키 문자열은 원본과 무관하고 "재기동 시 폭·창 크기·정렬
+복원" 동작만 재현한다. 컬럼 폭은 원본 ListView 처럼 전 컬럼 Interactive(사용자
+드래그로 개별 조절, 창 밖으로 넘치면 가로 스크롤 — 창 크기와 독립)로 두고,
+"Reset Column Widths"(원본 mnuResetColumns)는 columns.py 의 default_width 로
+되돌린다. 정렬 상태 저장은 원본에 없는 확장이다(원본은 정렬을 저장하지 않음).
+
+선택 하이라이트 이어짐(완전 매끈): 스타일시트로 셀 테두리와 헤더 섹션 구분선을
+없애고, 선택 시 행 전체에 팔레트 Highlight 색을 균일하게 깔아 컬럼 경계에서
+선택색이 갈라지지 않게 한다(원본 ListView FullRowSelect 동작에 부합). 다크테마
+팔레트 색을 그대로 쓰므로 팔레트 위임 원칙을 깨지 않는다.
 
 GUI 무계산 원칙: 수치는 gaindb.api 가 계산한 것만 표시한다.
 정렬 순서는 프록시(뷰) 좌표, 실제 데이터는 원본 모델 좌표이므로
@@ -68,6 +76,7 @@ import sys
 
 from PySide6.QtCore import (
     Qt, QSortFilterProxyModel, QCollator, QModelIndex, Signal, QRect, QPoint,
+    QSettings, QByteArray,
 )
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox,
@@ -78,7 +87,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QAction, QKeySequence
 
 from gui.model import FileTableModel, SORT_ROLE
-from gui.columns import Col
+from gui.columns import Col, COLUMNS, COLUMN_COUNT
 from gui.workers import (
     TagScanWorker, AnalyzeWorker, ApplyWorker, FileActionWorker,
     AlbumAnalyzeWorker, AlbumApplyWorker,
@@ -91,6 +100,34 @@ from gaindb.api import (
 # 위한 배율. 1000 이면 0.1% 단위(소수점 한 자리)까지 표현된다.
 _PROGRESS_SCALE = 1000
 
+# QSettings 조직/앱 이름(크로스플랫폼: Win=레지스트리, macOS=plist).
+_SETTINGS_ORG = "GaindB"
+_SETTINGS_APP = "GaindB"
+
+# 리스트뷰 스타일시트: 셀 테두리·헤더 섹션 구분선을 없애 선택 하이라이트가
+# 컬럼 경계에서 갈라지지 않고 행 전체로 이어지게 한다(완전 매끈). 선택 배경은
+# 팔레트 Highlight 색을 그대로 써 다크테마 팔레트 위임을 깨지 않는다.
+_TABLE_QSS = """
+QTableView {
+    border: none;
+    gridline-color: transparent;
+    outline: none;
+}
+QTableView::item {
+    border: 0px;
+    padding: 0px 2px;
+}
+QTableView::item:selected {
+    background: palette(highlight);
+    color: palette(highlighted-text);
+}
+QHeaderView::section {
+    border: none;
+    border-right: 1px solid palette(mid);
+    border-bottom: 1px solid palette(mid);
+    padding: 2px 4px;
+}
+"""
 
 def collect_mp3_paths(paths, recurse: bool = True) -> list[str]:
     """파일/폴더 경로 목록에서 .mp3 파일 경로를 모아 돌려준다.
@@ -143,8 +180,8 @@ class PathElideDelegate(QStyledItemDelegate):
       1) 전체 경로가 다 들어가면 그대로.
       2) 안 들어가면 경로를 접는다: 드라이브 + \...\ + 마지막 폴더 + \ + 파일명.
       3) 그렇게 최소로 접어도 넘치면 그때만 파일명을 뒤에서 elide 한다.
-    그리기만 커스터마이즈하고 배경·선택 하이라이트는 기본 스타일에 맡겨
-    다크테마 팔레트를 깨지 않는다. 전체 경로 툴팁·정렬은 모델이 담당한다.
+    배경·선택 하이라이트는 기본 스타일(drawControl)에 맡겨 스타일시트가 지정한
+    선택색·매끈한 경계를 그대로 따른다. 전체 경로 툴팁·정렬은 모델이 담당한다.
     """
 
     _SEP = "\u2026"  # '...' (한 글자 말줄임표)
@@ -357,6 +394,8 @@ class MainWindow(QMainWindow):
         self.resize(1040, 560)
         self.setAcceptDrops(True)
 
+        self._settings = QSettings(_SETTINGS_ORG, _SETTINGS_APP)
+
         self.model = FileTableModel(self)
         self.proxy = NaturalSortProxy(self)
         self.proxy.setSourceModel(self.model)
@@ -393,6 +432,7 @@ class MainWindow(QMainWindow):
         self._build_central()
         self._build_statusbar()
         self._build_context_menu()
+        self._restore_settings()
         self._update_action_states()
 
     # --- UI 구성 ---
@@ -441,6 +481,12 @@ class MainWindow(QMainWindow):
         self.act_each_folder_album.setToolTip(
             "Treat each folder as a separate album (else all files = one album)")
 
+        # Reset Column Widths(원본 mnuResetColumns) — 기본폭으로 되돌림.
+        self.act_reset_columns = QAction("Reset Column Widths", self)
+        self.act_reset_columns.setToolTip(
+            "Reset all column widths to their defaults")
+        self.act_reset_columns.triggered.connect(self._reset_column_widths)
+
     def _wire_menu_actions(self):
         """툴바 Track 액션이 만들어진 뒤 메뉴에 배치한다(액션 공유)."""
         self.menu_file.addAction(self.act_add_files)
@@ -459,6 +505,8 @@ class MainWindow(QMainWindow):
         self.menu_modify.addAction(self.act_undo)
 
         self.menu_options.addAction(self.act_each_folder_album)
+        self.menu_options.addSeparator()
+        self.menu_options.addAction(self.act_reset_columns)
 
     def _build_toolbar(self):
         tb = QToolBar("Main", self)
@@ -544,20 +592,25 @@ class MainWindow(QMainWindow):
             QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(
             QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.table.setAlternatingRowColors(True)
+        # 완전 매끈: 세로 그리드선 끔 + 스타일시트로 셀 테두리·헤더 구분선 제거.
+        # 선택 하이라이트가 컬럼 경계 없이 행 전체로 이어진다.
+        self.table.setShowGrid(False)
+        self.table.setStyleSheet(_TABLE_QSS)
+        # 교대 행 색상은 선택색과 뒤섞여 경계가 도드라져 보이므로 끈다.
+        self.table.setAlternatingRowColors(False)
         self.table.verticalHeader().setVisible(False)
         self.table.delete_requested.connect(self._on_delete_selected)
         self.table.doubleClicked.connect(self._on_double_click)
         self.table.context_menu_requested.connect(self._show_context_menu)
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(
-            int(Col.NAME), QHeaderView.ResizeMode.Stretch)
-        # Track + Album 수치 컬럼 전부 내용맞춤(원본 컬럼 순서, columns.py 정의).
-        for c in (Col.VOLUME, Col.TRACK_GAIN, Col.CLIP,
-                  Col.ALBUM_VOLUME, Col.ALBUM_GAIN, Col.ALBUM_CLIP,
-                  Col.MAX_AMP):
+        # 원본 ListView 처럼 전 컬럼 Interactive(드래그한 경계가 그대로 움직이고
+        # 다른 컬럼은 유지, 창 밖으로 넘치면 가로 스크롤 — 창 크기와 독립).
+        # 마지막 섹션 자동 확장을 꺼야 "드래그 반대편이 움직이는" 현상이 없다.
+        header.setStretchLastSection(False)
+        for cdef in COLUMNS:
             header.setSectionResizeMode(
-                int(c), QHeaderView.ResizeMode.ResizeToContents)
+                int(cdef.index), QHeaderView.ResizeMode.Interactive)
+            self.table.setColumnWidth(int(cdef.index), cdef.default_width)
         self.model.rowsInserted.connect(self._update_action_states)
         self.model.rowsRemoved.connect(self._update_action_states)
         self.model.modelReset.connect(self._update_action_states)
@@ -602,6 +655,79 @@ class MainWindow(QMainWindow):
         self.ctx_play = QAction("Play mp3 file", self)
         self.ctx_play.triggered.connect(self._on_ctx_play)
         self.ctx_menu.addAction(self.ctx_play)
+
+    # --- 설정(컬럼폭·정렬·창 기하) 저장/복원 ---
+
+    def _default_window_size(self):
+        """저장된 geometry 가 없을 때, 전 컬럼 default_width 합계에 맞춰 초기
+        창 가로폭을 정한다(모든 컬럼이 잘리지 않고 딱 보이는 폭). 원본 frmMain
+        은 고정 폼 크기라 이 자동 맞춤은 우리 확장이다."""
+        total = sum(cdef.default_width for cdef in COLUMNS)
+
+        frame = self.table.frameWidth() * 2
+        vbar = self.table.verticalScrollBar().sizeHint().width()
+        margins = self.contentsMargins()
+        extra = frame + vbar + 4 + margins.left() + margins.right()
+
+        avail = self.screen().availableGeometry()
+        width = min(total + extra, avail.width())
+        height = max(600, int(avail.height() * 0.6))
+        self.resize(width, height)
+
+    def _restore_settings(self):
+        """QSettings 에서 창 기하·컬럼폭·정렬 상태를 복원한다(시작 시).
+
+        원본 frmMain.Form_Load 의 GetSetting 복원에 대응. 저장 매체·키는 원본과
+        무관하고 "재기동 시 폭·창 크기·정렬 복원" 동작만 재현한다. 컬럼폭은
+        저장 시점 컬럼 수(columns/count)가 현재 COLUMN_COUNT 와 다르면 통째로
+        건너뛰어(스키마 불일치 방어) default_width 초기값을 유지한다.
+        """
+        geo = self._settings.value("window/geometry")
+        if isinstance(geo, QByteArray) and not geo.isEmpty():
+            self.restoreGeometry(geo)
+        else:
+            self._default_window_size()
+
+        saved_count = self._settings.value("columns/count", type=int)
+        if saved_count == COLUMN_COUNT:
+            for cdef in COLUMNS:
+                key = f"columns/width_{int(cdef.index)}"
+                w = self._settings.value(key, type=int)
+                if w and w > 0:
+                    self.table.setColumnWidth(int(cdef.index), w)
+
+        # 정렬 복원(원본에 없는 확장). sortByColumn 재생 -> 프록시/QCollator/
+        # None 뒤로 정책이 그대로 태워진다. 저장값 없으면 NAME 오름 유지.
+        sort_col = self._settings.value("sort/column", type=int)
+        if sort_col is not None and 0 <= sort_col < COLUMN_COUNT:
+            order_val = self._settings.value("sort/order", type=int)
+            order = (Qt.SortOrder.DescendingOrder if order_val == 1
+                     else Qt.SortOrder.AscendingOrder)
+            self.table.sortByColumn(sort_col, order)
+
+    def _save_settings(self):
+        """창 기하·컬럼폭·정렬 상태를 QSettings 에 저장한다(창 닫기 시).
+
+        원본 frmMain.Form_Unload 의 SaveSetting 저장에 대응(매체·키는 독립).
+        """
+        self._settings.setValue("window/geometry", self.saveGeometry())
+
+        self._settings.setValue("columns/count", COLUMN_COUNT)
+        for cdef in COLUMNS:
+            key = f"columns/width_{int(cdef.index)}"
+            self._settings.setValue(key, self.table.columnWidth(int(cdef.index)))
+
+        header = self.table.horizontalHeader()
+        self._settings.setValue("sort/column", header.sortIndicatorSection())
+        order = header.sortIndicatorOrder()
+        self._settings.setValue(
+            "sort/order", 1 if order == Qt.SortOrder.DescendingOrder else 0)
+
+    def _reset_column_widths(self):
+        """모든 컬럼폭을 columns.py 의 default_width 로 되돌린다(원본 mnuResetColumns)."""
+        for cdef in COLUMNS:
+            self.table.setColumnWidth(int(cdef.index), cdef.default_width)
+        self.statusBar().showMessage("Column widths reset to defaults")
 
     # --- Album 씨앗 관리 ---
 
@@ -1354,10 +1480,11 @@ class MainWindow(QMainWindow):
         else:
             event.ignore()
 
-    # --- 창 닫기: 실행 중 워커 안전 종료 ---
+    # --- 창 닫기: 설정 저장 + 실행 중 워커 안전 종료 ---
 
     def closeEvent(self, event):
-        """창을 닫을 때 실행 중인 워커를 취소·대기시킨 뒤 닫는다."""
+        """창을 닫을 때 설정을 저장하고 실행 중인 워커를 취소·대기시킨 뒤 닫는다."""
+        self._save_settings()
         w = self._worker
         if w is not None:
             w.request_cancel()

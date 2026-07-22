@@ -223,6 +223,14 @@ GaindB/
 - **Track Gain steps==0 정책(갱신됨 — 이전 "steps==0 곡 제외"를 폐기)**: Track Gain 은 대상 행을 steps 값과 무관하게 전부 워커에 넘긴다(steps==0 곡도 사전 제외하지 않음). 태그 기록 여부 판단은 코어(`apply_file_track_gain` → `apply_track_gain`)에 맡긴다 — steps==0 이라도 태그가 없거나 오래됐으면(dirty) 코어가 태그를 쓰고(원본 mp3gain `-r` 의 "…but tag needs update" 동작), 이미 최신 태그면 디코딩 없이 `no_change`(tag_written=False)로 넘어간다. `ApplyWorker.run` 도 steps==0 단축 경로를 제거하고 항상 `apply_file_track_gain` 을 호출한 뒤 코어 status(ok→row_applied / no_change→row_analyzed / 그외→failed)로만 분기한다. **폐기 사유**: 구버전은 GUI(`_on_gain`)가 result.steps==0 곡을 대상에서 사전 제외하고 워커의 steps==0 도 apply 를 건너뛰어, 태그 삭제 후 이미 목표 볼륨인 곡의 dirty 태그가 안 써지는 버그가 있었다(태그 삭제→분석→Track Gain 시 재현). GUI 행 status 로는 태그 존재 여부를 구분할 수 없다(태그 삭제 후 분석한 행도 status=analyzed)는 점이 사전 제외를 불가능하게 하는 근거. 트레이드오프: steps==0 곡도 워커를 거쳐 태그를 한 번 재확인하는 비용이 생기나, 태그가 있으면 코어가 디코딩을 생략해 가볍다.
 - **8단계 GUI 세부 재현 메모(원본 폼 대조)**: NAME 은 전체 경로 표시. 자연 정렬(QCollator numericMode, 미분석 None 은 항상 뒤). 다크테마 안전 색상(none 은 OS 팔레트 위임). 플랫폼 폰트(Win 만 Segoe UI Variable Text, QFontInfo 확인 후). 유니코드 파일명 완전 지원(원본 VB6 ANSI 한계 개선). Delete 키=선택 삭제, Clear 버튼/Ctrl+Shift+Delete=전체 삭제(원본 ClearFiles/ClearAll 2분리), 더블클릭=기본앱 재생, 빈 영역 고무줄 선택(QTableView 직접 구현). 추가 시 태그 동기 스캔(`read_file_tags`, 곡당 ~1ms) + 대량 추가는 `TagScanWorker` 백그라운드(겸용 버튼: 스캔 중=Pause·분석/게인/액션 중=Cancel·pending 있으면=Rescan). Track Analysis 대상="선택 있으면 선택·없으면 전체" 중 값 없는 행만. Track Gain 은 대상 행을 steps 무관 전부 워커에 넘김(steps==0 제외 안 함, 위 정책 참조). Track Analysis 는 태그 미기록(원본 `/o` 출력전용 확증), 기록은 Track Gain(`/g` changeGainAndTag)뿐. 우클릭 팝업: `contextMenuEvent`→`context_menu_requested`→`_show_context_menu`, 우클릭 행이 선택에 없으면 그 행만 선택. Undo 성공 시 `shift_after_apply(result, undo_steps)`로 표시 복귀, Remove Tags 성공 시 `clear_result`로 미분석 복귀. 단축키 Add Files=Ctrl+F·Folder=Ctrl+D·Analysis=Ctrl+T·Gain=Ctrl+G(원본 메뉴 재현). 파일 내부 진행률은 duration 기반 예측 바이트 대비 누적 비율, 진행바 세분 합산(_PROGRESS_SCALE=1000). 창 닫기 시 워커 request_cancel→wait(10s).
 - **로그 기능(Error/Analysis/Change) 확정 정책(이번 세션)**: 원본 frmLogs / LogErr·LogRadioAnalysis·LogAlbumAnalysis·LogChange 를 clean-room 재현하되 세 가지를 합의로 확정. (1) **켜기/끄기 UX = A안(체크박스 노출)**: 원본은 체크박스를 숨기고(`Visible=0`) "경로 유무"로 on/off 를 판정하나, 원본에 실재하는 그 체크박스를 노출해 on/off(enabled)와 위치(path)를 분리했다. 로그를 잠깐 꺼도 경로가 사라지지 않고 on/off 가 화면에 드러난다(원본 이탈이나 원본 컨트롤 재사용이라 순수 신설 아님). 활성 판정 = `enabled and path`. (2) **dB 표기 = 정밀값 통일**: 원본 LogChange 는 화면 근사 1.505 를 쓰나 정본 `FIVELOG10TWO=1.50514997831991`로 통일(db_to_steps 정밀값 정책 일관). 로그는 무손실 검증 대상이 아니라 사람이 읽는 기록이라 픽셀 재현보다 프로젝트 일관성 우선. (3) **타임스탬프 = ISO 8601 고정**(`YYYY-MM-DD HH:MM:SS`): 원본 `CStr(Now)`는 OS 로케일 의존이라 재현 부적절. (4) **Album Analysis Log = 그룹당 한 줄**(대표 key=폴더 경로): 원본은 곡마다 AlbumdB 를 남기나 앨범 dB 는 그룹당 하나라 그룹당 한 줄로 축약(로그 가독성). 구현: `gui/logging.py`(Qt 비의존 순수 모듈, LogConfig + log_error/log_analysis_track/log_analysis_album/log_change + check_writable), `gui/dialogs/logs_dialog.py`(원본 frmLogs 대응 다이얼로그), main_window 배선(각 워커 완료 슬롯에서 결과 객체를 포맷해 append — 원본 subprocess stdout 파싱 대신 코어 직접 결과라 단순). 로그 실패는 `_safe_log` 가 LogWriteError 를 잡아 상태바로만 안내(본작업 불중단, 원본도 로그 실패 시 처리 계속). 설정은 QSettings `logs/*` 6키로 영속화. ApplyWorker·AlbumApplyWorker 의 `row_applied` 시그널을 `(str, dict, int)`로 넓혀 실제 적용 steps 를 Change Log 로 전달(steps==0 은 log_change 내부 no-op).
+- **트레이 기능(Minimize to tray) 확정 정책(이번 세션)**: 원본 frmSysTray / frmMain mnuSysTray·Form_Resize 를 clean-room 재현.
+  1) 진입 = Options → "Minimize to tray" 체크(기본 꺼짐, QSettings `tray/minimize_to_tray` 영속화).
+  2) 동작 = 옵션 켜짐 + 최소화 시 창 숨김 + 트레이 아이콘 표시(`changeEvent`/WindowStateChange 로 감지).
+  3) 복원 = 트레이 좌클릭·더블클릭 또는 우클릭 팝업 Restore. 종료 = 팝업 Exit(`self.close()` 후 `QApplication.quit()` — 트레이가 살아 있으면 close 만으론 이벤트 루프가 안 끝남).
+  4) X(닫기)는 원본대로 실제 종료(트레이로 안 보냄). macOS 는 Dock 최소화 관례라 자동 트레이 이동만 비활성(아이콘·메뉴 자체는 동작).
+  5) 아이콘 = `assets/GainDB.png`(창·트레이 공용, PyInstaller 대비 `gui/resources.py` 경로 헬퍼). 파일 없으면 표준 스타일 아이콘 대체.
+  6) 트레이는 데스크톱 환경 의존이라 자동 단위 테스트 없음 — 수동 검증으로 확정.
+
 
 ### 10.3. 현재 상태 · 완료 이력 · 다음 할 일
 
@@ -244,11 +252,15 @@ GaindB/
 - `b936eec`·`d2364fe` feat(gui): ApplyWorker·AlbumApplyWorker `row_applied` 를 `(str,dict,int)`로 넓혀 적용 steps 전달(Change Log 용).
 - `ffb0ba8` feat(gui): 로그 config 로드/저장·Logs 다이얼로그·각 슬롯 로그 호출 배선(main_window).
 - `ec836ae` test: `tests/test_logging.py` — 형식·활성판정·정밀 dB·check_writable(12건, 전체 130건 PASS).
+- `9c089f9` feat(gui): 리소스 경로 헬퍼(`gui/resources.py`, PyInstaller `_MEIPASS` 대비).
+- `34eab1f` feat(gui): 앱/창 아이콘 설정(`assets/GainDB.png`).
+- `bb6a9e7` feat(gui): Minimize to tray(트레이 아이콘·Restore/Exit·옵션 영속화, clean-room frmSysTray).
+- `e36f6bf` fix(gui): 트레이 Exit 시 앱 완전 종료(`QApplication.quit()` after close).
 
 **다음 할 일(남은 것만).**
 
 - **후순위 기능 GUI(착수 시 해당 원본 폼 붙여 제공).**
-  - 트레이·언어메뉴(원본 basLocalizer 대응, tr()/번역파일). (컬럼폭·정렬 저장은 `c83b9f1`, 로그파일은 `ec836ae` 로 완료.)
+  - 언어메뉴(원본 basLocalizer 대응, tr()/번역파일). (컬럼폭·정렬 저장은 `c83b9f1`, 로그파일은 `ec836ae`, 트레이는 `e36f6bf` 로 완료.)
 - **실클릭 회귀 — 해시 무결성만 남음(반복 점검).** 취소 후 파일 원본 무결성을 `audio_body_sha256` 로 실측 비교. GUI 를 건드릴 때마다 재확인하는 체크리스트로 존치.
 - **보류·점검 항목(성격이 각각 달라 완료로 옮기지 않고 존치).**
   - **비가역(255 클램프) 사전 경고 — 보류 확정(합의).** 원본은 경고 없이 조용히 클램프(원본 동일 재현)라 사전 경고는 원본에 없는 추가 기능. 재론하려면 원본 이탈 감수 가치의 사용자 합의 필요.

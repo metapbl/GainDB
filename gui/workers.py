@@ -306,7 +306,7 @@ class AlbumApplyWorker(QThread):
     progress = Signal(int, int)         # 분석 구간: 진행바+카운트
     apply_progress = Signal(int, int)   # 적용 구간: 카운트만(진행바 유지)
     file_progress = Signal(float)
-    row_applied = Signal(str, dict)
+    row_applied = Signal(str, dict, int)   # path, 표시 dict, 적용 steps(로그용)
     row_analyzed = Signal(str, dict)
     failed = Signal(str, str)
     done = Signal()
@@ -393,7 +393,7 @@ class AlbumApplyWorker(QThread):
                         else:
                             shown = track_res
                         if apply_res.get("status") == "ok":
-                            self.row_applied.emit(path, shown)
+                            self.row_applied.emit(path, shown, steps)
                         else:
                             self.row_analyzed.emit(path, shown)
                     except (DecodeCancelled, GainCancelled):

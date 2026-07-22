@@ -158,3 +158,92 @@ class ApplyFileAlbumGainTagTest(BaseGainTest):
                             f"track gain tag missing: {p}")
             self.assertTrue(info.have_album_gain,
                             f"album gain tag missing: {p}")
+
+
+class AlbumPeakShiftTest(BaseGainTest):
+    """앨범 게인 적용 시 track/album peak 이 x2^(steps/4) 로 올바르게 이동해
+    태그에 저장되고, 그 값이 실제 적용 후 파형 peak 과 일치하는지 검증한다
+    (9번 함정 표시 수식 (3) '적용 후 peak 이동' 이 앨범 경로에서도 지켜지는지).
+
+    핵심: 앨범 경로(_apply_one_album_file)와 트랙 경로(apply_track_gain)는
+    같은 change_gain_and_tag 를 호출해 peak 을 이동시키므로 구조적으로 같은
+    공식을 쓴다. 이 테스트는 그 결과를 fixture 사본에서 실측으로 고정한다.
+
+    255 클램프(비가역) 회피를 위해 반드시 음수 스텝(음량 낮추기)으로 유도한다
+    (target 을 분석 dB 보다 낮게 잡아 db_to_steps(album_db + mod) < 0 보장).
+    단곡을 '1곡 앨범' 으로 처리해 album_db == track_db, album_peak ==
+    track_peak 이 되게 하면 대조가 깔끔하다.
+    """
+
+    # 정규화 peak 허용오차. 원본 _PEAK_EPS(+-32768 스케일 3.3)를 정규화로 환산.
+    _PEAK_EPS_NORM = 3.3 / 32768.0
+
+    def _pick_fixture(self):
+        for name in _ALBUM_FIXTURES:
+            try:
+                fixture_path(name)
+            except Exception:
+                continue
+            return name
+        return None
+
+    def test_album_peak_shifts_and_matches_waveform(self):
+        name = self._pick_fixture()
+        if name is None:
+            self.skipTest("no 44.1k fixture available")
+        copy = self.copy_fixture(name)
+
+        # 깨끗한 상태에서 시작(혹시 사본에 태그가 있으면 제거).
+        api.remove_file_tags(copy)
+
+        # (1) 적용 전 원재료: peak_before, album_db(=track_db, 단곡).
+        raw = api.analyze_album_file(copy)
+        agg = api.album_gain_from_files([raw])
+        self.assertEqual(agg["status"], "ok")
+        peak_before = agg["album_peak"]
+        album_db = agg["album_db"]
+        self.assertGreater(peak_before, 0.0)
+
+        # (2) 음수 스텝 유도: 분석 dB 보다 충분히 낮은 target 을 역산한다.
+        #     steps = db_to_steps(album_db + (target - 89)) 가 확실히 < 0 이도록
+        #     album_db + mod 를 약 -4스텝(약 -6dB)로 만든다.
+        from gaindb.analysis import DB_PER_STEP
+        mod = -4.0 * DB_PER_STEP - album_db
+        target = api.DEFAULT_TARGET_DB + mod
+
+        # (3) 적용(파괴적, 사본). track_seed 로 재디코딩 생략.
+        res = api.apply_file_album_gain(
+            copy, agg["album_db"], agg["album_peak"],
+            agg["album_min"], agg["album_max"],
+            track_seed=raw, target_db=target,
+        )
+        steps = res["steps"]
+        if steps >= 0:
+            self.skipTest(f"could not induce negative steps (got {steps})")
+        self.assertEqual(res["status"], "ok")
+
+        # (4) 태그에 저장된 peak = peak_before * 2^(steps/4) 인가.
+        factor = 2.0 ** (steps / 4.0)
+        expected_peak = peak_before * factor
+        info, _ = read_mp3gain_tags(copy)
+        self.assertTrue(info.have_track_peak, "track peak tag missing after apply")
+        self.assertTrue(info.have_album_peak, "album peak tag missing after apply")
+        # 태그는 6자리 소수로 저장/재파싱되므로 소수 오차를 넉넉히 허용.
+        self.assertAlmostEqual(info.track_peak, expected_peak, places=4)
+        self.assertAlmostEqual(info.album_peak, expected_peak, places=4)
+
+        # (5) 저장된 peak = 실제 적용 후 파형 peak 인가(핵심 확증).
+        left, right, _sr = decode_pcm(copy)
+        real_peak_after = track_peak(left, right)
+        del left, right
+        # 음수 스텝이라 클램프(255 상한) 위험 없음 => 근접 일치해야 한다.
+        self.assertAlmostEqual(real_peak_after, info.track_peak,
+                               delta=self._PEAK_EPS_NORM)
+
+        # (6) 이어지는 트랙 게인(89)이 보는 상태에 거짓 clip 이 없어야 한다.
+        #     음량을 낮춘 파일이므로 89 로 되돌려도 definite clip 이면 안 된다.
+        shown = api.read_file_tags(copy, api.DEFAULT_TARGET_DB)
+        self.assertEqual(shown["status"], "ok")
+        self.assertNotEqual(
+            shown["clip_state"], "definite",
+            "false definite clip after lowering then reading at 89 dB")

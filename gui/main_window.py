@@ -6,6 +6,12 @@ r"""gui/main_window.py — 메인 창(8단계: Track + Album, 태그 스캔·분
 (원본 AddSingleFile), Track/Album 의 Analysis 와 Gain 을 QThread 워커로 연결한다.
 우클릭 팝업(원본 mnuPopup)으로 Clear Analysis·Undo·Remove Tags·Play 를 제공한다.
 
+로그(원본 LogErr/LogRadioAnalysis/LogAlbumAnalysis/LogChange 재현): Options →
+Logs... 로 Error/Analysis/Change 로그 경로·on/off 를 설정한다(gui/logging.py +
+gui/dialogs/logs_dialog.py). 각 워커 완료 슬롯에서 이미 보유한 결과 객체를 그대로
+포맷해 파일에 append 한다(원본은 subprocess stdout 파싱, 우리는 코어 직접 결과라
+더 단순). 로그 실패는 _safe_log 가 잡아 상태바로만 안내하고 본작업을 막지 않는다.
+
 메뉴바 + 툴바 공존(원본 frmMain 도 메뉴+툴바 병존). Track 액션의 QAction 을
 메뉴에도 재사용해 단축키·enabled 관리를 한 곳으로 통일한다. Album 은 신규
 QAction(Album Analysis=Ctrl+U / Album Gain=Ctrl+B / Each folder is album 체크).
@@ -50,10 +56,11 @@ Path\File 컬럼은 PathElideDelegate 로 그린다: 경로를 먼저 접고(C:\
 시작 시 복원한다. 원본 frmMain 의 Form_Load/Form_Unload(GetSetting/SaveSetting
 으로 Column01..·FormWidth/Height·WindowState 저장)을 관찰해 독립 구현한 것으로,
 저장 매체(QSettings)·키 문자열은 원본과 무관하고 "재기동 시 폭·창 크기·정렬
-복원" 동작만 재현한다. 컬럼 폭은 원본 ListView 처럼 전 컬럼 Interactive(사용자
-드래그로 개별 조절, 창 밖으로 넘치면 가로 스크롤 — 창 크기와 독립)로 두고,
-"Reset Column Widths"(원본 mnuResetColumns)는 columns.py 의 default_width 로
-되돌린다. 정렬 상태 저장은 원본에 없는 확장이다(원본은 정렬을 저장하지 않음).
+복원" 동작만 재현한다. 로그 설정(logs/*)도 같은 QSettings 에 함께 영속화한다.
+컬럼 폭은 원본 ListView 처럼 전 컬럼 Interactive(사용자 드래그로 개별 조절,
+창 밖으로 넘치면 가로 스크롤 — 창 크기와 독립)로 두고, "Reset Column Widths"
+(원본 mnuResetColumns)는 columns.py 의 default_width 로 되돌린다. 정렬 상태
+저장은 원본에 없는 확장이다(원본은 정렬을 저장하지 않음).
 
 선택 하이라이트 이어짐(완전 매끈): 스타일시트로 셀 테두리와 헤더 섹션 구분선을
 없애고, 선택 시 행 전체에 팔레트 Highlight 색을 균일하게 깔아 컬럼 경계에서
@@ -92,6 +99,11 @@ from gui.workers import (
     TagScanWorker, AnalyzeWorker, ApplyWorker, FileActionWorker,
     AlbumAnalyzeWorker, AlbumApplyWorker,
 )
+from gui.logging import (
+    LogConfig, LogWriteError,
+    log_error, log_analysis_track, log_analysis_album, log_change,
+)
+from gui.dialogs.logs_dialog import LogsDialog
 from gaindb.api import (
     DEFAULT_TARGET_DB, recompute_target, shift_after_apply, group_by_album,
 )
@@ -395,6 +407,8 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(True)
 
         self._settings = QSettings(_SETTINGS_ORG, _SETTINGS_APP)
+        self._log_config = LogConfig()
+        self._load_log_config()
 
         self.model = FileTableModel(self)
         self.proxy = NaturalSortProxy(self)
@@ -481,6 +495,12 @@ class MainWindow(QMainWindow):
         self.act_each_folder_album.setToolTip(
             "Treat each folder as a separate album (else all files = one album)")
 
+        # Logs...(원본 mnuLogs) — 로그 설정 다이얼로그 열기.
+        self.act_logs = QAction("Logs...", self)
+        self.act_logs.setToolTip(
+            "Configure error / analysis / change log files")
+        self.act_logs.triggered.connect(self._on_open_logs)
+
         # Reset Column Widths(원본 mnuResetColumns) — 기본폭으로 되돌림.
         self.act_reset_columns = QAction("Reset Column Widths", self)
         self.act_reset_columns.setToolTip(
@@ -506,6 +526,7 @@ class MainWindow(QMainWindow):
 
         self.menu_options.addAction(self.act_each_folder_album)
         self.menu_options.addSeparator()
+        self.menu_options.addAction(self.act_logs)
         self.menu_options.addAction(self.act_reset_columns)
 
     def _build_toolbar(self):
@@ -656,7 +677,35 @@ class MainWindow(QMainWindow):
         self.ctx_play.triggered.connect(self._on_ctx_play)
         self.ctx_menu.addAction(self.ctx_play)
 
-    # --- 설정(컬럼폭·정렬·창 기하) 저장/복원 ---
+    # --- 설정(컬럼폭·정렬·창 기하·로그) 저장/복원 ---
+
+    def _load_log_config(self):
+        """QSettings 에서 로그 on/off·경로를 복원한다(원본 frmMain Form_Load 대응)."""
+        s = self._settings
+        c = self._log_config
+        c.error_enabled = s.value("logs/error_enabled", False, type=bool)
+        c.error_path = s.value("logs/error_path", "", type=str)
+        c.analysis_enabled = s.value("logs/analysis_enabled", False, type=bool)
+        c.analysis_path = s.value("logs/analysis_path", "", type=str)
+        c.change_enabled = s.value("logs/change_enabled", False, type=bool)
+        c.change_path = s.value("logs/change_path", "", type=str)
+
+    def _on_open_logs(self):
+        """Options → Logs...: 로그 설정 다이얼로그를 연다(원본 mnuLogs_Click)."""
+        dlg = LogsDialog(self._log_config, self)
+        dlg.exec()
+
+    def _safe_log(self, func, *args):
+        """로그 기록을 호출하되 실패해도 작업을 막지 않는다(상태바로만 안내).
+
+        로그는 부가 기능이라, 파일 쓰기 실패가 분석/적용/undo 본작업을 중단시켜서는
+        안 된다(원본도 로그 실패 시 팝업만 띄우고 처리는 계속). LogWriteError 를
+        잡아 상태바에 한 줄 남기고 넘어간다.
+        """
+        try:
+            func(*args)
+        except LogWriteError as exc:
+            self.statusBar().showMessage(f"Log write failed: {exc}")
 
     def _default_window_size(self):
         """저장된 geometry 가 없을 때, 전 컬럼 default_width 합계에 맞춰 초기
@@ -706,7 +755,7 @@ class MainWindow(QMainWindow):
             self.table.sortByColumn(sort_col, order)
 
     def _save_settings(self):
-        """창 기하·컬럼폭·정렬 상태를 QSettings 에 저장한다(창 닫기 시).
+        """창 기하·컬럼폭·정렬·로그 설정을 QSettings 에 저장한다(창 닫기 시).
 
         원본 frmMain.Form_Unload 의 SaveSetting 저장에 대응(매체·키는 독립).
         """
@@ -722,6 +771,14 @@ class MainWindow(QMainWindow):
         order = header.sortIndicatorOrder()
         self._settings.setValue(
             "sort/order", 1 if order == Qt.SortOrder.DescendingOrder else 0)
+
+        c = self._log_config
+        self._settings.setValue("logs/error_enabled", c.error_enabled)
+        self._settings.setValue("logs/error_path", c.error_path)
+        self._settings.setValue("logs/analysis_enabled", c.analysis_enabled)
+        self._settings.setValue("logs/analysis_path", c.analysis_path)
+        self._settings.setValue("logs/change_enabled", c.change_enabled)
+        self._settings.setValue("logs/change_path", c.change_path)
 
     def _reset_column_widths(self):
         """모든 컬럼폭을 columns.py 의 default_width 로 되돌린다(원본 mnuResetColumns)."""
@@ -988,13 +1045,7 @@ class MainWindow(QMainWindow):
     # --- Album Analysis / Album Gain 핸들러 ---
 
     def _on_album_analyze(self):
-        """Album Analysis(원본 album 모드 재현). 선택(없으면 전체) 전부 분석.
-
-        원본 mp3gain -a 는 지정 파일 전부를 분석해 그룹 히스토그램을 합산한다.
-        일부만 분석하면 앨범 dB 가 틀리므로 needs_analysis 필터를 걸지 않는다
-        (Track 값이 있어도 Album 값은 없을 수 있어 재분석이 옳다). 진행/카운트
-        슬롯은 Track 분석과 동일한 것을 재사용하고, 앨범 고유 시그널만 새 슬롯.
-        """
+        """Album Analysis(원본 album 모드 재현). 선택(없으면 전체) 전부 분석."""
         if self._is_busy():
             return
 
@@ -1040,13 +1091,7 @@ class MainWindow(QMainWindow):
         self._worker.start()
 
     def _on_album_gain(self):
-        """Album Gain 적용(원본 AlbumGain 재현). AlbumApplyWorker 위임.
-
-        대상: 선택 있으면 선택·없으면 전체. 그룹핑은 Each folder is album 체크.
-        씨앗(_album_raws)에서 대상 경로 원재료만 추려 넘겨 재디코딩을 막는다
-        (없으면 워커가 그 그룹을 분석). 진행/적용 슬롯은 Track Gain 과 동일한
-        것을 재사용한다.
-        """
+        """Album Gain 적용(원본 AlbumGain 재현). AlbumApplyWorker 위임."""
         if self._is_busy():
             return
 
@@ -1294,9 +1339,16 @@ class MainWindow(QMainWindow):
         fr = self.model.get_row(r)
         fr.set_result(result)
         self.model.row_changed(r)
+        # Analysis Log(원본 LogRadioAnalysis): 분석된 Track dB·MaxAmp 기록.
+        if result.get("status") == "ok" and result.get("track_db") is not None:
+            self._safe_log(
+                log_analysis_track, self._log_config, path,
+                result.get("track_db"), result.get("curr_max_amp") or 0.0)
 
     def _on_worker_failed(self, path: str, msg: str):
         self._failed_count += 1
+        # Error Log(원본 LogErr): 오류 한 건 기록(행 유무와 무관하게 남긴다).
+        self._safe_log(log_error, self._log_config, f"{path}: {msg}")
         r = self.model.find_row_by_path(path)
         if r is None:
             return
@@ -1327,10 +1379,17 @@ class MainWindow(QMainWindow):
         self._album_raws[path] = raw
 
     def _on_album_group_done(self, key: str, agg: dict):
-        """한 앨범 그룹의 집계 완료(상태바 표기용, 모델 반영은 row_done 이 담당)."""
-        # 표시는 row_done(_on_worker_row_done)이 곡별로 처리하므로 여기서는
-        # 별도 모델 변경이 없다. 진단·정보 표기 용도로만 남겨둔다.
-        pass
+        """한 앨범 그룹의 집계 완료(Analysis Log 에 AlbumdB 기록).
+
+        표시는 row_done(_on_worker_row_done)이 곡별로 처리한다. 여기서는 원본
+        LogAlbumAnalysis 대응으로 그룹의 album_db 를 로그에만 남긴다(모델 미변경).
+        원본은 곡마다 AlbumdB 를 남기나, 우리는 그룹 단위로 한 줄(대표 key)만
+        남긴다 - 앨범 dB 는 그룹당 하나라 중복을 줄인 것(합의, 10.2 로그 가독성).
+        """
+        if agg.get("status") == "ok" and agg.get("album_db") is not None:
+            self._safe_log(
+                log_analysis_album, self._log_config, str(key),
+                agg.get("album_db"))
 
     # --- 적용 워커 슬롯(Track Gain + Album Gain 공유) ---
 
@@ -1376,8 +1435,13 @@ class MainWindow(QMainWindow):
         fr.set_result(result)
         self.model.row_changed(r)
 
-    def _on_apply_applied(self, path: str, result: dict):
-        """실제 게인이 적용된 행. shift 반영된 표시 dict 로 갱신."""
+    def _on_apply_applied(self, path: str, result: dict, steps: int = 0):
+        """실제 게인이 적용된 행. shift 반영된 표시 dict 로 갱신 + Change Log.
+
+        steps 는 워커가 실제 적용한 스텝(Track/Album 공유). Change Log(원본
+        LogChange)에 steps × 정밀 dB 로 남긴다. steps==0 이면 log_change 가
+        내부에서 no-op(변경 없음은 기록 안 함).
+        """
         self._applied_count += 1
         r = self.model.find_row_by_path(path)
         if r is None:
@@ -1385,6 +1449,7 @@ class MainWindow(QMainWindow):
         fr = self.model.get_row(r)
         fr.mark_applied(result)
         self.model.row_changed(r)
+        self._safe_log(log_change, self._log_config, path, steps)
 
     def _on_apply_finished(self):
         cancelled = self._worker.was_cancelled if self._worker else False
@@ -1416,16 +1481,22 @@ class MainWindow(QMainWindow):
         self.progress.setValue(done)
 
     def _on_action_undone(self, path: str, undo_steps: int):
-        """undo 성공: 되돌린 스텝으로 표시를 갱신(원본 UndoFileGain 의 AlterDb)."""
+        """undo 성공: 되돌린 스텝으로 표시를 갱신(원본 UndoFileGain 의 AlterDb).
+
+        Change Log(원본 LogChange)에 undo 스텝을 기록한다(원본도 undo 를
+        LogChange 로 남긴다).
+        """
         self._action_done += 1
         r = self.model.find_row_by_path(path)
         if r is None:
+            self._safe_log(log_change, self._log_config, path, undo_steps)
             return
         fr = self.model.get_row(r)
         if fr.result and fr.result.get("status") == "ok" \
                 and fr.result.get("track_db") is not None:
             fr.result = shift_after_apply(fr.result, undo_steps)
             self.model.row_changed(r)
+        self._safe_log(log_change, self._log_config, path, undo_steps)
 
     def _on_action_tags_removed(self, path: str):
         """태그 제거 성공: 행 result 를 비워 미분석(빈칸) 복귀."""

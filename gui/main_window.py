@@ -99,7 +99,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox,
     QTableView, QToolBar, QProgressBar, QPushButton, QFileDialog,
     QAbstractItemView, QHeaderView, QRubberBand, QStyledItemDelegate, QMenu,
-    QSystemTrayIcon, QStyle,
+    QSystemTrayIcon, QStyle, QApplication,
 )
 
 from PySide6.QtGui import QAction, QKeySequence
@@ -733,7 +733,7 @@ class MainWindow(QMainWindow):
         tray_menu.addAction(self.tray_act_restore)
         tray_menu.addSeparator()
         self.tray_act_exit = QAction("Exit", self)
-        self.tray_act_exit.triggered.connect(self.close)
+        self.tray_act_exit.triggered.connect(self._exit_app)
         tray_menu.addAction(self.tray_act_exit)
         self._tray.setContextMenu(tray_menu)
 
@@ -756,6 +756,14 @@ class MainWindow(QMainWindow):
         self.showNormal()
         self.raise_()
         self.activateWindow()
+
+    def _exit_app(self):
+        """트레이 Exit: 창을 닫아 정리(설정 저장·워커 종료)한 뒤 앱을 완전히
+        종료한다. 트레이 아이콘이 살아 있으면 Qt 이벤트 루프가 유지되어
+        self.close() 만으로는 프로세스가 끝나지 않으므로 quit() 를 명시한다.
+        """
+        self.close()
+        QApplication.quit()
 
     def _on_toggle_tray_option(self, checked: bool):
         """Options → Minimize to tray 토글. 상태만 갱신(다음 최소화부터 적용)."""
@@ -1683,3 +1691,7 @@ class MainWindow(QMainWindow):
                 w.terminate()
                 w.wait()
         super().closeEvent(event)
+
+
+
+

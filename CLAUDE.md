@@ -181,6 +181,7 @@ GaindB/
 - **이 미러의 `.c` 는 크롤 불가**: `application/octet-stream` MIME. 소스는 로컬 보관 + 사용자가 붙여넣어 제공(5). Claude 가 크롤로 가져오려 시도하지 말 것.
 - **테스트는 원본 음원을 절대 건드리지 않는다(영구 제약, 오염 사고 재발함)**: 모든 검증·테스트는 tempfile 사본에서만 동작하고 끝나면 정리한다. 각 테스트는 깨끗한 fixture(또는 `-s d` 로 태그 제거한 상태)에서 시작한다. 과거·재발 모두 원본 두 음원에 mp3gain 태그가 남아 테스트가 실패로 보인 사고(코드 결함 아님, 원본 오염 탓). 재발분은 `mp3gain_cli.py -s d` 로 APE 태그 제거해 순수 상태로 복구했다. **원본 경로를 검증 명령에 직접 쓰지 말 것.**
 - **undo 0 태그는 남는다(원본 동일 동작)**: 깨끗한 파일에 `-g N` 적용 후 `-u` 하면 오디오 본문은 비트 동일로 복원되지만 `MP3GAIN_UNDO 0,0` APE 태그가 남아 파일 전체 해시는 달라진다. 무손실 검증은 전체 해시가 아니라 tag_offset 까지의 오디오 본문 해시(`audio_body_sha256`)로 판정한다.
+- **numpy 배열의 truthiness 평가 금지(앨범 워커 전멸 교훈)**: `arr or []`·`if arr:` 처럼 numpy 배열을 boolean 문맥에 두면 "The truth value of an array with more than one element is ambiguous" 예외가 난다. 앨범 분석 워커에서 `raw.get("histogram") or []` 가 매 곡 이 예외로 죽어 전 곡 실패한 적 있음. 히스토그램 등 배열은 반드시 `x if x is not None else []` 로 판정한다(길이 판단은 `len(x)`, 존재 판단은 `is not None`).
 - **초장시간 곡은 통짜 디코딩 금지(메모리 폭증·UI 얼음 교훈)**: 곡 전체 PCM 을 메모리에 올리면(스테레오 10h ≈ 12GB, f64 승격 시 25GB+) 시스템이 스와핑으로 얼어붙고, 파일 경계에서만 취소하면 그 곡이 끝날 때까지 취소가 안 먹힌다. → 분석은 스트리밍(청크 흘림, 10.2), 취소는 청크 경계에서 ffmpeg 즉시 kill.
 - **Track Gain 이중 디코딩 금지(이번 세션 해소)**: `apply_track_gain` 은 원래 씨앗 없이 매번 decode+analyze+scan 을 다시 했다. GUI 가 Track Analysis 로 이미 분석한 곡을 Track Gain 하면 같은 디코딩을 한 번 더 해(10h 곡에서 "100% 이후 정지"의 정체) 낭비였다. → `apply_track_gain`/`apply_file_track_gain` 에 씨앗(seed_db_gain·seed_peak·seed_min_gain·seed_max_gain, 또는 api 는 seed dict)을 선택 주입해 유효하면 decode/analyze/scan 을 건너뛴다(결과 수치 동일, 씨앗 없으면 CLI 경로 불변). 씨앗 peak 가 None 이면(태그에 track_peak 없던 경우) 자동으로 디코딩 경로로 폴백(안전).
 - **적용 단계도 취소·진행 확인 지점을 가져야 함(취소 갇힘 교훈)**: `scan_gain`·`apply_gain` 은 순수 파이썬 프레임 순회라 디코딩이 없다. 예전엔 여기 취소 확인이 없어 초장시간 곡의 "분석 100% 이후" 순회에 워커가 갇혀 Cancel 이 안 먹고 버튼이 굳었다. → 두 함수에 should_cancel/on_progress 를 `_CALLBACK_INTERVAL`(=4096) 프레임마다 확인, 취소 시 `writer.GainCancelled`(=정상 취소, DecodeCancelled 와 동급). 취소 확인은 파일 write 이전 순회 단계에서만 하므로 취소해도 파일은 원본 그대로(부분 기록 없음). ApplyWorker 는 DecodeCancelled·GainCancelled 를 함께 잡아 정상 종료.
@@ -201,7 +202,7 @@ GaindB/
 7. 배포 라이선스 1차 점검 — 원본 C 소스와 직접 대조해 전 모듈 clean-room 부합 확인, 도움말 산문 재작성·계수 출처 정직 기재·주석 정리, git 분리 확인, 의존성 매트릭스 정리(numpy·scipy=BSD, PySide6=LGPLv3 동적링크, ffmpeg=외부 호출 전파 없음/동봉 시 LGPL 빌드만). 산출물 `docs/LICENSE_REVIEW.md`.
 8. GUI(PySide6, `gui/`) — 파일/폴더 추가·태그 스캔·자연 정렬·다크색상·유니코드·리스트 UX(Delete/더블클릭/고무줄)·Track Analysis(AnalyzeWorker)·Track Gain(ApplyWorker, 원본 RadioGain 재현)·단축키·Clear·취소(청크 경계 즉시 kill)·파일 내부 진행률·스트리밍 분석(수 시간 곡 대응)·창 닫기 안전. 표시값은 원본 exe 실측과 일치(CurrMaxAmp·Volume·Track Gain·clip). `api.analyze_file`(비파괴·무출력)이 CLI --show/GUI/AVD 공유. 대량 추가 성능: 모델에 path→row 딕셔너리 인덱스 도입해 `find_row_by_path` 를 O(1) 로(대량 스캔 O(N²) 제거), 태그 스캔 카운트를 워커 progress 기준으로 통일(읽기 실패 파일 있어도 표시 안 어긋남). 우클릭 팝업(원본 mnuPopup, MVP 4항목: Clear Analysis/Undo/Remove Tags/Play) 추가 — `FileActionWorker`(action="undo"|"remove_tags", 원본 DoFileAction 대응) + `api.undo_file_gain`/`remove_file_tags` 래퍼. 우클릭 시 그 행이 선택에 없으면 그 행만 선택 후 메뉴(원본 "선택 한정" 취지), busy 중 전 항목 비활성.
 
-**검증 인프라.** 통합 테스트 스위트(`tests/`, unittest, 외부 의존 없음) — `python -m unittest discover -s tests` 전부 PASS(112건 기준). 모든 테스트는 원본 음원 불간섭(tempfile 사본, `FixtureGuard` 오염 감시, 무결성은 `audio_body_sha256`). `_support.py`(BaseGainTest·run_cli·해시), 도메인별 test 모듈(roundtrip/analysis/tag/options/recalc/clip/useid3/samplerate + GUI 순수 함수부 `test_gui_pure`·스트리밍 동일성 `test_streaming_analysis`). `test_gui_pure` 는 collect_mp3_paths·모델 path→row 인덱스 불변식·표시 수식(recompute_target/shift_after_apply)을 원본 음원·ffmpeg 없이 검증. `test_streaming_analysis` 는 TrackAnalyzer 스트리밍 누적 = 통짜(analyze_track/track_peak/track_histogram) 결과가 비트 단위 동일함을 여러 청크 크기·샘플레이트로 검증(진척 로그 diff=0 을 정식 고정). fixture 는 Debussy(44.1k)·10cm(48k) 원본 + ffmpeg 변형 다수(mono/stereo·전 샘플레이트). mutagen 상호운용·원본 exe dB 대조는 skip 오염 방지를 위해 `manual_checks/`(git 제외)에서 로컬 수동 실행. exe 는 MSYS2+MinGW-w64(UCRT64)로 빌드한 1.6.2, 사본에 `-o -s s` 로만 정답 추출(원본 오염 방지).
+**검증 인프라.** 통합 테스트 스위트(`tests/`, unittest, 외부 의존 없음) — `python -m unittest discover -s tests` 전부 PASS(118건 기준). 모든 테스트는 원본 음원 불간섭(tempfile 사본, `FixtureGuard` 오염 감시, 무결성은 `audio_body_sha256`). `_support.py`(BaseGainTest·run_cli·해시), 도메인별 test 모듈(roundtrip/analysis/tag/options/recalc/clip/useid3/samplerate/album + GUI 순수 함수부 `test_gui_pure`·스트리밍 동일성 `test_streaming_analysis`). `test_album` 은 그룹핑·스트리밍=벌크 동치·track+album 이중 태그에 더해 `AlbumPeakShiftTest`(앨범 게인 후 태그 peak = `peak_before×2^(steps/4)` = 실제 파형 peak, 89dB 재판정 시 거짓 clip 없음 — 9번 표시 수식 (3)의 앨범 경로 회귀 고정). `test_gui_pure` 는 collect_mp3_paths·모델 path→row 인덱스 불변식·표시 수식(recompute_target/shift_after_apply)을 원본 음원·ffmpeg 없이 검증. `test_streaming_analysis` 는 TrackAnalyzer 스트리밍 누적 = 통짜(analyze_track/track_peak/track_histogram) 결과가 비트 단위 동일함을 여러 청크 크기·샘플레이트로 검증(진척 로그 diff=0 을 정식 고정). fixture 는 Debussy(44.1k)·10cm(48k) 원본 + ffmpeg 변형 다수(mono/stereo·전 샘플레이트). mutagen 상호운용·원본 exe dB 대조는 skip 오염 방지를 위해 `manual_checks/`(git 제외)에서 로컬 수동 실행. exe 는 MSYS2+MinGW-w64(UCRT64)로 빌드한 1.6.2, 사본에 `-o -s s` 로만 정답 추출(원본 오염 방지).
 
 ### 10.2. 확정된 정책·결정 (구현 중 새로 정해진 것)
 
@@ -222,38 +223,29 @@ GaindB/
 - **Track Gain steps==0 정책(갱신됨 — 이전 "steps==0 곡 제외"를 폐기)**: Track Gain 은 대상 행을 steps 값과 무관하게 전부 워커에 넘긴다(steps==0 곡도 사전 제외하지 않음). 태그 기록 여부 판단은 코어(`apply_file_track_gain` → `apply_track_gain`)에 맡긴다 — steps==0 이라도 태그가 없거나 오래됐으면(dirty) 코어가 태그를 쓰고(원본 mp3gain `-r` 의 "…but tag needs update" 동작), 이미 최신 태그면 디코딩 없이 `no_change`(tag_written=False)로 넘어간다. `ApplyWorker.run` 도 steps==0 단축 경로를 제거하고 항상 `apply_file_track_gain` 을 호출한 뒤 코어 status(ok→row_applied / no_change→row_analyzed / 그외→failed)로만 분기한다. **폐기 사유**: 구버전은 GUI(`_on_gain`)가 result.steps==0 곡을 대상에서 사전 제외하고 워커의 steps==0 도 apply 를 건너뛰어, 태그 삭제 후 이미 목표 볼륨인 곡의 dirty 태그가 안 써지는 버그가 있었다(태그 삭제→분석→Track Gain 시 재현). GUI 행 status 로는 태그 존재 여부를 구분할 수 없다(태그 삭제 후 분석한 행도 status=analyzed)는 점이 사전 제외를 불가능하게 하는 근거. 트레이드오프: steps==0 곡도 워커를 거쳐 태그를 한 번 재확인하는 비용이 생기나, 태그가 있으면 코어가 디코딩을 생략해 가볍다.
 - **8단계 GUI 세부 재현 메모(원본 폼 대조)**: NAME 은 전체 경로 표시. 자연 정렬(QCollator numericMode, 미분석 None 은 항상 뒤). 다크테마 안전 색상(none 은 OS 팔레트 위임). 플랫폼 폰트(Win 만 Segoe UI Variable Text, QFontInfo 확인 후). 유니코드 파일명 완전 지원(원본 VB6 ANSI 한계 개선). Delete 키=선택 삭제, Clear 버튼/Ctrl+Shift+Delete=전체 삭제(원본 ClearFiles/ClearAll 2분리), 더블클릭=기본앱 재생, 빈 영역 고무줄 선택(QTableView 직접 구현). 추가 시 태그 동기 스캔(`read_file_tags`, 곡당 ~1ms) + 대량 추가는 `TagScanWorker` 백그라운드(겸용 버튼: 스캔 중=Pause·분석/게인/액션 중=Cancel·pending 있으면=Rescan). Track Analysis 대상="선택 있으면 선택·없으면 전체" 중 값 없는 행만. Track Gain 은 대상 행을 steps 무관 전부 워커에 넘김(steps==0 제외 안 함, 위 정책 참조). Track Analysis 는 태그 미기록(원본 `/o` 출력전용 확증), 기록은 Track Gain(`/g` changeGainAndTag)뿐. 우클릭 팝업: `contextMenuEvent`→`context_menu_requested`→`_show_context_menu`, 우클릭 행이 선택에 없으면 그 행만 선택. Undo 성공 시 `shift_after_apply(result, undo_steps)`로 표시 복귀, Remove Tags 성공 시 `clear_result`로 미분석 복귀. 단축키 Add Files=Ctrl+F·Folder=Ctrl+D·Analysis=Ctrl+T·Gain=Ctrl+G(원본 메뉴 재현). 파일 내부 진행률은 duration 기반 예측 바이트 대비 누적 비율, 진행바 세분 합산(_PROGRESS_SCALE=1000). 창 닫기 시 워커 request_cancel→wait(10s).
 
-### 10.3. 다음 세션 시작점
+### 10.3. 현재 상태 · 완료 이력 · 다음 할 일
 
-**8단계 GUI: Track + Album 계열 모두 실사용 완료(step 4 배선 커밋됨).** 이번 세션에서 Album 메인윈도우 배선(step 4)을 처음부터 재작성해 커밋했고(HEAD=`d805095`), 이전 세션들의 앨범 관련 미해결 버그를 전부 해소했다. 이제 GUI 는 Track 분석/게인, Album 분석/게인, 우클릭 팝업, 취소, 스트리밍까지 실사용 가능하다. 메뉴바(File/Analysis/Modify/Options)와 툴바가 공존하며 같은 QAction 을 공유한다. 단축키: Album Analysis=Ctrl+U, Album Gain=Ctrl+B(Track 은 Ctrl+T/Ctrl+G 유지).
+**현재 상태.** 1~7단계 완료, 8단계 GUI MVP + Track/Album 계열 모두 실사용 완료. HEAD=`da5ecf6`. GUI 는 Track 분석/게인, Album 분석/게인, 우클릭 팝업, 취소, 스트리밍까지 실사용 가능하다. 메뉴바(File/Analysis/Modify/Options)와 툴바가 같은 QAction 을 공유한다. 단축키: Track Analysis=Ctrl+T·Track Gain=Ctrl+G·Album Analysis=Ctrl+U·Album Gain=Ctrl+B. 진행 UI 는 2안 확정(진행바 1회 0→100%, 카운트 분석/적용 2회 왕복 1..N, 문구 Analyzing→Applying — 상세 10.2). 통합 테스트 118건 전부 PASS.
 
-**이번 세션 해소된 버그(전부 원인 특정·수정 완료).**
-- **histogram numpy 배열 boolean 평가 ValueError**: `AlbumAnalyzeWorker` 경로에서 `raw.get("histogram") or []` 가 numpy 배열을 truthiness 평가해 "The truth value of an array with more than one element is ambiguous" 예외로 매 곡 사망 → 모든 곡이 ROW_EXC. `raw.get("histogram") if raw.get("histogram") is not None else []` 로 수정(numpy 배열은 `or`/`if x:` 로 판정 금지 — 영구 교훈, 9번 함정 후보).
-- **진행바 튐(0 1 0 2 … 0 100)**: 분석 단계 file_progress 슬롯과 완료 카운트 progress 슬롯이 서로 다른 base 를 써서 진동. `_progress_base` 단일 변수로 통일(`_on_*_file_progress` 는 `_progress_base+fraction`, `_on_*_progress` 는 `_progress_base=done`, 워커 시작 시 0 리셋)해 0→100% 단조 상승으로 해소.
-- **상태바 카운트 0 고정 + 1부터 시작**: 카운트를 완료 수가 아닌 진행 신호 기반 "현재 처리 곡 번호"로 전환, `_progress_base+1` 로 1/N 부터 N/N 표시.
-- **앨범 게인 분자 24/23 오버슛**: 적용 단계에서 `_on_apply_current` 와 `_on_album_apply_count` 가 상태바를 다퉈 24/23 이 떴다. `_album_applying` 플래그(적용 진입 시 True)로 적용 단계 상태바를 `_on_album_apply_count` 에 양보시켜 해소.
-- **씨앗 있어도 항상 재분석하던 문제**: `AlbumApplyWorker._ensure_group_raws` 가 `_album_raws` 씨앗을 무시하고 매번 전곡 재분석했다(이전 세션 "ALBUM_APPLY_RUN_START 직후 멈춤"·카운트 이중 증가의 정체). 씨앗 히트(ENSURE_SEED_HIT) 시 재분석 생략하도록 정상화 → **앨범 볼륨을 아는 상태에서 Album Gain 을 누르면 분석을 건너뛰고 바로 적용**(원본 mp3gain 앨범 모드 동일, 씨앗 재사용 설계대로). 씨앗 없으면 분석 후 적용.
-
-**진행 UI 정책은 2안으로 확정**(진행바 1회 0→100%, 카운트 분석/적용 2회 왕복 1..N, 문구 Analyzing→Applying) — 상세는 10.2 참조.
-
-**진단 로그 상태(다음 세션 첫 정리 대상).** 위 버그 진단을 위해 `gui/workers.py`(_dlog 27건)·`gui/main_window.py`(_dlog 10건)에 `debug.log` 파일 로깅을 넣은 채로 커밋했다(`d805095`, 커밋 메시지에 "DEBUGLOG still present" 명시). `.gitignore` 에 `debug.log` 추가 완료. **다음 세션 첫 작업 = 이 진단 DEBUGLOG 제거 후 재커밋**(클리핑 검증에 또 필요하면 그때 다시 삽입). `Select-String -Path gui\workers.py -Pattern "_dlog" ` / `gui\main_window.py` 로 위치 확인 후 제거.
-
-**다음 세션 우선순위.**
-- (a) **진단 DEBUGLOG 제거 + 재커밋(첫 작업).**
-- (b) **앨범 게인 후 트랙 게인(89) 클리핑 / peak 갱신 검증** — 이전 세션에서 의심됐던 "앨범 게인 후 트랙 게인 시 이전엔 없던 클리핑" 현상이 **현재는 재현되지 않는다**(원인 미특정). 이번 세션의 수정들은 표시·진행·배선 계층이라 peak 계산 자체를 건드리지 않았으므로, 앨범 경로 정상화의 부작용으로 함께 사라졌을 가능성만 있고 확증은 없다 → "해결"이 아니라 "현재 재현 안 됨"으로 존치. **검증 방법**: 깨끗한(태그 제거) 파일에서 Album Gain 1회 적용 후, 태그에 저장된 peak(curr_max_amp/track_peak)이 실제 파형 peak 과 일치하고 `×2^(steps/4)` 로 올바르게 갱신됐는지 대조(9번 함정 표시 수식 (3) "적용 후 peak 이동" 이 앨범 경로에서도 지켜지는지). 로그로 (1)앨범 게인 스텝, (2)적용 후 저장 peak, (3)이어지는 트랙 게인 클립 판정에 쓰인 peak 3값을 비교.
-- (c) **후순위 기능 나머지** — 컬럼폭·정렬 저장, 트레이·로그·언어메뉴. (Constant Gain·Max No-clip 은 아래 보류.) 착수 시 해당 원본 폼(frmOptions 등)을 붙여 제공.
-
-**Album 커밋 진척(완료·커밋됨).**
+**완료 이력(커밋순).**
 - `e82a79a` feat: 앨범 게인 코어 경로(공유 본체 `_apply_one_album_file` + 스트리밍 api 레이어).
 - `5735bcc` fix: api 앨범 import 를 공유 `_apply_one_album_file` 로 정렬.
-- `a068cc1` test: 앨범 코어 검증(`tests/test_album.py` — 그룹핑, 스트리밍=벌크 비트 동치, track+album 이중 태그). 5건 PASS.
+- `a068cc1` test: 앨범 코어 검증(`tests/test_album.py` — 그룹핑, 스트리밍=벌크 비트 동치, track+album 이중 태그).
 - `99a5ecc` feat: 리스트뷰 앨범 3컬럼(`columns.py` ALBUM_VOLUME/ALBUM_GAIN/ALBUM_CLIP, COLUMN_COUNT=8, model.py 표시·정렬·전경색 확장).
 - `1b205e7` feat: 앨범 analyze/apply 워커 + raw→display api 헬퍼(`AlbumAnalyzeWorker`·`AlbumApplyWorker`·`result_from_album_raw`).
-- `d805095` fix: 앨범 게인 진행 UI(진행바 1회·카운트 2회 왕복·Analyzing/Applying) + step 4 메인윈도우 배선 + 위 버그 5건 해소. (진단 DEBUGLOG 포함 — 다음 세션 제거 예정.)
+- `d805095` fix: 앨범 게인 진행 UI(진행바 1회·카운트 2회 왕복·Analyzing/Applying) + step 4 메인윈도우 배선. 이 과정에서 앨범 관련 버그 5건 해소: (1) histogram numpy 배열 truthiness ValueError 로 전 곡 사망(→ `is not None` 판정, 9번 함정 등재), (2) 진행바 튐(→ `_progress_base` 단일화), (3) 상태바 카운트 0 고정·1부터 시작(→ 진행 신호 기반 현재 곡 번호), (4) 앨범 게인 분자 24/23 오버슛(→ `_album_applying` 플래그로 적용 단계 상태바 양보), (5) 씨앗 있어도 항상 재분석(→ `_ensure_group_raws` 가 `_album_raws` 씨앗 히트 시 재분석 생략, 원본 앨범 모드처럼 볼륨 알면 바로 적용).
+- `f59b1b2` chore: 진단 DEBUGLOG 제거(`gui/workers.py`·`gui/main_window.py`, 이전 세션 `d805095` 에 임시 삽입했던 `_dlog` 전량 삭제).
+- `ce5c18c` docs: `_on_apply_analyzed` docstring 을 no_change 정책에 맞게 정정(옛 steps==0 제외 흔적 제거).
+- `da5ecf6` test: 앨범 게인 후 peak 이동 검증(`AlbumPeakShiftTest`). **결론: 앨범 peak 이동은 트랙·앨범이 공유하는 `change_gain_and_tag`(left==right 일 때 track/album peak 둘 다 x2^(steps/4))가 구조적으로 보장한다.** 이전 세션에서 의심됐던 "앨범 게인 후 트랙 게인 클리핑"은 peak 계산 결함이 아니라 표시·배선 층 문제였고 앨범 경로 정상화로 해소됐음이 확증됨(회귀 테스트로 고정). — 이 항목으로 이전 "현재 재현 안 됨" 미결이 종결됨.
 
-**보류·점검 항목(당장 착수 안 함).** 성격이 각각 다르므로 완료(10.1)로 옮기지 않고 여기 남긴다.
+**다음 할 일(남은 것만).**
 
-- **비가역(255 클램프) 사전 경고 — 보류 확정(합의).** 원본은 경고 없이 조용히 클램프하므로(원본 동일 재현) 사전 경고는 원본에 없는 추가 기능(MVP 밖). 재론하려면 원본 이탈 감수 가치의 사용자 합의 필요.
-- **실클릭 회귀 재확인 — 대부분 통과, 해시 무결성만 남음(반복 점검 성격).** 남은 것: 취소 후 파일 원본 무결성을 `audio_body_sha256` 로 실측 비교. GUI 를 건드릴 때마다 재확인하는 체크리스트로 존치.
-- **steps==0 곡의 태그 재확인 비용 — 유효성 재확인, 최적화 보류.** 태그가 있으면 코어가 디코딩 생략해 가벼움. 체감 지연 시 모델 `has_tag` 플래그로 최신 태그 곡만 사전 제외 최적화 고려(태그 없어 dirty 인 곡은 여전히 워커 경유 필요).
-- **Constant Gain(`-g`/`-l 0`/`-l 1`) GUI — 최후순위 보류(합의, 축소 아님).** 코어(`apply_gain`) 완비, 슬라이더 다이얼로그+워커만 얹으면 됨. 재개 시 4개 논점 합의 필요(태그 갱신 경로·채널별 옵션·진행률 정책·UI 위치).
-- **Max No-clip(`-x` 계열) GUI — 보류(합의, 축소 아님).** 계산 뼈대는 `-k`(autoClip) 로 코어에 존재. peak≠라우드니스 부작용 + 원본조차 기본 숨김(mnuMaxAmp.Visible=False). 앨범 그룹 버전은 Album 폴더 그룹핑 인프라 재사용이라 지금 착수 수월해짐.
+- **후순위 기능 GUI(착수 시 해당 원본 폼 붙여 제공).**
+  - 컬럼폭·정렬 상태 저장, 트레이·로그파일·언어메뉴(원본 basLocalizer 대응, tr()/번역파일).
+- **실클릭 회귀 — 해시 무결성만 남음(반복 점검).** 취소 후 파일 원본 무결성을 `audio_body_sha256` 로 실측 비교. GUI 를 건드릴 때마다 재확인하는 체크리스트로 존치.
+- **보류·점검 항목(성격이 각각 달라 완료로 옮기지 않고 존치).**
+  - **비가역(255 클램프) 사전 경고 — 보류 확정(합의).** 원본은 경고 없이 조용히 클램프(원본 동일 재현)라 사전 경고는 원본에 없는 추가 기능. 재론하려면 원본 이탈 감수 가치의 사용자 합의 필요.
+  - **steps==0 곡의 태그 재확인 비용 — 유효성 재확인, 최적화 보류.** 태그가 있으면 코어가 디코딩 생략해 가벼움. 체감 지연 시 모델 `has_tag` 플래그로 최신 태그 곡만 사전 제외 최적화 고려.
+  - **Constant Gain(`-g`/`-l 0`/`-l 1`) GUI — 최후순위 보류(합의, 축소 아님).** 코어(`apply_gain`) 완비, 슬라이더 다이얼로그+워커만 얹으면 됨. 재개 시 4개 논점 합의 필요(태그 갱신 경로·채널별 옵션·진행률 정책·UI 위치).
+  - **Max No-clip(`-x` 계열) GUI — 보류(합의, 축소 아님).** 계산 뼈대는 `-k`(autoClip) 로 코어에 존재. peak≠라우드니스 부작용 + 원본조차 기본 숨김(mnuMaxAmp.Visible=False). 앨범 그룹 버전은 Album 폴더 그룹핑 인프라 재사용이라 착수 수월.
+- **CLAUDE.md 유지.** 단계 완료 시 본 10.3 만 갱신(완료 이력에 커밋 한 줄 추가, 끝난 항목은 다음 할 일에서 제거). 2 핵심 원칙을 약화시키는 압축은 금지(2·8 참조).

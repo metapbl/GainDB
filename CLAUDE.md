@@ -229,7 +229,7 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 2. ReplayGain 분석기(`analysis.py` — equal-loudness 필터+RMS+히스토그램+95퍼센타일−PINK_REF). Track 은 ffmpeg replaygain 과 허용오차 이내, Album 은 혼합 검증.
 3. MP3 디코딩(`decode.py` — ffmpeg/ffprobe subprocess).
 4. 태그(`tag.py` APE·`id3.py` ID3v2 — read/write/remove/round-trip, scan_gain, change_gain_and_tag, auto/album, 꼬리 보존, useId3 분기).
-5. CLI(`mp3gain_cli.py`) — mp3gain 옵션 전부 재현(게인·분석·적용·클립·database·태그). recalc 비트마스크로 디코딩 스킵(수치 일치). CLI I/O 는 영문만(다국어는 GUI 책임).
+5. CLI(`gaindb_cli.py`) — mp3gain 옵션 전부 재현(게인·분석·적용·클립·database·태그). recalc 비트마스크로 디코딩 스킵(수치 일치). CLI I/O 는 영문만(다국어는 GUI 책임).
 6. 샘플레이트 확장 — ReplayGain 전 샘플레이트(32k / MPEG2·2.5 계열) 코어 추가, exe 대조 min/max 전부 일치.
 7. 배포 라이선스 검토 — 전 모듈 독립 구현 부합 확인, 계수 출처 정직 기재, git·배포물 분리, 의존성 매트릭스, Apache 2.0 노선 확정, 파일별 저작권 위험 전수 감사(8.8, `docs/LICENSE_REVIEW.md` 부록 A). 최종 확인은 배포 직전 전문가 검토로 남겨둠(2.3).
 8. GUI(PySide6, `gui/`) — 파일/폴더 추가·태그 스캔·자연 정렬·유니코드·리스트 UX·Track/Album 분석·게인·우클릭 팝업(Clear Analysis/Undo/Remove Tags/Play)·취소(청크 경계 즉시 kill)·스트리밍 분석(수 시간 곡)·컬럼폭/정렬 저장·로그·트레이·다국어. 표시값은 원본 exe 실측과 일치. `api.analyze_file`(비파괴)이 CLI/GUI/AVD 공유.

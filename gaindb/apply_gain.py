@@ -1,14 +1,17 @@
 """
-apply_gain.py - MP3 파일의 global_gain 을 무손실 조정하는 스크립트.
+gaindb/apply_gain.py - MP3 파일의 global_gain 을 무손실 조정하는 라이브러리 모듈.
 
-사용법:
-    수동:  python -m gaindb.apply_gain <게인스텝> "<파일.mp3>"
-    자동:  python -m gaindb.apply_gain auto "<파일.mp3>"
-    앨범:  python -m gaindb.apply_gain album "<파일1.mp3>" "<파일2.mp3>" ...
+게인 적용 로직(Track/Album ReplayGain)을 함수로 제공한다. CLI(gaindb_cli.py)
+와 GUI api 계층(gaindb/api.py)이 이 모듈의 함수를 import 해 사용한다. 이 파일은
+독립 실행 진입점이 아니다(사용자용 CLI 는 gaindb_cli.py 가 담당).
 
-수동 모드: 게인스텝은 정수. 1스텝 = 약 1.5dB. 양수=키우기, 음수=줄이기.
-자동 모드: ReplayGain 분석으로 89dB 기준 적정 스텝을 계산해 곡별로 적용한다.
-앨범 모드: 여러 곡의 히스토그램을 누적해 앨범 단일 스텝을 산출, 전 곡에 동일 적용.
+제공 함수:
+    apply_track_gain      : 한 곡에 Track ReplayGain 을 무손실 적용(89dB 기준).
+    apply_album_gain      : 여러 곡에 Album ReplayGain 을 무손실 적용(단일 스텝).
+    _apply_one_album_file : 앨범 게인 적용의 곡별 본체(CLI/GUI 공유).
+    _fill_track_info      : 원본 main 의 track 값 채우기(허용오차 → dirty 판정).
+    _fill_album_info      : 원본 main 의 album 값 채우기(허용오차 → dirty 판정).
+    _album_aggregate      : 곡별 결과에서 앨범 peak/min/max 집계.
 
 auto/album 은 원본 mp3gain 의 main 순서를 따른다: 분석으로 89dB 기준 dB·peak·
 min/max 를 얻어 태그(info)에 먼저 채우고(원본 허용오차 비교로 dirty 판정),
@@ -18,10 +21,8 @@ skip_tag 면 태그를 건드리지 않고 게인만 적용한다(원본 changeG
 use_id3 면 APE 대신 ID3v2 로 태그를 읽고/쓴다(원본 -s i 동등).
 
 주의: 파일을 직접 수정한다. 되돌리려면 undo(태그 기반) 또는 반대 부호 수동 적용.
-클리핑 경고·자동 클립(-k)·클립 질의는 5단계(CLI) 에서 다룬다(합의된 단계 분할).
+클리핑 경고·자동 클립(-k)·클립 질의는 CLI(gaindb_cli.py)가 다룬다(단계 분할).
 """
-
-import sys
 
 from gaindb.decode import decode_pcm
 from gaindb.analysis import (
@@ -382,98 +383,3 @@ def _album_aggregate(per):
         if item["min"] is not None and item["min"] < album_min:
             album_min = item["min"]
     return album_peak, album_min, album_max
-
-
-def _run_manual(change: int, path: str) -> int:
-    count = apply_gain(path, change)
-    print(f"{path}")
-    print(f"Applied gain {change:+d} steps (about {change * 1.5:+.1f} dB): "
-          f"{count} frames modified")
-    return 0
-
-
-def _run_auto(path: str) -> int:
-    result = apply_track_gain(path)
-    print(f"{path}")
-    if result["status"] == "not_enough_samples":
-        print("Not enough samples to analyze. No changes applied.")
-        return 1
-    if result["status"] == "no_change":
-        msg = (
-            f"Analysis gain {result['db_gain']:+.2f} dB -> 0 steps. "
-            "Already at target loudness; no change."
-        )
-        if result["tag_written"]:
-            msg += " (tag updated only)"
-        print(msg)
-        return 0
-    steps = result["steps"]
-    print(
-        f"Analysis gain {result['db_gain']:+.2f} dB -> {steps:+d} steps "
-        f"(about {steps * 1.5:+.1f} dB) applied, tag updated."
-    )
-    return 0
-
-
-def _run_album(paths) -> int:
-    result = apply_album_gain(paths)
-    if result["status"] == "not_enough_samples":
-        print("Not enough samples across the album. No changes applied.")
-        return 1
-
-    steps = result["steps"]
-    if result["status"] == "no_change":
-        print(
-            f"Album gain {result['db_gain']:+.2f} dB -> 0 steps. "
-            "No gain change (tag updated if needed). Per-file results:"
-        )
-    else:
-        print(
-            f"Album gain {result['db_gain']:+.2f} dB -> {steps:+d} steps "
-            f"(about {steps * 1.5:+.1f} dB) applied. Per-file results:"
-        )
-    for item in result["per_file"]:
-        fc = item.get("frames_changed")
-        fc_str = f"{fc} frames modified" if fc is not None else "tag updated"
-        print(f"  {item['path']}: {fc_str}")
-    return 0
-
-
-def main(argv):
-    if len(argv) < 2:
-        print('Usage (manual): python -m gaindb.apply_gain <gain_steps> "<file.mp3>"')
-        print('Usage (auto):   python -m gaindb.apply_gain auto "<file.mp3>"')
-        print('Usage (album):  python -m gaindb.apply_gain album "<file1.mp3>" "<file2.mp3>" ...')
-        return 1
-
-    mode_arg = argv[1]
-
-    if mode_arg.lower() == "album":
-        paths = argv[2:]
-        if not paths:
-            print('Usage (album): python -m gaindb.apply_gain album "<file1.mp3>" "<file2.mp3>" ...')
-            return 1
-        return _run_album(paths)
-
-    if mode_arg.lower() == "auto":
-        if len(argv) != 3:
-            print('Usage (auto): python -m gaindb.apply_gain auto "<file.mp3>"')
-            return 1
-        return _run_auto(argv[2])
-
-    # 수동 모드: 첫 인자가 정수 게인스텝.
-    if len(argv) != 3:
-        print('Usage (manual): python -m gaindb.apply_gain <gain_steps> "<file.mp3>"')
-        return 1
-
-    try:
-        change = int(mode_arg)
-    except ValueError:
-        print("The first argument must be an integer gain step, or 'auto'/'album'.")
-        return 1
-
-    return _run_manual(change, argv[2])
-
-
-if __name__ == "__main__":
-    sys.exit(main(sys.argv))

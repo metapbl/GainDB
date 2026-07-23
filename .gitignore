@@ -36,3 +36,11 @@ test_8k.mp3
 test_mono_24k.mp3
 test_mono_12k.mp3
 debug.log
+
+# Local-only: copyrighted test audio, reference sources, manual checks (never distribute)
+_local/
+
+# Python bytecode cache and runtime logs
+__pycache__/
+*.pyc
+*.log

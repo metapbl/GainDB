@@ -1,8 +1,8 @@
 """D-2 recalc 디코딩 스킵 통합 테스트 (in-process, verify_cli_d2 흡수).
 
 이 파일은 decode_pcm 호출 "횟수"를 측정해야 하므로, 다른 통합 테스트와 달리
-CLI 를 subprocess 가 아닌 in-process(mp3gain_cli.main 직접 호출)로 돌리고
-mp3gain_cli.decode_pcm 을 가로챈다(subprocess 로는 monkeypatch 불가).
+CLI 를 subprocess 가 아닌 in-process(gaindb_cli.main 직접 호출)로 돌리고
+gaindb_cli.decode_pcm 을 가로챈다(subprocess 로는 monkeypatch 불가).
 
 원본 불간섭(11항목)은 BaseGainTest 의 tempfile 사본 + FixtureGuard 로 지킨다.
 run_cli(subprocess) 대신 _run_inproc 를 쓴다.
@@ -21,30 +21,30 @@ from __future__ import annotations
 import io
 from contextlib import redirect_stdout, redirect_stderr
 
-import mp3gain_cli
+import gaindb_cli
 from gaindb.tag import read_mp3gain_tags
 from tests._support import BaseGainTest
 
 
 class _DecodeCounter:
-    """mp3gain_cli.decode_pcm 을 가로채 호출 횟수를 센다."""
+    """gaindb_cli.decode_pcm 을 가로채 호출 횟수를 센다."""
 
     def __init__(self):
         self.count = 0
         self._orig = None
 
     def __enter__(self):
-        self._orig = mp3gain_cli.decode_pcm
+        self._orig = gaindb_cli.decode_pcm
 
         def counting(path):
             self.count += 1
             return self._orig(path)
 
-        mp3gain_cli.decode_pcm = counting
+        gaindb_cli.decode_pcm = counting
         return self
 
     def __exit__(self, *exc):
-        mp3gain_cli.decode_pcm = self._orig
+        gaindb_cli.decode_pcm = self._orig
         return False
 
 
@@ -52,14 +52,14 @@ class RecalcDecodeSkipTest(BaseGainTest):
     """in-process CLI 호출 + decode_pcm 카운트. (subprocess 미사용)"""
 
     def _run_inproc(self, args):
-        """mp3gain_cli.main(["mp3gain_cli.py", *args]) 를 in-process 호출.
+        """gaindb_cli.main(["gaindb_cli.py", *args]) 를 in-process 호출.
 
         stdout/stderr 를 캡처해 (rc, out, err) 반환. 원본 불간섭은 상위
         BaseGainTest 의 tempfile 사본 + tearDown FixtureGuard 로 보장된다.
         """
         out, err = io.StringIO(), io.StringIO()
         with redirect_stdout(out), redirect_stderr(err):
-            rc = mp3gain_cli.main(["mp3gain_cli.py", *[str(a) for a in args]])
+            rc = gaindb_cli.main(["gaindb_cli.py", *[str(a) for a in args]])
         return rc, out.getvalue(), err.getvalue()
 
     def _audio_body(self, path):

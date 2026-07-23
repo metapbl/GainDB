@@ -24,7 +24,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # 통합 CLI 진입점.
-CLI_SCRIPT = REPO_ROOT / "mp3gain_cli.py"
+CLI_SCRIPT = REPO_ROOT / "gaindb_cli.py"
 
 # 음원 디렉터리: 환경변수 우선, 없으면 리포 루트.
 _env_dir = os.environ.get("GAINDB_TEST_MP3_DIR")
@@ -139,7 +139,7 @@ class BaseGainTest(unittest.TestCase):
         return str(dst)
 
     def run_cli(self, args, stdin: str | None = None):
-        """통합 CLI(mp3gain_cli.py)를 실제 subprocess 로 실행.
+        """통합 CLI(gaindb_cli.py)를 실제 subprocess 로 실행.
 
         반환: subprocess.CompletedProcess (returncode/stdout/stderr).
         인코딩은 UTF-8 고정(9항목 PowerShell 인코딩 함정 회피). 자식 파이썬의

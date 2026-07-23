@@ -48,7 +48,7 @@ from gaindb.tag import (
     change_gain_and_tag,
     remove_mp3gain_ape_tag,
 )
-from apply_gain import apply_track_gain, _apply_one_album_file
+from gaindb.apply_gain import apply_track_gain, _apply_one_album_file
 
 
 # 목표 음량 기준: mp3gain 내부 89 dB ReplayGain 레퍼런스.

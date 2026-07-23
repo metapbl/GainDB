@@ -2,9 +2,9 @@
 apply_gain.py - MP3 파일의 global_gain 을 무손실 조정하는 스크립트.
 
 사용법:
-    수동:  python apply_gain.py <게인스텝> "<파일.mp3>"
-    자동:  python apply_gain.py auto "<파일.mp3>"
-    앨범:  python apply_gain.py album "<파일1.mp3>" "<파일2.mp3>" ...
+    수동:  python -m gaindb.apply_gain <게인스텝> "<파일.mp3>"
+    자동:  python -m gaindb.apply_gain auto "<파일.mp3>"
+    앨범:  python -m gaindb.apply_gain album "<파일1.mp3>" "<파일2.mp3>" ...
 
 수동 모드: 게인스텝은 정수. 1스텝 = 약 1.5dB. 양수=키우기, 음수=줄이기.
 자동 모드: ReplayGain 분석으로 89dB 기준 적정 스텝을 계산해 곡별로 적용한다.
@@ -441,9 +441,9 @@ def _run_album(paths) -> int:
 
 def main(argv):
     if len(argv) < 2:
-        print('Usage (manual): python apply_gain.py <gain_steps> "<file.mp3>"')
-        print('Usage (auto):   python apply_gain.py auto "<file.mp3>"')
-        print('Usage (album):  python apply_gain.py album "<file1.mp3>" "<file2.mp3>" ...')
+        print('Usage (manual): python -m gaindb.apply_gain <gain_steps> "<file.mp3>"')
+        print('Usage (auto):   python -m gaindb.apply_gain auto "<file.mp3>"')
+        print('Usage (album):  python -m gaindb.apply_gain album "<file1.mp3>" "<file2.mp3>" ...')
         return 1
 
     mode_arg = argv[1]
@@ -451,19 +451,19 @@ def main(argv):
     if mode_arg.lower() == "album":
         paths = argv[2:]
         if not paths:
-            print('Usage (album): python apply_gain.py album "<file1.mp3>" "<file2.mp3>" ...')
+            print('Usage (album): python -m gaindb.apply_gain album "<file1.mp3>" "<file2.mp3>" ...')
             return 1
         return _run_album(paths)
 
     if mode_arg.lower() == "auto":
         if len(argv) != 3:
-            print('Usage (auto): python apply_gain.py auto "<file.mp3>"')
+            print('Usage (auto): python -m gaindb.apply_gain auto "<file.mp3>"')
             return 1
         return _run_auto(argv[2])
 
     # 수동 모드: 첫 인자가 정수 게인스텝.
     if len(argv) != 3:
-        print('Usage (manual): python apply_gain.py <gain_steps> "<file.mp3>"')
+        print('Usage (manual): python -m gaindb.apply_gain <gain_steps> "<file.mp3>"')
         return 1
 
     try:

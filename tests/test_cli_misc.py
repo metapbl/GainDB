@@ -24,7 +24,7 @@ from math import log10, floor
 from gaindb.tag import read_mp3gain_ape_tag
 from gaindb.writer import scan_gain
 from gaindb.analysis import db_to_steps
-from mp3gain_cli import _auto_clip_track, _auto_clip_album
+from gaindb_cli import _auto_clip_track, _auto_clip_album
 from tests._support import BaseGainTest
 
 
@@ -258,7 +258,7 @@ class MinMaxScanRegressionTest(BaseGainTest):
     def _expected_minmax(self, path):
         """scan_gain 반환을 (min, max) 로 정규화한다.
 
-        mp3gain_cli 는 min_gain, max_gain = scan_gain(path) 순으로 언팩하므로
+        gaindb_cli 는 min_gain, max_gain = scan_gain(path) 순으로 언팩하므로
         (min, max) 튜플을 전제한다. 만약 실제 순서가 반대면 이 한 곳만 뒤집으면
         된다(테스트 전반이 이 헬퍼를 경유).
         """

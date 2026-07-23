@@ -12,7 +12,7 @@ import contextlib
 import io
 import unittest
 
-from mp3gain_cli import parse_args
+from gaindb_cli import parse_args
 
 
 def _p(*tail):
@@ -73,7 +73,7 @@ class OptionParsingUnitTest(unittest.TestCase):
     def test_unrecognized_option_warns_and_continues(self):
         # 미인식 2글자 옵션은 경고만 하고 계속(원본 동작). 파일은 정상 수집.
         # 파서가 원본처럼 stderr 로 "I don't recognize option -z" 를 내므로
-        # (mp3gain_cli.py, file=sys.stderr), 여기서 그 출력을 캡처해 콘솔로
+        # (gaindb_cli.py, file=sys.stderr), 여기서 그 출력을 캡처해 콘솔로
         # 새지 않게 하고, 경고 문구가 실제로 나왔는지도 함께 확인한다.
         err = io.StringIO()
         with contextlib.redirect_stderr(err):

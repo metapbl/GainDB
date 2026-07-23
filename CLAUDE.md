@@ -71,9 +71,9 @@ GaindB/
 │  ├─ id3.py               # ID3v2 태그(RVA2 + TXXX) 읽기/쓰기
 │  ├─ tag.py               # APEv2 태그(전 필드 + undo)
 │  ├─ analysis.py          # ReplayGain 분석(Track/Album), dB→스텝 변환
-│  └─ api.py               # 비파괴 analyze_file (CLI/GUI/AVD 공유 진입점)
-├─ apply_gain.py           # 게인 적용 로직(수동/auto/album)
-├─ mp3gain_cli.py          # 통합 CLI 진입점(mp3gain 호환 옵션 체계)
+│  ├─ api.py               # 비파괴 analyze_file (CLI/GUI/AVD 공유 진입점)
+│  └─ apply_gain.py        # 게인 적용 로직(수동/auto/album)
+├─ gaindb_cli.py           # 통합 CLI 진입점(mp3gain 호환 옵션 체계)
 ├─ gui/                    # PySide6 프런트엔드(8단계, 독립 구현)
 │  ├─ __init__.py
 │  ├─ __main__.py          # 진입점: QApplication, i18n 배선

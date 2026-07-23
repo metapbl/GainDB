@@ -1,5 +1,5 @@
 """
-mp3gain_cli.py - Gain dB unified CLI (re-implements the original mp3gain option scheme)
+gaindb_cli.py - Gain dB unified CLI (re-implements the original mp3gain option scheme)
 
 Mirrors the option parsing and execution branches of the original mp3gain.c main().
 
@@ -7,7 +7,7 @@ Mirrors the option parsing and execution branches of the original mp3gain.c main
 CLI I/O SPECIFICATION (user interface contract)
 ================================================================================
 Invocation:
-    python mp3gain_cli.py [options] <infile> [<infile 2> ...]
+    python gaindb_cli.py [options] <infile> [<infile 2> ...]
 
 Option tokens (original mp3gain scheme; clean-room re-implementation):
     A token is an option ONLY if it is exactly two characters and begins with
@@ -98,7 +98,7 @@ from gaindb.analysis import (
     db_to_steps,
     NOT_ENOUGH_SAMPLES,
 )
-from apply_gain import _fill_track_info, _fill_album_info
+from gaindb.apply_gain import _fill_track_info, _fill_album_info
 from gaindb.api import analyze_file, DEFAULT_TARGET_DB
 
 VERSION = "0.5.0-dev"

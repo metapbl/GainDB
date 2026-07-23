@@ -1,6 +1,6 @@
 """③-b 태그 통합 테스트 (CLI 경로).
 
-원본 mp3gain 의 태그 동작을 mp3gain_cli.py 경로에서 재현·검증한다.
+원본 mp3gain 의 태그 동작을 gaindb_cli.py 경로에서 재현·검증한다.
 APE(기본) / ID3v2(-s i) 두 경로 각각 write / read / remove / round-trip.
 
 무손실 복원(round-trip) 원칙(11항목 영구 제약):

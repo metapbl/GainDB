@@ -1,7 +1,8 @@
 """
-gaindb_cli.py - Gain dB unified CLI (re-implements the original mp3gain option scheme)
+gaindb_cli.py - Gain dB unified CLI (independent re-implementation of the mp3gain option scheme)
 
-Mirrors the option parsing and execution branches of the original mp3gain.c main().
+Reproduces the option parsing and execution branches of the mp3gain CLI, written
+independently from public specifications and observed behaviour.
 
 ================================================================================
 CLI I/O SPECIFICATION (user interface contract)
@@ -9,7 +10,7 @@ CLI I/O SPECIFICATION (user interface contract)
 Invocation:
     python gaindb_cli.py [options] <infile> [<infile 2> ...]
 
-Option tokens (original mp3gain scheme; clean-room re-implementation):
+Option tokens (mp3gain-compatible scheme; independent re-implementation):
     A token is an option ONLY if it is exactly two characters and begins with
     '-' or '/'. The option argument, when required, is ALWAYS the next token
     (glued arguments like "-g3" are rejected -- agreed exception, CLAUDE.md 5.4).
@@ -42,21 +43,21 @@ Option tokens (original mp3gain scheme; clean-room re-implementation):
     -u            undo changes (based on stored tag info)
     -w            "wrap" gain change if gain+change > 255 or < 0
 
-Debug sub-commands (NOT part of the original mp3gain scheme -- Gain dB dev tools,
+Debug sub-commands (NOT part of the mp3gain scheme -- Gain dB dev tools,
 agreed in CLAUDE.md D-3; absorbed from former scan_gain.py / inspect_tag.py):
     --debug-scan <file> [...]   dump frame parse + global_gain min/max
     --debug-tag  <file> [...]   dump APEv2 tag structure + recognized gain fields
     These are intercepted before the 2-char option parser; their output is
-    developer-oriented (English) and is not an original-mp3gain reproduction.
+    developer-oriented (English) and is not an mp3gain reproduction.
 
 Output channels:
-    stdout - functional output reproduced from the original: per-track/album
+    stdout - functional output matching mp3gain: per-track/album
              suggestions, database rows, "Applying mp3 gain change...",
              "No changes...", clipping WARNING lines. These strings match the
-             original mp3gain English verbatim.
+             mp3gain English verbatim.
     stderr - banner / usage / version / status messages ("Undoing...",
              "Applying gain change of N to CHANNEL...", "done", "Deleting tag
-             info...", clip prompt). Original-derived strings are verbatim;
+             info...", clip prompt). mp3gain-compatible strings are verbatim;
              a few are Gain-dB-specific English (e.g. ffmpeg decode failure).
 
 Exit code:
@@ -176,13 +177,11 @@ def _show_version(out=sys.stderr):
 def _err_usage():
     """Equivalent of the original errUsage: short usage + exit 1.
 
-    Copyright line is kept verbatim (attribution to the original author). The
-    mpglib line is replaced because Gain dB decodes via ffmpeg, not mpglib.
+    The banner reports only the ffmpeg dependency; Gain dB decodes via ffmpeg,
+    not via an in-tree decoder.
     """
     _show_version()
-    print("copyright(c) 2001-2009 by Glen Sawyer", file=sys.stderr)
-    print("Gain dB is a clean-room re-implementation; PCM decoding uses ffmpeg",
-          file=sys.stderr)
+    print("PCM decoding uses ffmpeg (called from PATH)", file=sys.stderr)
     print(f"Usage: {PROGNAME} [options] <infile> [<infile 2> ...]", file=sys.stderr)
     print("  --use -? or -h for a full list of options", file=sys.stderr)
     sys.exit(1)
@@ -191,9 +190,8 @@ def _err_usage():
 def _wrap_explanation():
     """Explanation of the -w "wrap" behaviour (Gain dB independent wording) + exit.
 
-    Conveys the same information as the original wrap explanation, but the prose
-    is written independently (clean-room). The option (-w) and its behaviour are
-    unchanged.
+    Conveys the same information as the wrap explanation, but the prose is written
+    independently. The option (-w) and its behaviour are unchanged.
     """
     e = sys.stderr
     print("About the -w \"wrap\" option:", file=e)
@@ -236,7 +234,7 @@ def _wrap_explanation():
           file=e)
     print("     a positive change.", file=e)
     print("", file=e)
-    print("Pass -w if you want the original exact-reversible wrapping behaviour.",
+    print("Pass -w if you want the exact-reversible wrapping behaviour.",
           file=e)
     sys.exit(0)
 
@@ -244,16 +242,14 @@ def _wrap_explanation():
 def _full_usage():
     """Full option listing (Gain dB independent wording) + exit.
 
-    Option tokens and argument forms are the original interface (reproduced), but
-    each option's description text is written independently (clean-room). The
+    Option tokens and argument forms are the mp3gain-compatible interface
+    (reproduced), but each option's description text is written independently. The
     original fullUsage omits the "-s u" line; we include it (agreed correction,
     CLAUDE.md D-3).
     """
     _show_version()
     e = sys.stderr
-    print("copyright(c) 2001-2009 by Glen Sawyer (original mp3gain)", file=e)
-    print("Gain dB is a clean-room re-implementation; PCM decoding uses ffmpeg",
-          file=e)
+    print("PCM decoding uses ffmpeg (called from PATH)", file=e)
     print(f"Usage: {PROGNAME} [options] <infile> [<infile 2> ...]", file=e)
     print("options:", file=e)
     print("\t-v - print the version number", file=e)

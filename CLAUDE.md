@@ -110,8 +110,7 @@ GaindB/
 │  ├─ test_cli_misc.py              # CLI 기타 분기(usage/version 등)
 │  ├─ test_gui_pure.py              # GUI 순수 함수부
 │  └─ test_streaming_analysis.py    # 스트리밍=통짜 비트 동일성
-├─ docs/
-│  └─ LICENSE_REVIEW.md    # 라이선스 검토 + 부록 A 파일별 저작권 위험 전수 감사
+├─ docs/                    # (공개) 필요 시 사용자용 문서. 
 ├─ LICENSE                 # Apache License 2.0 전문
 ├─ NOTICE                  # 독립 구현·의존성 사실 고지
 ├─ CLAUDE.md               # 이 컨텍스트 파일
@@ -120,16 +119,18 @@ GaindB/
 └─ _local/                 # 원본 참고 소스·저작권 음원·수동 검증(git·배포물 제외)
    ├─ mp3gain/             #   원본 C·VB GUI 소스(사양·동작 참고용, 저장소·배포물에 미포함)
    ├─ manual_checks/       #   mutagen/exe 상호운용·대조 스크립트
+   ├─ LICENSE_REVIEW.md    #   (비공개) 라이선스 정합성 점검 + 파일별 저작권 감사 통합 문서
    └─ test_audio/          #   저작권 테스트 음원
 
 git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·`.vscode/`·`__pycache__/`·`.venv/` 를 제외한 48개 파일이다(2026-07 스캔 기준). 원본 참고 소스와 저작권 음원은 전부 `_local/` 아래로 격리되어 저장소·배포물에 포함되지 않는다. 원본 exe 는 코드가 아니라 실행 결과만 검증 기준으로 쓰므로 독립 구현 원칙 위반이 아니다(2.2 의 "관찰된 동작 차용").
+
 ## 5. 원본 참고 자료 · 새 세션 시작법
 
 - 소스 미러: https://github.com/Sound-Linux-More/mp3gain · 원조: https://sourceforge.net/projects/mp3gain/
 - **원본 C 소스는 로컬 `_local/mp3gain/src/` 에 보관**. git·배포물 제외. Claude 는 이 폴더를 직접 읽지 못하므로, Claude 가 필요한 함수/구간을 지목하면 사용자가 해당 파일에서 찾아 붙여넣어 제공한다.
 - **원본 Windows GUI(MP3GainGUI)는 VB 로 작성된, CLI `mp3gain.exe` 를 호출하는 프런트엔드**다. 소스를 로컬에 보관(git·배포물 제외). 8단계에서 화면 구성·동작을 관찰·참고하되 코드는 옮기지 않는다(2.2).
 - **이 미러의 `.c` 는 크롤 불가**(`application/octet-stream` MIME). 그래서 C·VB 소스는 로컬 보관 + 사용자가 붙여넣어 제공. Claude 가 크롤로 가져오려 시도하지 말 것.
-- **새 세션 시작**: 첫 메시지에 본 파일(CLAUDE.md)과 `docs/LICENSE_REVIEW.md` 를 첨부하고 "먼저 읽어달라"는 한 줄을 덧붙인다. 이어 그 세션 단계에 필요한 소스(.c/.h 또는 GUI, 또는 감사 대상 .py)를 붙여넣어 제공한다. 검색 도구는 최신 정보 확인용으로만 쓰고, 원본 소스 입수에는 쓰지 않는다.
+- **새 세션 시작**: 첫 메시지에 본 파일(CLAUDE.md)과 `_local/LICENSE_REVIEW.md`(비공개 라이선스 감사 통합 문서)를 첨부하고 "먼저 읽어달라"는 한 줄을 덧붙인다. 이어 그 세션 단계에 필요한 소스(.c/.h 또는 GUI, 또는 감사 대상 .py)를 붙여넣어 제공한다. 검색 도구는 최신 정보 확인용으로만 쓰고, 원본 소스 입수에는 쓰지 않는다.
 
 ## 6. 구현 단계 로드맵
 
@@ -199,7 +200,7 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 - **판정 기준**: 차용 가능(알고리즘·파일/태그 포맷·비트 레이아웃·표준 계수 수치·옵션 체계·관찰된 UI 동작·원본 exe 가 출력하는 문자열 = 저작권 비대상) vs 차용 불가(원본 소스 코드·설명 산문·독창적 표현).
 - **유지 주의**: 일반 영어 변수명(`original_*`), 원본 exe 의 동작 결과 출력 문자열, 테스트가 검증하는 문자열은 건드리지 않는다.
 - **처리**: (A) 삭제 → 사실 언급은 README/NOTICE 로만(2.3). (B) "독립 구현"으로 치환. (C) "mp3gain 과 동일한 결과" 등 결과 일치 서술로 중립화, 원본 파일명 직접 언급 최소화.
-- **기록**: `docs/LICENSE_REVIEW.md` 부록 A(파일별 감사)에 검토일·발견 위험·처리·차용 근거·상태를 남긴다.
+- **기록**: `_local/LICENSE_REVIEW.md`(비공개) 2부(파일별 감사)에 검토일·위험 유형·처리·유지 근거·커밋·상태를 남긴다.
 - **검증**: 수정 후 `python -m unittest discover -s tests` 통과 확인 뒤 커밋.
 
 ## 9. 알려진 함정 (영구 제약)
@@ -231,7 +232,7 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 4. 태그(`tag.py` APE·`id3.py` ID3v2 — read/write/remove/round-trip, scan_gain, change_gain_and_tag, auto/album, 꼬리 보존, useId3 분기).
 5. CLI(`gaindb_cli.py`) — mp3gain 옵션 전부 재현(게인·분석·적용·클립·database·태그). recalc 비트마스크로 디코딩 스킵(수치 일치). CLI I/O 는 영문만(다국어는 GUI 책임).
 6. 샘플레이트 확장 — ReplayGain 전 샘플레이트(32k / MPEG2·2.5 계열) 코어 추가, exe 대조 min/max 전부 일치.
-7. 배포 라이선스 검토 — 전 모듈 독립 구현 부합 확인, 계수 출처 정직 기재, git·배포물 분리, 의존성 매트릭스, Apache 2.0 노선 확정, 파일별 저작권 위험 전수 감사(8.8, `docs/LICENSE_REVIEW.md` 부록 A). 최종 확인은 배포 직전 전문가 검토로 남겨둠(2.3).
+7. 배포 라이선스 검토 — 전 모듈 독립 구현 부합 확인, 계수 출처 정직 기재, git·배포물 분리, 의존성 매트릭스, Apache 2.0 노선 확정, 파일별 저작권 위험 전수 감사(8.8, `_local/LICENSE_REVIEW.md` 부록 A). 최종 확인은 배포 직전 전문가 검토로 남겨둠(2.3).
 8. GUI(PySide6, `gui/`) — 파일/폴더 추가·태그 스캔·자연 정렬·유니코드·리스트 UX·Track/Album 분석·게인·우클릭 팝업(Clear Analysis/Undo/Remove Tags/Play)·취소(청크 경계 즉시 kill)·스트리밍 분석(수 시간 곡)·컬럼폭/정렬 저장·로그·트레이·다국어. 표시값은 원본 exe 실측과 일치. `api.analyze_file`(비파괴)이 CLI/GUI/AVD 공유.
 
 **검증 인프라.** 통합 테스트 스위트(`tests/`, unittest, 외부 의존 없음) — `python -m unittest discover -s tests` 전부 PASS(130건). 모든 테스트는 원본 음원 불간섭(tempfile 사본, `FixtureGuard` 오염 감시), 무손실은 `audio_body_sha256`(오디오 본문만 해시)로 판정. 도메인별 모듈(roundtrip/analysis/tag/options/recalc/clip/useid3/samplerate/album/logging + GUI 순수 함수부 `test_gui_pure`·스트리밍 동일성 `test_streaming_analysis`). mutagen 상호운용·원본 exe dB 대조는 오염 방지를 위해 `_local/manual_checks/`(git 제외)에서 로컬 수동 실행.
@@ -272,7 +273,7 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 
 **다음 할 일(남은 것만).**
 
-- **파일별 저작권 위험 전수 감사(8.8) — 진행 중.** `docs/LICENSE_REVIEW.md` 부록 A.1 표 순서대로 소스 트리 전 파일을 하나씩 세션 열어 감사·소거·기록. 우선순위: mp3gain_cli.py → analysis.py → id3.py → tag.py → frame.py → writer.py → api.py → gui/* → 문서/테스트. 매 파일 수정 후 테스트 130건 통과 확인·커밋.
+- **파일별 저작권 위험 전수 감사(8.8) — 진행 중.** `_local/LICENSE_REVIEW.md` 부록 A.1 표 순서대로 소스 트리 전 파일을 하나씩 세션 열어 감사·소거·기록. 우선순위: mp3gain_cli.py → analysis.py → id3.py → tag.py → frame.py → writer.py → api.py → gui/* → 문서/테스트. 매 파일 수정 후 테스트 130건 통과 확인·커밋.
 - **README + LICENSE 헤더.** 감사 완료 후 README(프로젝트 소개·설치·ffmpeg 안내·라이선스 배지) 작성, 필요 시 각 소스 파일에 Apache 2.0 짧은 헤더 추가.
 - **공개 전 최종 점검.** 히스토리에 위험 파일 없음 재확인(완료), 전체 빌드·테스트, AVD 의 `gaindb/` 사본 동기화, 전문가(변호사) 검토(2.3).
 - **후순위 기능 GUI — 잔여 없음.** 남은 것은 아래 보류 항목뿐.

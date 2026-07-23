@@ -1,15 +1,13 @@
-r"""gui/i18n.py — 다국어(한글/영문) 국제화 인프라(clean-room).
+r"""gui/i18n.py — 다국어(한글/영문) 국제화 인프라(독립 구현).
 
-원본 MP3GainGUI 의 basLocalizer(런타임 문자열 테이블 교체 + 영문 폴백 +
-언어 메뉴 수동 전환 + 선택 언어 영속화)를 Qt 표준 국제화 메커니즘으로 재현한다.
-원본은 VB6 에 표준 i18n 이 없어 외부 INI + 자체 조회 함수(GetLocalString)를
-직접 만들었으나, 우리는 Qt 표준(tr() + .qm + QTranslator)이 있으므로 그것을
-쓴다 — 재현 대상은 "동작"(런타임 교체·폴백·수동 전환·영속화)이지 언어 제약의
-산물(자체 조회 함수)이 아니다(8단계 아키텍처 결정과 일관).
+런타임 문자열 테이블 교체 + 영문 폴백 + 언어 메뉴 수동 전환 + 선택 언어
+영속화라는 동작을 Qt 표준 국제화 메커니즘으로 재현한다. 재현 대상은 이
+"동작"이지 특정 구현 수단이 아니다 — Qt 표준(tr() + .qm + QTranslator)이
+있으므로 그것을 쓴다(8단계 아키텍처 결정과 일관).
 
 지원 언어(합의): 영문(en, 소스 원문 = 번역파일 없음) + 한국어(ko, gaindb_ko.qm).
 tr() 로 감싼 문자열은 번역이 없으면 원문(영문)을 그대로 반환하므로 영문 폴백이
-자동 확보된다(원본 GetLocalString 의 기본값 폴백과 동일 효과).
+자동 확보된다.
 
 초기 언어 결정(합의): QSettings i18n/language 키가 있으면(사용자가 한 번이라도
 명시 선택했으면) 그 값을 최우선. 없으면(첫 실행) QLocale.system() 을 감지해
@@ -77,7 +75,7 @@ def resolve_language() -> str:
 
 
 def save_language(lang: str) -> None:
-    """사용자가 고른 언어를 QSettings 에 영속화한다(원본 LanguageFile 저장 대응)."""
+    """사용자가 고른 언어를 QSettings 에 영속화한다."""
     if lang not in SUPPORTED:
         lang = DEFAULT_LANGUAGE
     settings = QSettings(_SETTINGS_ORG, _SETTINGS_APP)
@@ -136,6 +134,5 @@ def install_translator(app, lang: str) -> str:
         _active_translator = translator
         return lang
 
-    # .qm 이 없거나 로드 실패: 원문(영문) 폴백. 조용히 en 으로 떨어진다
-    # (원본도 로드 실패 시 "will continue, but in English").
+    # .qm 이 없거나 로드 실패: 원문(영문) 폴백. 조용히 en 으로 떨어진다.
     return "en"

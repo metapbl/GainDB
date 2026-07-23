@@ -1,7 +1,6 @@
 """Entry point for `python -m gui`.
 
-Clean-room PySide6 front-end for the MP3 gain tool.
-No VB6 source code is reused here.
+Independent PySide6 front-end for the MP3 gain tool.
 """
 from __future__ import annotations
 

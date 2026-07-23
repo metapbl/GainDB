@@ -1,4 +1,4 @@
-"""Qt table model for the MP3 gain file list (clean-room)."""
+"""Qt table model for the MP3 gain file list (independent implementation)."""
 from __future__ import annotations
 
 import os
@@ -56,7 +56,7 @@ class FileRow:
         self.error_msg = ""
 
     def set_tag_result(self, result: dict) -> None:
-        """파일 추가 시 태그 스캔 결과를 반영한다(원본 AddSingleFile 대응)."""
+        """파일 추가 시 태그 스캔 결과를 반영한다."""
         self.result = result
         self.error_msg = ""
         self.status = "analyzed" if result.get("status") == "ok" else "pending"
@@ -67,16 +67,16 @@ class FileRow:
         return not self.tag_scanned
 
     def needs_analysis(self) -> bool:
-        """Track Analysis 대상인지(값이 아직 없는지). 원본 RadiodBGain=NOREALNUM."""
+        """Track Analysis 대상인지(값이 아직 없는지)."""
         return self.status not in ("analyzed", "applied")
 
     def needs_album_analysis(self) -> bool:
         """Album Analysis 대상인지(앨범 표시값 album_* 이 아직 없는지).
 
-        원본 AlbumdBGain=NOREALNUM 대응. result 가 있고 status 가 ok 여도
-        album_db 가 없으면 앨범 분석이 필요하다(Track 분석만 된 상태). 태그에서
-        album_gain 을 읽은 경우는 read_file_tags 확장 시 album_db 가 채워진다
-        (그 배선은 4단계 GUI 에서). 지금은 album_db 유무로만 판정한다.
+        result 가 있고 status 가 ok 여도 album_db 가 없으면 앨범 분석이 필요하다
+        (Track 분석만 된 상태). 태그에서 album_gain 을 읽은 경우는 read_file_tags
+        확장 시 album_db 가 채워진다(그 배선은 4단계 GUI). 지금은 album_db 유무로만
+        판정한다.
         """
         r = self.result
         if not r or r.get("status") != "ok":
@@ -167,7 +167,7 @@ class FileTableModel(QAbstractTableModel):
     # ---- display / sort helpers -----------------------------------------
     def _display_text(self, row: FileRow, key: Col) -> str:
         if key == Col.NAME:
-            return row.path  # full path + filename (matches original mp3gain)
+            return row.path  # full path + filename (matches mp3gain)
 
         r = row.result
         if not r:

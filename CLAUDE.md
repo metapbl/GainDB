@@ -63,32 +63,66 @@
 루트: `C:\Users\ggoyo_zhxlvdr\GaindB` (구조가 바뀌면 이 트리와 10 진척 로그를 함께 갱신한다.)
 
 GaindB/
-├─ gaindb/                 # 패키지
+├─ gaindb/                 # 코어 패키지 (순수 로직 + 분석)
 │  ├─ __init__.py
 │  ├─ frame.py             # 프레임 파서: _BitReader, 헤더 파싱, global_gain 읽기
 │  ├─ writer.py            # global_gain ±N 무손실 적용 + CRC 재계산
-│  ├─ decode.py            # ffmpeg/ffprobe 로 MP3→PCM
+│  ├─ decode.py            # ffmpeg/ffprobe 로 MP3→PCM (스트리밍 포함)
 │  ├─ id3.py               # ID3v2 태그(RVA2 + TXXX) 읽기/쓰기
 │  ├─ tag.py               # APEv2 태그(전 필드 + undo)
 │  ├─ analysis.py          # ReplayGain 분석(Track/Album), dB→스텝 변환
-│  └─ api.py               # 비파괴 analyze_file(CLI/GUI/AVD 공유)
-├─ apply_gain.py           # CLI: 수동/auto/album 게인 적용
+│  └─ api.py               # 비파괴 analyze_file (CLI/GUI/AVD 공유 진입점)
+├─ apply_gain.py           # 게인 적용 로직(수동/auto/album)
 ├─ mp3gain_cli.py          # 통합 CLI 진입점(mp3gain 호환 옵션 체계)
-├─ gui/                    # PySide6 프런트엔드(8단계)
-├─ tests/                  # 통합 테스트 스위트(unittest, 외부 의존 없음)
-├─ manual_checks/          # 통합 스위트 밖 로컬 수동 검증(git 제외, mutagen/exe 상호운용·대조)
-├─ mp3gain/                # 원본 C·GUI 소스(참고용). git·배포물 제외 (실제로는 _local/ 로 격리)
-├─ _local/                 # 저작권 테스트 음원·원본 참고 소스·수동 검증(git 제외, 절대 배포 안 함)
+├─ gui/                    # PySide6 프런트엔드(8단계, 독립 구현)
+│  ├─ __init__.py
+│  ├─ __main__.py          # 진입점: QApplication, i18n 배선
+│  ├─ main_window.py       # 메인 창: 리스트·분석/게인·우클릭·취소·트레이 배선
+│  ├─ model.py             # Qt 테이블 모델(FileTableModel)
+│  ├─ columns.py           # 컬럼 정의(QT_TRANSLATE_NOOP 헤더)
+│  ├─ workers.py           # QThread 워커(분석/게인/앨범, 진행·취소)
+│  ├─ logging.py           # 로그 파일 기록(Qt 비의존)
+│  ├─ i18n.py              # 다국어 인프라(런타임 전환·로케일 폴백)
+│  ├─ resources.py         # 아이콘 등 리소스 헬퍼
+│  ├─ dialogs/
+│  │  ├─ __init__.py
+│  │  └─ logs_dialog.py    # 로그 보기 다이얼로그
+│  └─ translations/        # 다국어 리소스
+│     ├─ .gitkeep
+│     ├─ gaindb_ko.ts      # 한국어 번역 소스
+│     └─ gaindb_ko.qm      # 한국어 번역 컴파일본
+├─ assets/
+│  └─ GainDB.png           # 트레이·앱 아이콘
+├─ tests/                  # 통합 테스트 스위트(unittest, 외부 의존 없음, 130건 PASS)
+│  ├─ __init__.py
+│  ├─ _support.py                   # 공용 헬퍼(FixtureGuard, audio_body_sha256 등)
+│  ├─ test_support_smoke.py         # 테스트 헬퍼 자체 검증
+│  ├─ test_roundtrip_options.py     # 무손실 round-trip + 옵션 조합
+│  ├─ test_analysis_integration.py  # ReplayGain 분석 수치
+│  ├─ test_tag_integration.py       # APE/ID3 태그 read/write/remove
+│  ├─ test_useid3_migration.py      # -s i ID3 태그 경로
+│  ├─ test_options_parsing.py       # CLI 옵션 파서
+│  ├─ test_recalc_decode_skip.py    # recalc 비트마스크 디코딩 스킵
+│  ├─ test_clip_integration.py      # 클리핑 판정·자동 클립(-k)
+│  ├─ test_samplerate_expansion.py  # 전 샘플레이트 계수
+│  ├─ test_album.py                 # 앨범 게인 누적·peak 이동
+│  ├─ test_logging.py               # 로그 파일 기록
+│  ├─ test_cli_misc.py              # CLI 기타 분기(usage/version 등)
+│  ├─ test_gui_pure.py              # GUI 순수 함수부
+│  └─ test_streaming_analysis.py    # 스트리밍=통짜 비트 동일성
 ├─ docs/
 │  └─ LICENSE_REVIEW.md    # 라이선스 검토 + 부록 A 파일별 저작권 위험 전수 감사
 ├─ LICENSE                 # Apache License 2.0 전문
 ├─ NOTICE                  # 독립 구현·의존성 사실 고지
 ├─ CLAUDE.md               # 이 컨텍스트 파일
-├─ CopyClaudeMd.bat        # CLAUDE.md 사본 동기화 스크립트
-└─ .gitignore
+├─ .gitignore
+├─ .vscode/                # 에디터 설정(git 제외)
+└─ _local/                 # 원본 참고 소스·저작권 음원·수동 검증(git·배포물 제외)
+   ├─ mp3gain/             #   원본 C·VB GUI 소스(사양·동작 참고용, 저장소·배포물에 미포함)
+   ├─ manual_checks/       #   mutagen/exe 상호운용·대조 스크립트
+   └─ test_audio/          #   저작권 테스트 음원
 
-원본 참고 소스(C·VB GUI)와 저작권 테스트 음원은 `_local/` 아래로 격리하며 git·배포물에서 제외한다. 원본 exe 는 코드가 아니라 실행 결과만 검증 기준으로 쓰므로 독립 구현 원칙 위반이 아니다(2.2 의 "관찰된 동작 차용").
-
+git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·`.vscode/`·`__pycache__/`·`.venv/` 를 제외한 48개 파일이다(2026-07 스캔 기준). 원본 참고 소스와 저작권 음원은 전부 `_local/` 아래로 격리되어 저장소·배포물에 포함되지 않는다. 원본 exe 는 코드가 아니라 실행 결과만 검증 기준으로 쓰므로 독립 구현 원칙 위반이 아니다(2.2 의 "관찰된 동작 차용").
 ## 5. 원본 참고 자료 · 새 세션 시작법
 
 - 소스 미러: https://github.com/Sound-Linux-More/mp3gain · 원조: https://sourceforge.net/projects/mp3gain/

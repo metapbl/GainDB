@@ -1,17 +1,16 @@
-r"""gui/dialogs/logs_dialog.py — 로그 설정 다이얼로그(원본 MP3GainGUI frmLogs 재현).
+r"""gui/dialogs/logs_dialog.py — 로그 설정 다이얼로그(독립 구현).
 
-원본 frmLogs 는 "Options → Logs..." 로 여는 창으로, Error/Analysis/Change 세
-로그의 파일 경로를 지정한다(clean-room, 화면 구성·동작만 관찰 차용).
+"Options → Logs..." 로 여는 창으로, Error/Analysis/Change 세 로그의 파일
+경로를 지정한다(화면 구성·동작만 관찰 차용).
 
-원본과의 확정된 차이(합의, CLAUDE.md 10.2 — A안): 원본은 체크박스를 숨기고
-"경로 유무"로 on/off 를 판정하나, 우리는 원본에 실재하는(숨겨졌던) 체크박스를
-노출해 on/off(체크박스)와 위치(경로)를 분리한다. 이로써 로그를 잠깐 꺼도 경로가
-사라지지 않고, on/off 상태가 화면에 드러난다.
+확정된 차이(합의, CLAUDE.md 10.2 — A안): 숨겨진 체크박스 + "경로 유무"로 on/off
+를 판정하는 대신, 체크박스를 노출해 on/off(체크박스)와 위치(경로)를 분리한다.
+이로써 로그를 잠깐 꺼도 경로가 사라지지 않고, on/off 상태가 화면에 드러난다.
 
 각 행 구성: [☑ 체크박스 라벨] [경로 입력칸] [Browse...]. 체크박스를 끄면 그 행의
 경로칸·Browse 버튼을 비활성화하되 경로 텍스트는 유지한다. OK 시 켜진 로그의
-경로가 실제로 쓰기 가능한지 검사하고(원본 CheckFile), 실패하면 경고 후 창을 닫지
-않는다. 검증을 통과하면 전달받은 LogConfig 를 갱신하고 accept.
+경로가 실제로 쓰기 가능한지 검사하고, 실패하면 경고 후 창을 닫지 않는다. 검증을
+통과하면 전달받은 LogConfig 를 갱신하고 accept.
 
 i18n: 사용자 노출 문자열은 tr() 로 감싼다(컨텍스트 "LogsDialog"). _LogRow 는
 QObject 가 아니므로 부모 다이얼로그의 tr() 로 번역된 문자열을 전달받거나
@@ -31,7 +30,7 @@ from gui.logging import LogConfig, check_writable
 
 
 class _LogRow:
-    """한 로그(체크박스+경로+Browse)를 묶은 헬퍼. 원본 frmLogs 의 한 줄 대응."""
+    """한 로그(체크박스+경로+Browse)를 묶은 헬퍼(로그 설정 창의 한 줄)."""
 
     def __init__(self, label: str, tooltip: str, parent: QDialog):
         self.check = QCheckBox(label, parent)
@@ -75,7 +74,7 @@ class _LogRow:
 
 
 class LogsDialog(QDialog):
-    """로그 경로·on/off 를 편집하는 모달 다이얼로그(원본 frmLogs)."""
+    """로그 경로·on/off 를 편집하는 모달 다이얼로그."""
 
     def __init__(self, config: LogConfig, parent=None):
         super().__init__(parent)
@@ -125,7 +124,7 @@ class LogsDialog(QDialog):
         self._change.set_state(c.change_enabled, c.change_path)
 
     def _on_ok(self):
-        # 켜진 로그마다 경로가 비어있지 않은지 + 쓰기 가능한지 검사(원본 CheckFile).
+        # 켜진 로그마다 경로가 비어있지 않은지 + 쓰기 가능한지 검사.
         checks = (
             (self._error, self.tr("Error Log is enabled but no file path is set."),
              self.tr("Can't open or write to the Error log file:")),

@@ -191,88 +191,60 @@ GaindB/
 
 ### 10.1. 완료 요약 (1~8단계)
 
-**1~7단계 완료·검증 완료. 8단계 GUI MVP 완료(잔여 점검 항목은 10.3).**
+**1~7단계 완료·검증 완료. 8단계 GUI MVP + 후순위 기능(우클릭 팝업·앨범 계열·컬럼저장·로그·트레이·다국어)까지 완료.** 세부 구현은 코드·git log 에 있으므로 여기선 "무엇을 완료했는가"만 남긴다.
 
 1. 프레임 파서 + `global_gain` 읽기/쓰기(`frame.py`·`writer.py`, round-trip 바이트 동일).
-2. ReplayGain 분석기(`analysis.py` — equal-loudness 필터+RMS+히스토그램+95퍼센타일−PINK_REF, `db_to_steps`; Track 은 ffmpeg replaygain 과 허용오차 이내, Album 은 44.1k+48k 혼합 검증). 한 48k 곡은 `track_peak>1.0`(1.033) — 클립 방지(-k)에서만 의미, 게인 산출엔 무영향.
-3. MP3 디코딩(`decode.py` — ffmpeg/ffprobe subprocess, ±32768 스케일).
-4. 태그(`tag.py` APE·`id3.py` ID3v2 — read/write/remove/round-trip, scan_gain, change_gain_and_tag, auto/album 연결, otherFields·Lyrics3/ID3v1 꼬리 보존, useId3 분기).
-5. CLI(`mp3gain_cli.py`) — 원본 옵션 전부 재현(직접 게인·분석·적용·클립·database·태그·출력). recalc 비트마스크(FULL/AMP/MIN_MAX)로 디코딩 스킵(결과 수치는 원본 동일). CLI I/O 는 영문만 출력(다국어는 GUI tr() 책임). min/max 스캔 버그 수정: `need_scan = recalc & (FULL|AMP|MIN_MAX)`.
-6. 샘플레이트 확장 — 32k / 24k·22.05k·16k / 12k·11.025k·8k 코어 추가·검증. frame.py MPEG2/2.5 분기 실측 재검증(수정 불필요, exe 대조 min/max 전부 일치).
-7. 배포 라이선스 1차 점검 — 원본 C 소스와 직접 대조해 전 모듈 clean-room 부합 확인, 도움말 산문 재작성·계수 출처 정직 기재·주석 정리, git 분리 확인, 의존성 매트릭스 정리(numpy·scipy=BSD, PySide6=LGPLv3 동적링크, ffmpeg=외부 호출 전파 없음/동봉 시 LGPL 빌드만). 산출물 `docs/LICENSE_REVIEW.md`.
-8. GUI(PySide6, `gui/`) — 파일/폴더 추가·태그 스캔·자연 정렬·다크색상·유니코드·리스트 UX(Delete/더블클릭/고무줄)·Track Analysis(AnalyzeWorker)·Track Gain(ApplyWorker, 원본 RadioGain 재현)·단축키·Clear·취소(청크 경계 즉시 kill)·파일 내부 진행률·스트리밍 분석(수 시간 곡 대응)·창 닫기 안전. 표시값은 원본 exe 실측과 일치(CurrMaxAmp·Volume·Track Gain·clip). `api.analyze_file`(비파괴·무출력)이 CLI --show/GUI/AVD 공유. 대량 추가 성능: 모델에 path→row 딕셔너리 인덱스 도입해 `find_row_by_path` 를 O(1) 로(대량 스캔 O(N²) 제거), 태그 스캔 카운트를 워커 progress 기준으로 통일(읽기 실패 파일 있어도 표시 안 어긋남). 우클릭 팝업(원본 mnuPopup, MVP 4항목: Clear Analysis/Undo/Remove Tags/Play) 추가 — `FileActionWorker`(action="undo"|"remove_tags", 원본 DoFileAction 대응) + `api.undo_file_gain`/`remove_file_tags` 래퍼. 우클릭 시 그 행이 선택에 없으면 그 행만 선택 후 메뉴(원본 "선택 한정" 취지), busy 중 전 항목 비활성.
+2. ReplayGain 분석기(`analysis.py` — equal-loudness 필터+RMS+히스토그램+95퍼센타일−PINK_REF). Track 은 ffmpeg replaygain 과 허용오차 이내, Album 은 혼합 검증.
+3. MP3 디코딩(`decode.py` — ffmpeg/ffprobe subprocess).
+4. 태그(`tag.py` APE·`id3.py` ID3v2 — read/write/remove/round-trip, scan_gain, change_gain_and_tag, auto/album, 꼬리 보존, useId3 분기).
+5. CLI(`mp3gain_cli.py`) — 원본 옵션 전부 재현(게인·분석·적용·클립·database·태그). recalc 비트마스크로 디코딩 스킵(수치는 원본 동일). CLI I/O 는 영문만(다국어는 GUI 책임).
+6. 샘플레이트 확장 — ReplayGain 전 샘플레이트(32k / MPEG2·2.5 계열) 코어 추가, exe 대조 min/max 전부 일치.
+7. 배포 라이선스 1차 점검 — 전 모듈 clean-room 부합 확인, 계수 출처 정직 기재, git 분리, 의존성 매트릭스(`docs/LICENSE_REVIEW.md`). 최종 확인은 배포 직전 전문가 검토로 남겨둠(2.3).
+8. GUI(PySide6, `gui/`) — 파일/폴더 추가·태그 스캔·자연 정렬·유니코드·리스트 UX·Track/Album 분석·게인·우클릭 팝업(Clear Analysis/Undo/Remove Tags/Play)·취소(청크 경계 즉시 kill)·스트리밍 분석(수 시간 곡)·컬럼폭/정렬 저장·로그·트레이·다국어. 표시값은 원본 exe 실측과 일치. `api.analyze_file`(비파괴)이 CLI/GUI/AVD 공유.
 
-**검증 인프라.** 통합 테스트 스위트(`tests/`, unittest, 외부 의존 없음) — `python -m unittest discover -s tests` 전부 PASS(118건 기준). 모든 테스트는 원본 음원 불간섭(tempfile 사본, `FixtureGuard` 오염 감시, 무결성은 `audio_body_sha256`). `_support.py`(BaseGainTest·run_cli·해시), 도메인별 test 모듈(roundtrip/analysis/tag/options/recalc/clip/useid3/samplerate/album + GUI 순수 함수부 `test_gui_pure`·스트리밍 동일성 `test_streaming_analysis`). `test_album` 은 그룹핑·스트리밍=벌크 동치·track+album 이중 태그에 더해 `AlbumPeakShiftTest`(앨범 게인 후 태그 peak = `peak_before×2^(steps/4)` = 실제 파형 peak, 89dB 재판정 시 거짓 clip 없음 — 9번 표시 수식 (3)의 앨범 경로 회귀 고정). `test_gui_pure` 는 collect_mp3_paths·모델 path→row 인덱스 불변식·표시 수식(recompute_target/shift_after_apply)을 원본 음원·ffmpeg 없이 검증. `test_streaming_analysis` 는 TrackAnalyzer 스트리밍 누적 = 통짜(analyze_track/track_peak/track_histogram) 결과가 비트 단위 동일함을 여러 청크 크기·샘플레이트로 검증(진척 로그 diff=0 을 정식 고정). fixture 는 Debussy(44.1k)·10cm(48k) 원본 + ffmpeg 변형 다수(mono/stereo·전 샘플레이트). mutagen 상호운용·원본 exe dB 대조는 skip 오염 방지를 위해 `manual_checks/`(git 제외)에서 로컬 수동 실행. exe 는 MSYS2+MinGW-w64(UCRT64)로 빌드한 1.6.2, 사본에 `-o -s s` 로만 정답 추출(원본 오염 방지).
+**검증 인프라.** 통합 테스트 스위트(`tests/`, unittest, 외부 의존 없음) — `python -m unittest discover -s tests` 전부 PASS(130건). 모든 테스트는 원본 음원 불간섭(tempfile 사본, `FixtureGuard` 오염 감시), 무손실은 `audio_body_sha256`(오디오 본문만 해시)로 판정. 도메인별 모듈(roundtrip/analysis/tag/options/recalc/clip/useid3/samplerate/album/logging + GUI 순수 함수부 `test_gui_pure`·스트리밍 동일성 `test_streaming_analysis`). mutagen 상호운용·원본 exe dB 대조는 오염 방지를 위해 `manual_checks/`(git 제외)에서 로컬 수동 실행(exe 는 MSYS2+MinGW 빌드 1.6.2, 사본에 `-o -s s` 로만 정답 추출).
 
 ### 10.2. 확정된 정책·결정 (구현 중 새로 정해진 것)
 
-로드맵 단계·2 원칙에 이미 있는 결정(디코더/샘플레이트 예외=2.1)은 여기서 반복하지 않는다. 아래는 작업하며 새로 확정된 사항.
+로드맵 단계·2 원칙에 이미 있는 결정(디코더/샘플레이트 예외=2.1)은 반복하지 않는다. 아래는 작업하며 새로 확정된 what(결정 + 핵심 근거).
 
-- **저샘플레이트 계수 = 공개 표준값 전사(clean-room 판단)**: 공식 사양(Hydrogenaudio)은 44.1k·48k 계수만 수치로 주고 그 외는 변환만 기술. 원본 동일 응답 재설계는 비공개 equal-loudness target 곡선이 필요하고 scipy 에 MATLAB yulewalk 등가가 없어 원리적으로 막힘(조사 확인). 2.1(원본 동일 재현) 최우선이라 여러 독립 구현에 사실상 사양처럼 공유되는 표준 계수 수치만 차용(코드 독립, 저작권 비대상 수치). 실질 1차 출처는 David Robinson gain_analysis.c 상수(ABYule/ABButter)라는 점을 `analysis.py` docstring·여기에 병기. 44.1k·48k 를 같은 분해 규칙으로 재생성해 자기검증.
-- **허용오차 0.1dB(합의)**: 저샘플레이트에서 디코더 차이(mpg123 vs ffmpeg)가 히스토그램 0.01dB 양자화와 맞물려 실측 최대 0.06dB. 2.1 완화가 아니라 디코더가 항구적 예외인 프로젝트에서 불가피 편차의 실측 상한을 정한 것. 계수 오류(수 dB)는 이 기준으로 확실히 걸러짐.
-- **표시Only 정책 통일(진척 로그 → 정본)**: `api.analyze_file` 은 원본 DispJunk/Mp3Info.cls 의 Volume·Track Gain·3색 clip 을 재현하되 두 가지 조정 — (1) Track Gain 제수를 화면용 근사 1.505 대신 정밀값 `5*log10(2)=1.50514997831991`(원본도 실제 계산엔 정밀값). (2) 스텝 반올림을 원본 GUI 의 banker's rounding 대신 적용 경로와 동일한 `db_to_steps`(round-half-away-from-zero)로 통일 → "표시된 스텝·dB·clip = 실제 적용 결과" 항상 일치. 0.5dB 경계 극소수 곡에서 원본 GUI 와 1스텝 다를 수 있으나 이것이 우리 적용 결과와 정합하는 올바른 값. clip 판정식(`peak×2^(steps/4)>32767`, 확실/애매 구분)은 저작권 비대상 수식·상수라 차용, VB 폼·이벤트 코드는 미차용.
-- **8단계 아키텍처: 코어 직접 import(subprocess 아님)**: 원본 GUI 는 VB↔C 언어차로 exe subprocess 호출·stdout 파싱했으나, 우리는 GUI·코어가 같은 Python 이라 코어 함수를 직접 import(원본 subprocess 는 언어 제약의 산물, 재현 대상 아님 — 재현 대상은 결과·화면 구성·동작). stdout 파싱 취약성 제거, 진행률·취소·에러를 파이썬 객체로, 배포 시 exe 동봉 불필요. 원본 GUI 확증: GUI 는 계산 안 하고 목표 음량을 CLI 인자로 안 넘김(`targetChange` 가 `dblGainAdjust=목표−89` 를 화면 표시용으로만 계산), CLI 는 항상 89 기준 분석·`/g <steps>` 적용, 표시·clip 은 DispJunk 담당.
-- **8단계 MVP 범위(합의)**: 컬럼 = 파일명(전체 경로, 원본 Path\File)/Volume/Track Gain/clip(3색: 확실=빨강·애매=파랑·없음=OS팔레트)/Curr Max Amp. 버튼 = Add Files/Folder·Track Analysis(표시만)·Track Gain(적용)·Clear·진행률. 목표 음량은 원본 89dB 기준 그대로 재현하되 "89dB ReplayGain 기준·절대 SPL 아님"을 명시(축소 아님, 표기 명확화 — 이후 i18n 세션에서 라벨은 `(ReplayGain 89 dB 기준)` 으로 축약하고 SPL 상세는 툴팁으로 이관, 아래 i18n 항목 참조). 클립 정책 = auto-clip 끔 + 지정값 그대로 적용 + 판정은 표시로만(원본 mnuDontAddClipping 기본 꺼짐 일치). **MVP 제외(원본에 있으나 후순위)**: Album 계열·Constant Gain·Max No-clip·트레이·로그파일·언어메뉴·정렬 저장. (우클릭 팝업·트레이·로그·컬럼폭/정렬 저장·다국어는 이후 구현 완료 — 10.1·10.3 참조.)
-- **취소 정책(합의, 갱신됨)**: "파일 경계에서만·진행 중 ffmpeg 방치" → "청크 경계에서 취소·진행 중 ffmpeg 즉시 kill". decode 계층이 청크마다 should_cancel 확인, 서면 proc.kill() 후 DecodeCancelled(=DecodeError 하위) → 워커가 실패 아닌 정상 취소로 구분. 수백 ms 내 반영. 원본 GUI 도 취소 시 exe 종료했으므로 오히려 원본 취소 동작에 더 가까움.
-- **스트리밍 분석(곡 전체 PCM 미적재)**: `TrackAnalyzer`(analysis.py) + `decode_pcm_streaming`(decode.py). 청크를 흘려보내며 누적 — 결과는 통짜 처리와 **비트 단위 동일**(diff=0 실측)이라 6단계 exe 대조·0.1dB 검증 불변. 동일성 근거: 필터 lfilter zi 를 청크마다 이어받아 연속 통과, RMS 윈도우 자투리는 버퍼로 이월, peak 는 필터 전 원샘플 abs 최댓값 갱신. 기존 통짜 함수(analyze_track/track_histogram/track_peak, decode_pcm)는 짧은 곡·CLI·테스트용으로 존치. Popen 은 `with proc:` 로 파이프 자동 정리(ResourceWarning 제거).
-- **다국어 위치(합의)**: CLI 는 영문만 출력, 화면 표기 다국어화는 PySide6 tr()/번역 파일로 GUI 계층에서 처리(원본 basLocalizer 대응).
-- **i18n 구현 세부 확정(이번 세션 — 원본 basLocalizer 를 Qt 표준 국제화로 재현)**: 재현 대상은 "동작"(런타임 교체·시스템 로케일 폴백·수동 전환·영속화)이지 VB 언어 제약의 산물이 아니다(2.2). 지원 언어 = 영문(en, 소스 원문이라 .qm 없음=폴백) + 한국어(ko, `gaindb_ko.qm`). 초기 언어 = `QSettings i18n/language` 있으면 그것, 없으면 시스템 로케일 감지(`resolve_language`). 언어 메뉴(`QActionGroup` 상호배타)에서 고르면 `save_language` 영속화 + `install_translator` 즉시 전환, Qt 가 흘리는 `QEvent.LanguageChange` 를 `changeEvent` 가 받아 `_retranslate_ui` 로 정적 문자열 재세팅(테이블 헤더 포함 재시작 없이 실시간 갱신 확인). 다섯 가지 세부 확정: (1) **SPL 라벨 정책** — 목표 볼륨 라벨은 `(ReplayGain 89 dB 기준)` 으로 축약, SPL/LUFS 상세는 툴팁에만. 표시값이 실제 절대 SPL 이 아니므로 UI 라벨에서 "SPL" 용어 제외(축소 아님, 표기 명확화 — MVP 범위 항목의 "절대 SPL 아님 명시" 결정을 라벨 대신 툴팁으로 이관). (2) **컬럼 헤더 번역** — `FileTableModel.headerData` 가 `self.tr(COLUMNS[section].header)` 로 변수를 넘겨 lupdate 정적 추출이 안 되므로, `columns.py` 헤더 상수를 `QT_TRANSLATE_NOOP("FileTableModel", …)` 로 감싸 컨텍스트를 `FileTableModel` 로 고정(8개 헤더). (3) **비-QObject 클래스 번역** — `_LogRow` 처럼 QObject 가 아닌 헬퍼는 `self.tr()` 불가라 `QCoreApplication.translate("LogsDialog", …)` 로 컨텍스트 명시. f-string 대신 Qt 플레이스홀더(`tr("Choose %1 file").arg(...)`). (4) **Qt 표준 위젯 번역** — OK/Cancel 등 내장 위젯 텍스트는 앱 .ts 가 아니라 Qt 기본 번역에서 오므로, `_install_qt_base` 가 `QLibraryInfo` 경로에서 `qtbase_<lang>.qm` 을 로드해 "확인/취소" 표시. (5) **로그 내용 영문 고정** — UI 라벨·다이얼로그만 번역하고 로그 파일 기록 내용은 영문 유지(이슈 리포트·디버깅 시 언어 무관 일관성; CLI I/O 영문 정책과 동일 사상). 언어 표기 자체(English / 한국어)는 자기 이름이라 tr() 대상 아님. 빌드 워크플로: `pyside6-lupdate <소스들> -ts gaindb_ko.ts -no-obsolete` → .ts 번역 채움 → `pyside6-lrelease` 로 .qm 생성(lupdate 대상 = main_window.py·model.py·columns.py·dialogs/logs_dialog.py).
-- **AVD 연결(확정)**: 병합 시 다운로드 후 별도 단계로 함수 계층(api) 호출(다운로드 파이프라인 실시간 결합 아님). 폴더를 넘기면 곡별 결과 반환.
-- **Track Gain 진행바 = 분석 단계 전담(이번 세션 확정)**: 실측상 적용(scan_gain+apply_gain: 디코딩 없는 프레임 순회)은 1시간 곡도 1초 미만으로 전체 소요의 1% 미만, 분석(ffmpeg 디코딩)은 수 분이다. 초기엔 분석0.7/적용0.3 으로 배분했으나 적용이 순식간이라 "70%에서 100%로 툭 점프"해 부자연스러웠고, 0.99 분할도 마지막 1%가 눈에 안 띄었다. → 진행바는 분석 진행률만 0~1 로 표시하고(file_progress), 적용은 on_progress 를 아예 안 넘긴다(진행률 생략). 취소만은 적용 단계에도 should_cancel 로 계속 연결(진행률 뺐다고 취소가 막히지 않음). 미분석 곡은 분석이 0~100% 를 온전히 쓰고 적용은 100% 에서 1초 미만 머문 뒤 완료(가장 정직한 표현). 씨앗 재사용 곡(Analysis 후 Gain)은 분석이 없어 진행바가 잠깐 0 에 머물다 완료(전체 1초 미만).
-- **앨범 게인 진행 UI = 2안(이번 세션 확정)**: 앨범 게인은 내부적으로 2단계(분석→적용)다. 진행 표현을 "진행바는 1회, 카운트는 2회 왕복"으로 확정했다. (1) **진행바**는 분석 단계에서만 0→100% 를 한 번 올리고(적용은 프레임 순회라 순식간), 적용 중에는 100% 에 머문다 — Track Gain 진행바 정책(분석 전담)과 동일 사상. (2) **상태바 카운트**는 분석 1/N→N/N, 적용 1/N→N/N 으로 두 번 센다. 카운트는 완료 수가 아니라 현재 처리 곡 번호라 **1 부터 시작**(N 곡이면 N/N 이 끝, `_progress_base + 1` 표시). (3) **문구 구분**: 분석 단계는 "Analyzing", 적용 단계는 "Applying". 두 단계가 슬롯을 공유(`_on_apply_current`/`_on_apply_file_progress`)하므로, `_album_applying` 플래그(적용 진입 시 `_on_album_apply_count` 가 True 로)로 적용 단계 상태바를 `_on_album_apply_count` 에 양보시키고, 분석/적용 문구는 `isinstance(self._worker, AlbumApplyWorker)` 로 갈라 트랙 게인("Applying")과 구분한다. 이 배선으로 이전 세션의 "카운트 0 고정·진행바 튐·24/23 오버슛" 이 모두 해소됐다(상세는 10.3).
-- **clear_result 는 tag_scanned 를 유지한다(잘못된 Rescan 제거)**: Rescan 은 대량 추가 시 태그 스캔 Pause→재개 전용이다(분석은 스트리밍이라 이어가기 없음 — 취소 후엔 다시 Track Analysis 가 재개 수단). 예전 `clear_result` 는 tag_scanned 를 False 로 되돌려, 태그 삭제(Remove Tags)·Clear Analysis 후 그 행이 needs_tag_scan()=True 가 되어 의미 없는 Rescan 이 떴다(눌러도 태그 없으니 100% 만 찍고 값 안 나옴). → clear_result 는 result·status 만 리셋하고 tag_scanned=True 유지. 논거: 태그 삭제 결과 = "태그 없는 파일을 추가한 상태"와 동일(tag_scanned=True + 값 없음)이므로, Rescan(태그 읽기) 대상이 아니라 Track Analysis(분석) 대상이어야 한다. status="pending" → needs_analysis()=True, tag_scanned=True → needs_tag_scan()=False.
-- **Track Gain steps==0 정책(갱신됨 — 이전 "steps==0 곡 제외"를 폐기)**: Track Gain 은 대상 행을 steps 값과 무관하게 전부 워커에 넘긴다(steps==0 곡도 사전 제외하지 않음). 태그 기록 여부 판단은 코어(`apply_file_track_gain` → `apply_track_gain`)에 맡긴다 — steps==0 이라도 태그가 없거나 오래됐으면(dirty) 코어가 태그를 쓰고(원본 mp3gain `-r` 의 "…but tag needs update" 동작), 이미 최신 태그면 디코딩 없이 `no_change`(tag_written=False)로 넘어간다. `ApplyWorker.run` 도 steps==0 단축 경로를 제거하고 항상 `apply_file_track_gain` 을 호출한 뒤 코어 status(ok→row_applied / no_change→row_analyzed / 그외→failed)로만 분기한다. **폐기 사유**: 구버전은 GUI(`_on_gain`)가 result.steps==0 곡을 대상에서 사전 제외하고 워커의 steps==0 도 apply 를 건너뛰어, 태그 삭제 후 이미 목표 볼륨인 곡의 dirty 태그가 안 써지는 버그가 있었다(태그 삭제→분석→Track Gain 시 재현). GUI 행 status 로는 태그 존재 여부를 구분할 수 없다(태그 삭제 후 분석한 행도 status=analyzed)는 점이 사전 제외를 불가능하게 하는 근거. 트레이드오프: steps==0 곡도 워커를 거쳐 태그를 한 번 재확인하는 비용이 생기나, 태그가 있으면 코어가 디코딩을 생략해 가볍다.
-- **8단계 GUI 세부 재현 메모(원본 폼 대조)**: NAME 은 전체 경로 표시. 자연 정렬(QCollator numericMode, 미분석 None 은 항상 뒤). 다크테마 안전 색상(none 은 OS 팔레트 위임). 플랫폼 폰트(Win 만 Segoe UI Variable Text, QFontInfo 확인 후). 유니코드 파일명 완전 지원(원본 VB6 ANSI 한계 개선). Delete 키=선택 삭제, Clear 버튼/Ctrl+Shift+Delete=전체 삭제(원본 ClearFiles/ClearAll 2분리), 더블클릭=기본앱 재생, 빈 영역 고무줄 선택(QTableView 직접 구현). 추가 시 태그 동기 스캔(`read_file_tags`, 곡당 ~1ms) + 대량 추가는 `TagScanWorker` 백그라운드(겸용 버튼: 스캔 중=Pause·분석/게인/액션 중=Cancel·pending 있으면=Rescan). Track Analysis 대상="선택 있으면 선택·없으면 전체" 중 값 없는 행만. Track Gain 은 대상 행을 steps 무관 전부 워커에 넘김(steps==0 제외 안 함, 위 정책 참조). Track Analysis 는 태그 미기록(원본 `/o` 출력전용 확증), 기록은 Track Gain(`/g` changeGainAndTag)뿐. 우클릭 팝업: `contextMenuEvent`→`context_menu_requested`→`_show_context_menu`, 우클릭 행이 선택에 없으면 그 행만 선택. Undo 성공 시 `shift_after_apply(result, undo_steps)`로 표시 복귀, Remove Tags 성공 시 `clear_result`로 미분석 복귀. 단축키 Add Files=Ctrl+F·Folder=Ctrl+D·Analysis=Ctrl+T·Gain=Ctrl+G(원본 메뉴 재현). 파일 내부 진행률은 duration 기반 예측 바이트 대비 누적 비율, 진행바 세분 합산(_PROGRESS_SCALE=1000). 창 닫기 시 워커 request_cancel→wait(10s).
-- **로그 기능(Error/Analysis/Change) 확정 정책(이번 세션)**: 원본 frmLogs / LogErr·LogRadioAnalysis·LogAlbumAnalysis·LogChange 를 clean-room 재현하되 세 가지를 합의로 확정. (1) **켜기/끄기 UX = A안(체크박스 노출)**: 원본은 체크박스를 숨기고(`Visible=0`) "경로 유무"로 on/off 를 판정하나, 원본에 실재하는 그 체크박스를 노출해 on/off(enabled)와 위치(path)를 분리했다. 로그를 잠깐 꺼도 경로가 사라지지 않고 on/off 가 화면에 드러난다(원본 이탈이나 원본 컨트롤 재사용이라 순수 신설 아님). 활성 판정 = `enabled and path`. (2) **dB 표기 = 정밀값 통일**: 원본 LogChange 는 화면 근사 1.505 를 쓰나 정본 `FIVELOG10TWO=1.50514997831991`로 통일(db_to_steps 정밀값 정책 일관). 로그는 무손실 검증 대상이 아니라 사람이 읽는 기록이라 픽셀 재현보다 프로젝트 일관성 우선. (3) **타임스탬프 = ISO 8601 고정**(`YYYY-MM-DD HH:MM:SS`): 원본 `CStr(Now)`는 OS 로케일 의존이라 재현 부적절. (4) **Album Analysis Log = 그룹당 한 줄**(대표 key=폴더 경로): 원본은 곡마다 AlbumdB 를 남기나 앨범 dB 는 그룹당 하나라 그룹당 한 줄로 축약(로그 가독성). 구현: `gui/logging.py`(Qt 비의존 순수 모듈, LogConfig + log_error/log_analysis_track/log_analysis_album/log_change + check_writable), `gui/dialogs/logs_dialog.py`(원본 frmLogs 대응 다이얼로그), main_window 배선(각 워커 완료 슬롯에서 결과 객체를 포맷해 append — 원본 subprocess stdout 파싱 대신 코어 직접 결과라 단순). 로그 실패는 `_safe_log` 가 LogWriteError 를 잡아 상태바로만 안내(본작업 불중단, 원본도 로그 실패 시 처리 계속). 설정은 QSettings `logs/*` 6키로 영속화. ApplyWorker·AlbumApplyWorker 의 `row_applied` 시그널을 `(str, dict, int)`로 넓혀 실제 적용 steps 를 Change Log 로 전달(steps==0 은 log_change 내부 no-op).
-- **트레이 기능(Minimize to tray) 확정 정책(이번 세션)**: 원본 frmSysTray / frmMain mnuSysTray·Form_Resize 를 clean-room 재현.
-  1) 진입 = Options → "Minimize to tray" 체크(기본 꺼짐, QSettings `tray/minimize_to_tray` 영속화).
-  2) 동작 = 옵션 켜짐 + 최소화 시 창 숨김 + 트레이 아이콘 표시(`changeEvent`/WindowStateChange 로 감지).
-  3) 복원 = 트레이 좌클릭·더블클릭 또는 우클릭 팝업 Restore. 종료 = 팝업 Exit(`self.close()` 후 `QApplication.quit()` — 트레이가 살아 있으면 close 만으론 이벤트 루프가 안 끝남).
-  4) X(닫기)는 원본대로 실제 종료(트레이로 안 보냄). macOS 는 Dock 최소화 관례라 자동 트레이 이동만 비활성(아이콘·메뉴 자체는 동작).
-  5) 아이콘 = `assets/GainDB.png`(창·트레이 공용, PyInstaller 대비 `gui/resources.py` 경로 헬퍼). 파일 없으면 표준 스타일 아이콘 대체.
-  6) 트레이는 데스크톱 환경 의존이라 자동 단위 테스트 없음 — 수동 검증으로 확정.
-
+- **저샘플레이트 계수 = 공개 표준값 전사(clean-room 판단)**: 공식 사양은 44.1k·48k 계수만 수치로 주고 그 외는 변환만 기술. 원본 동일 응답 재설계는 비공개 target 곡선·scipy 미지원(yulewalk 등가 없음)으로 원리적 불가. 2.1 최우선이라 여러 독립 구현이 사양처럼 공유하는 표준 계수 수치만 차용(코드 독립, 저작권 비대상 수치). 1차 출처(David Robinson gain_analysis.c ABYule/ABButter) 병기, 44.1k·48k 자기검증.
+- **허용오차 0.1dB(합의)**: 저샘플레이트에서 디코더 차이(mpg123 vs ffmpeg)+히스토그램 양자화로 실측 최대 0.06dB. 완화가 아니라 디코더가 항구 예외인 프로젝트에서 불가피 편차의 실측 상한. 계수 오류(수 dB)는 확실히 걸러짐.
+- **표시Only 정책 통일**: `api.analyze_file` 은 원본 DispJunk/Mp3Info.cls 의 Volume·Track Gain·3색 clip 재현하되, (1) Track Gain 제수는 정밀값 `5*log10(2)`, (2) 스텝 반올림은 적용 경로와 동일한 `db_to_steps` 로 통일 → "표시=실제 적용 결과" 항상 일치. clip 판정식(`peak×2^(steps/4)>32767`)은 저작권 비대상 수식이라 차용, VB 코드는 미차용.
+- **8단계 아키텍처: 코어 직접 import(subprocess 아님)**: 원본은 VB↔C 언어차로 exe subprocess·stdout 파싱했으나 우리는 같은 Python 이라 코어 직접 import(subprocess 는 언어 제약의 산물, 재현 대상 아님). 진행률·취소·에러를 파이썬 객체로. 원본 확증: GUI 는 계산 안 하고 목표를 CLI 인자로 안 넘김, CLI 는 항상 89 기준 분석·`/g <steps>` 적용, 표시·clip 은 DispJunk 담당.
+- **8단계 MVP 범위(합의)**: 컬럼 = 파일명(전체 경로)/Volume/Track Gain/clip(3색)/Curr Max Amp. 목표 89dB 기준 재현. 클립 = auto-clip 끔 + 지정값 적용 + 판정은 표시로만(원본 기본 꺼짐 일치). 초기 MVP 제외였던 Album·트레이·로그·언어메뉴·정렬저장·우클릭팝업은 이후 전부 구현 완료. 미구현 잔여는 Constant Gain·Max No-clip(10.3 보류).
+- **취소 정책(합의)**: 청크 경계에서 취소 + 진행 중 ffmpeg 즉시 kill. decode 계층이 청크마다 should_cancel 확인, proc.kill() 후 DecodeCancelled → 워커가 정상 취소로 구분. scan/apply 순수 파이썬 순회도 `_CALLBACK_INTERVAL` 마다 should_cancel(취소 시 GainCancelled, 파일 write 이전이라 원본 무손상). 수백 ms 내 반영.
+- **스트리밍 분석(곡 전체 PCM 미적재)**: `TrackAnalyzer` + `decode_pcm_streaming` — 청크를 흘려 누적, 결과는 통짜와 **비트 단위 동일**(diff=0 실측, `test_streaming_analysis` 고정). 근거: lfilter zi 청크 연속, RMS 자투리 이월, peak 는 필터 전 원샘플 abs. 통짜 함수는 짧은 곡·CLI·테스트용 존치.
+- **다국어 위치(합의)**: CLI 는 영문만, 화면 다국어화는 GUI 계층 tr()/번역파일(원본 basLocalizer 대응).
+- **i18n 구현 세부 확정**: 재현 대상은 동작(런타임 교체·로케일 폴백·수동 전환·영속화)이지 VB 제약이 아님(2.2). 지원 = en(원문, .qm 없음=폴백) + ko(`gaindb_ko.qm`). 초기 언어=QSettings 우선, 없으면 로케일 감지. Language 메뉴(QActionGroup)에서 고르면 영속화+즉시 전환, LanguageChange→retranslate 로 헤더 포함 실시간 갱신. 세부 결정: (1) SPL 라벨은 `(ReplayGain 89 dB 기준)` 축약, 상세는 툴팁(표시값이 절대 SPL 아님). (2) 컬럼 헤더는 변수 전달이라 lupdate 추출 불가 → `columns.py` 상수를 `QT_TRANSLATE_NOOP("FileTableModel", …)` 로. (3) 비-QObject(`_LogRow`)는 `QCoreApplication.translate("LogsDialog", …)`. (4) OK/Cancel 등 표준 위젯은 `qtbase_<lang>.qm`(QLibraryInfo 경로) 로드. (5) 로그 내용은 영문 고정(언어 무관 일관성). 빌드: lupdate → .ts 채움 → lrelease.
+- **AVD 연결(확정)**: 병합 시 다운로드 후 별도 단계로 api 호출(실시간 결합 아님). 폴더 넘기면 곡별 결과 반환.
+- **진행 UI 정책(합의)**: 적용(scan+apply, 디코딩 없는 순회)은 순식간이라 진행바는 **분석 단계만** 0→100% 표시, 적용은 진행률 생략(취소만 계속 연결). 앨범은 2단계(분석→적용)라 진행바 1회·상태바 카운트 2회 왕복(현재 처리 곡 번호라 1부터, 문구 Analyzing→Applying). 씨앗 재사용 곡은 분석 생략.
+- **clear_result 는 tag_scanned 유지**: 태그 삭제·Clear Analysis 후 상태 = "태그 없는 파일 추가"와 동일이므로 Rescan(태그 읽기) 대상이 아니라 Track Analysis(분석) 대상. clear_result 는 result·status 만 리셋, tag_scanned=True 유지(과거엔 False 로 되돌려 무의미한 Rescan 이 뜨는 버그).
+- **Track Gain steps==0 정책**: 대상 행을 steps 무관 전부 워커에 넘기고 태그 기록 판단은 코어에 위임 — steps==0 이라도 태그가 없거나 dirty 면 코어가 기록(원본 `-r` 동작), 최신이면 디코딩 없이 no_change. GUI 행 status 로는 태그 존재를 구분 못 하므로 사전 제외 불가(과거 사전 제외가 태그 삭제 후 목표 볼륨 곡의 dirty 태그를 안 쓰던 버그의 원인).
+- **로그 기능 정책**: 원본 frmLogs/LogXxx clean-room 재현. (1) on/off UX = 체크박스 노출(원본은 숨김+경로 유무 판정; enabled/path 분리). (2) dB 표기 = 정밀값 `FIVELOG10TWO`(픽셀 재현보다 프로젝트 일관성). (3) 타임스탬프 = ISO 8601 고정(원본 `CStr(Now)` 로케일 의존 회피). (4) Album Analysis Log = 그룹당 한 줄. 구현: `gui/logging.py`(Qt 비의존) + `logs_dialog.py` + main_window 배선(코어 직접 결과 포맷). 로그 실패는 상태바 안내만(본작업 불중단). QSettings `logs/*` 영속화.
+- **트레이 기능 정책**: 원본 frmSysTray clean-room 재현. Options 체크(기본 꺼짐, QSettings `tray/*`) + 최소화 시 창 숨김·트레이 아이콘, 좌클릭/더블클릭/팝업 Restore, 팝업 Exit(close 후 `QApplication.quit()`). X 는 실제 종료(트레이 안 감). macOS 는 자동 트레이 이동만 비활성. 아이콘 `assets/GainDB.png`(없으면 표준 대체). 데스크톱 환경 의존이라 수동 검증.
 
 ### 10.3. 현재 상태 · 완료 이력 · 다음 할 일
 
-**현재 상태.** 1~7단계 완료, 8단계 GUI MVP + Track/Album 계열 모두 실사용 완료. HEAD=`93061b5`. GUI 는 Track 분석/게인, Album 분석/게인, 우클릭 팝업, 취소, 스트리밍에 더해 다국어(영문/한국어 실시간 전환)까지 실사용 가능하다. 메뉴바(File/Analysis/Modify/Options/Language)와 툴바가 같은 QAction 을 공유한다. 단축키: Track Analysis=Ctrl+T·Track Gain=Ctrl+G·Album Analysis=Ctrl+U·Album Gain=Ctrl+B. 진행 UI 는 2안 확정(진행바 1회 0→100%, 카운트 분석/적용 2회 왕복 1..N, 문구 Analyzing→Applying — 상세 10.2). 통합 테스트 130건 전부 PASS. 후순위 GUI 항목(컬럼폭·정렬 저장, 로그파일, 트레이, 다국어·언어메뉴)을 모두 완료했다. 컬럼폭·정렬 상태는 QSettings("GaindB","GaindB")로 영속화(창 기하·컬럼폭·정렬), 원본 ListView 처럼 전 컬럼 Interactive + 넘치면 가로 스크롤, Reset Column Widths 액션(원본 mnuResetColumns), 선택 하이라이트가 컬럼 경계 없이 행 전체로 이어짐 + 헤더 border-right 세로 구분선, 최초 실행 시 전 컬럼 default_width 합계 기준 초기 창 폭 자동. 다국어는 Language 메뉴(English/한국어 QActionGroup 상호배타)로 즉시 전환·영속화하며 테이블 헤더까지 실시간 갱신(상세 10.2 i18n 항목).
+**현재 상태.** 1~7단계 완료, 8단계 GUI MVP + 후순위 기능 전부 실사용 완료. HEAD=`052bbee` 이후 검증 세션(테스트 130건 PASS, GUI 실클릭 취소 무결성 실측 통과). GUI 는 Track/Album 분석·게인, 우클릭 팝업, 취소, 스트리밍, 컬럼폭·정렬 저장, 로그, 트레이, 다국어(영문/한국어 실시간 전환)까지 실사용 가능. 메뉴바(File/Analysis/Modify/Options/Language)·툴바가 같은 QAction 공유. 단축키 Track Analysis=Ctrl+T·Track Gain=Ctrl+G·Album Analysis=Ctrl+U·Album Gain=Ctrl+B.
 
-**완료 이력(커밋순).**
-- `e82a79a` feat: 앨범 게인 코어 경로(공유 본체 `_apply_one_album_file` + 스트리밍 api 레이어).
-- `5735bcc` fix: api 앨범 import 를 공유 `_apply_one_album_file` 로 정렬.
-- `a068cc1` test: 앨범 코어 검증(`tests/test_album.py` — 그룹핑, 스트리밍=벌크 비트 동치, track+album 이중 태그).
-- `99a5ecc` feat: 리스트뷰 앨범 3컬럼(`columns.py` ALBUM_VOLUME/ALBUM_GAIN/ALBUM_CLIP, COLUMN_COUNT=8, model.py 표시·정렬·전경색 확장).
-- `1b205e7` feat: 앨범 analyze/apply 워커 + raw→display api 헬퍼(`AlbumAnalyzeWorker`·`AlbumApplyWorker`·`result_from_album_raw`).
-- `d805095` fix: 앨범 게인 진행 UI(진행바 1회·카운트 2회 왕복·Analyzing/Applying) + step 4 메인윈도우 배선. 이 과정에서 앨범 관련 버그 5건 해소: (1) histogram numpy 배열 truthiness ValueError 로 전 곡 사망(→ `is not None` 판정, 9번 함정 등재), (2) 진행바 튐(→ `_progress_base` 단일화), (3) 상태바 카운트 0 고정·1부터 시작(→ 진행 신호 기반 현재 곡 번호), (4) 앨범 게인 분자 24/23 오버슛(→ `_album_applying` 플래그로 적용 단계 상태바 양보), (5) 씨앗 있어도 항상 재분석(→ `_ensure_group_raws` 가 `_album_raws` 씨앗 히트 시 재분석 생략, 원본 앨범 모드처럼 볼륨 알면 바로 적용).
-- `f59b1b2` chore: 진단 DEBUGLOG 제거(`gui/workers.py`·`gui/main_window.py`, 이전 세션 `d805095` 에 임시 삽입했던 `_dlog` 전량 삭제).
-- `ce5c18c` docs: `_on_apply_analyzed` docstring 을 no_change 정책에 맞게 정정(옛 steps==0 제외 흔적 제거).
-- `da5ecf6` test: 앨범 게인 후 peak 이동 검증(`AlbumPeakShiftTest`). **결론: 앨범 peak 이동은 트랙·앨범이 공유하는 `change_gain_and_tag`(left==right 일 때 track/album peak 둘 다 x2^(steps/4))가 구조적으로 보장한다.** 이전 세션에서 의심됐던 "앨범 게인 후 트랙 게인 클리핑"은 peak 계산 결함이 아니라 표시·배선 층 문제였고 앨범 경로 정상화로 해소됐음이 확증됨(회귀 테스트로 고정). — 이 항목으로 이전 "현재 재현 안 됨" 미결이 종결됨.
-- `c83b9f1` feat(gui): 컬럼폭·정렬·창 기하 QSettings 영속화 + 리셋 액션 + 선택 하이라이트 이어짐 + 헤더 세로 구분선 + 초기 창폭 자동. 저장 키: `window/geometry`·`columns/width_N`(+스키마 방어 `columns/count`)·`sort/column`·`sort/order`(정렬 저장은 원본에 없는 확장). 전 컬럼 Interactive + `setStretchLastSection(False)`로 원본 ListView 동작(드래그 경계만 이동, 넘치면 가로 스크롤). `ColumnDef.default_width` 신설, `_reset_column_widths`(원본 mnuResetColumns)로 복원. `_TABLE_QSS` 스타일시트로 셀 테두리 제거(선택 하이라이트 행 전체 이어짐)·`QHeaderView::section` `border-right`로 세로 구분선 유지. `_default_window_size` 로 최초 실행 시 default_width 합계 기준 창 폭 자동(저장 geometry 있으면 그대로 복원). 세로선이 안 보이면 `palette(mid)` 대비 문제이므로 고정색(라이트 `#b0b0b0`/다크 `#5a5a5a`)으로 교체.
-- `747073d` feat(gui): 로그 파일 writer 모듈(`gui/logging.py` — error/analysis/change, clean-room frmLogs, Qt 비의존).
-- `d7078d2` feat(gui): 로그 설정 다이얼로그(`gui/dialogs/logs_dialog.py` — 체크박스 노출 A안, 원본 frmLogs).
-- `b936eec`·`d2364fe` feat(gui): ApplyWorker·AlbumApplyWorker `row_applied` 를 `(str,dict,int)`로 넓혀 적용 steps 전달(Change Log 용).
-- `ffb0ba8` feat(gui): 로그 config 로드/저장·Logs 다이얼로그·각 슬롯 로그 호출 배선(main_window).
-- `ec836ae` test: `tests/test_logging.py` — 형식·활성판정·정밀 dB·check_writable(12건, 전체 130건 PASS).
-- `9c089f9` feat(gui): 리소스 경로 헬퍼(`gui/resources.py`, PyInstaller `_MEIPASS` 대비).
-- `34eab1f` feat(gui): 앱/창 아이콘 설정(`assets/GainDB.png`).
-- `bb6a9e7` feat(gui): Minimize to tray(트레이 아이콘·Restore/Exit·옵션 영속화, clean-room frmSysTray).
-- `e36f6bf` fix(gui): 트레이 Exit 시 앱 완전 종료(`QApplication.quit()` after close).
-- `a7c2fbc` docs: 트레이 기능 문서화(10.2 정책·10.3 이력/다음 할 일, HEAD 갱신).
-- `595c995` feat(gui): 진입점 i18n 배선 + translations 디렉터리 개명(앱 시작 시 resolve_language→install_translator).
-- `a4abab1` feat(gui): UI 문자열 tr() 래핑 + Language 메뉴(QActionGroup 상호배타) + LanguageChange→retranslate 즉시 전환(원본 basLocalizer 재현).
-- `46d8660` feat(gui): headerData 에서 tr() 로 컬럼 헤더 번역(초기 시도, 변수 전달이라 정적 추출 안 됨 — 4cebee4 에서 QT_TRANSLATE_NOOP 로 정착).
-- `5c4f1ad` feat(gui): 한국어 번역 추가(`gaindb_ko.ts`/`.qm`).
-- `d1f319c` refactor(gui): SPL 라벨 축약 + 영문 표기 통일(Clear All/MP3/Undo Gain Changes/Remove Tags from Files) + 한글 번역 갱신.
-- `4cebee4` feat(gui): 컬럼 헤더 8개를 QT_TRANSLATE_NOOP(FileTableModel) 로 번역(변수 전달로 lupdate 추출 실패하던 문제 해소, 실시간 전환 확인).
-- `93061b5` feat(gui): 로그 다이얼로그 문자열 번역(tr + QCoreApplication.translate("LogsDialog") — 비-QObject _LogRow 대응) + Qt 기본 번역(qtbase_ko.qm) 로드로 OK/Cancel 을 확인/취소 표시.
+**완료 이력(계열별 요약. 개별 커밋은 git log).**
+- 1~7단계 코어·CLI: 프레임/분석/디코드/태그/CLI/샘플레이트/라이선스 점검(상세 10.1).
+- 8단계 GUI MVP: 리스트 UX·Track 분석/게인·취소·스트리밍·우클릭 팝업·성능 인덱스.
+- 앨범 계열: 코어(`_apply_one_album_file`+스트리밍 api)·리스트뷰 3컬럼·analyze/apply 워커·진행 UI 2안. `AlbumPeakShiftTest` 로 "앨범 peak 이동은 공유 `change_gain_and_tag` 가 구조적 보장"을 확증(이전 "앨범 후 트랙 게인 클리핑" 의심은 peak 결함 아닌 표시·배선 문제였고 종결).
+- 컬럼폭·정렬·창 기하 QSettings 영속화(`c83b9f1`) + Reset Column Widths(원본 mnuResetColumns) + 전 컬럼 Interactive·가로 스크롤·헤더 세로 구분선.
+- 로그 기능(`gui/logging.py`·`logs_dialog.py`·배선·`test_logging.py` 12건, 정책 10.2).
+- 트레이 기능(리소스 헬퍼·아이콘·minimize-to-tray·Exit quit, 정책 10.2, `e36f6bf`).
+- i18n(`595c995`~`93061b5`): 진입점 배선·UI tr() 래핑·Language 메뉴·한국어 .ts/.qm·SPL 라벨 축약·영문 표기 통일·QT_TRANSLATE_NOOP 헤더·로그 다이얼로그·qtbase 로 OK/Cancel(정책 10.2).
+- 문서화(`052bbee`): i18n 정책·이력 반영, 10.1~10.3 중간 강도 압축.
 
 **다음 할 일(남은 것만).**
 
-- **후순위 기능 GUI — 잔여 없음.** 컬럼폭·정렬 저장(`c83b9f1`), 로그파일(`ec836ae`), 트레이(`e36f6bf`), 다국어·언어메뉴(`93061b5` 까지 완료). 남은 후순위는 아래 보류·점검 항목의 Constant Gain·Max No-clip 뿐(성격상 보류로 분리 존치).
-- **실클릭 회귀 — 해시 무결성만 남음(반복 점검).** 취소 후 파일 원본 무결성을 `audio_body_sha256` 로 실측 비교. GUI 를 건드릴 때마다 재확인하는 체크리스트로 존치.
-- **보류·점검 항목(성격이 각각 달라 완료로 옮기지 않고 존치).**
-  - **비가역(255 클램프) 사전 경고 — 보류 확정(합의).** 원본은 경고 없이 조용히 클램프(원본 동일 재현)라 사전 경고는 원본에 없는 추가 기능. 재론하려면 원본 이탈 감수 가치의 사용자 합의 필요.
-  - **steps==0 곡의 태그 재확인 비용 — 유효성 재확인, 최적화 보류.** 태그가 있으면 코어가 디코딩 생략해 가벼움. 체감 지연 시 모델 `has_tag` 플래그로 최신 태그 곡만 사전 제외 최적화 고려.
-  - **Constant Gain(`-g`/`-l 0`/`-l 1`) GUI — 최후순위 보류(합의, 축소 아님).** 코어(`apply_gain`) 완비, 슬라이더 다이얼로그+워커만 얹으면 됨. 재개 시 4개 논점 합의 필요(태그 갱신 경로·채널별 옵션·진행률 정책·UI 위치).
-  - **Max No-clip(`-x` 계열) GUI — 보류(합의, 축소 아님).** 계산 뼈대는 `-k`(autoClip) 로 코어에 존재. peak≠라우드니스 부작용 + 원본조차 기본 숨김(mnuMaxAmp.Visible=False). 앨범 그룹 버전은 Album 폴더 그룹핑 인프라 재사용이라 착수 수월.
-- **CLAUDE.md 유지.** 단계 완료 시 본 10.3 만 갱신(완료 이력에 커밋 한 줄 추가, 끝난 항목은 다음 할 일에서 제거). 완료 이력이 길어지면 오래된 계열(예: 앨범 `e82a79a`~`da5ecf6`)을 한두 줄로 압축(별도 docs 커밋). 2 핵심 원칙을 약화시키는 압축은 금지(2·8 참조).
+- **후순위 기능 GUI — 잔여 없음.** 컬럼폭·정렬 저장·로그파일·트레이·다국어·언어메뉴 모두 완료. 남은 것은 아래 보류 항목의 Constant Gain·Max No-clip 뿐(성격상 보류로 분리 존치).
+- **실클릭 회귀 — 반복 점검 체크리스트로 존치.** 오디오 경로(decode/scan/apply)를 실제로 건드리는 변경이 있을 때, 취소 후 `audio_body_sha256` 로 원본 무결성을 재확인한다. UI·문서만 바뀐 변경은 코어 자동 테스트(130건)로 갈음 가능(이번 i18n 세션 실측 통과).
+- **보류·점검 항목(성격이 달라 완료로 옮기지 않고 존치).**
+  - **비가역(255 클램프) 사전 경고 — 보류 확정(합의).** 원본은 경고 없이 조용히 클램프(원본 동일 재현). 재론하려면 원본 이탈 감수 가치의 합의 필요.
+  - **steps==0 곡 태그 재확인 비용 — 최적화 보류.** 태그 있으면 코어가 디코딩 생략해 가벼움. 체감 지연 시 모델 `has_tag` 플래그로 최신 태그 곡만 사전 제외 고려.
+  - **Constant Gain(`-g`/`-l`) GUI — 최후순위 보류(축소 아님).** 코어(`apply_gain`) 완비, 슬라이더 다이얼로그+워커만 얹으면 됨. 재개 시 4개 논점 합의(태그 갱신 경로·채널별 옵션·진행률·UI 위치).
+  - **Max No-clip(`-x` 계열) GUI — 보류(축소 아님).** 계산 뼈대는 `-k` 로 코어에 존재. peak≠라우드니스 부작용 + 원본조차 기본 숨김. 앨범 버전은 그룹핑 인프라 재사용.
+- **CLAUDE.md 유지.** 단계 완료 시 10.3 만 갱신(완료 이력에 계열 요약 한 줄, 끝난 항목은 다음 할 일에서 제거). 2 핵심 원칙을 약화시키는 압축은 금지(2·8 참조).

@@ -105,18 +105,18 @@ from gaindb.api import analyze_file, DEFAULT_TARGET_DB
 VERSION = "0.5.0-dev"
 PROGNAME = "Gain dB"
 
-# Original recalc bitmask (mp3gain.c).
+# recalc bitmask (mp3gain-compatible values).
 FULL_RECALC = 1
 AMP_RECALC = 2
 MIN_MAX_GAIN_RECALC = 4
 
-# Original SWITCH_CHAR: Windows accepts both '/' and '-', elsewhere just '-'.
-# We accept both as option prefixes (matches the original WIN32 branch).
+# Switch chars: Windows accepts both '/' and '-', elsewhere just '-'. We accept
+# both as option prefixes (matches the mp3gain Windows behaviour).
 _SWITCH_CHARS = ("-", "/")
 
 
 class Options:
-    """Parsed global options. 1:1 with the original main()'s global flags."""
+    """Parsed global options (mirrors the mp3gain global flag set)."""
 
     __slots__ = (
         "apply_track", "apply_album", "analysis_track",
@@ -169,13 +169,13 @@ class Options:
 
 
 def _show_version(out=sys.stderr):
-    # Original showVersion: "%s version %s". The ffmpeg note is Gain-dB-specific.
+    # Version banner: "<name> version <ver>". The ffmpeg note is Gain-dB-specific.
     print(f"{PROGNAME} version {VERSION}", file=out)
     print("PCM decoding via ffmpeg (called from PATH)", file=out)
 
 
 def _err_usage():
-    """Equivalent of the original errUsage: short usage + exit 1.
+    """Short usage banner + exit 1.
 
     The banner reports only the ffmpeg dependency; Gain dB decodes via ffmpeg,
     not via an in-tree decoder.
@@ -243,9 +243,8 @@ def _full_usage():
     """Full option listing (Gain dB independent wording) + exit.
 
     Option tokens and argument forms are the mp3gain-compatible interface
-    (reproduced), but each option's description text is written independently. The
-    original fullUsage omits the "-s u" line; we include it (agreed correction,
-    CLAUDE.md D-3).
+    (reproduced), but each option's description text is written independently. We
+    include the "-s u" line (agreed correction, CLAUDE.md D-3).
     """
     _show_version()
     e = sys.stderr
@@ -312,7 +311,7 @@ def _is_float(s):
 
 
 def _atoi(s):
-    # Original atoi: take the leading integer, 0 on failure. Minimal re-impl.
+    # Parse the leading integer, 0 on failure (C atoi semantics). Minimal impl.
     s = s.strip()
     sign = 1
     i = 0
@@ -329,14 +328,14 @@ def _atoi(s):
 
 
 def _next_arg(argv, i, opt):
-    """Fetch the next token as the argument. errUsage (exit) if missing."""
+    """Fetch the next token as the argument. Usage banner (exit) if missing."""
     if i + 1 < len(argv):
         return argv[i + 1], i + 1
     _err_usage()
 
 
 def parse_args(argv):
-    """Equivalent of the original main()'s option parsing loop. Returns Options.
+    """Option parsing loop. Returns Options.
 
     argv is the full list including the program name (argv[0] is ignored).
     """
@@ -439,7 +438,7 @@ def parse_args(argv):
         elif c == "e":
             opt.analysis_track = True
         else:
-            # Original: an unrecognized option only warns and continues.
+            # An unrecognized option only warns and continues.
             print(f"I don't recognize option {tok}", file=sys.stderr)
 
         i += 1
@@ -450,7 +449,7 @@ def parse_args(argv):
 
 
 def _print_database_header(opt):
-    """Equivalent of the original main()'s three -o header branches."""
+    """Print the -o database header (one of three variants)."""
     if opt.check_tag_only:
         print("File\tMP3 gain\tdB gain\tMax Amplitude\tMax global_gain\t"
               "Min global_gain\tAlbum gain\tAlbum dB gain\tAlbum Max Amplitude\t"
@@ -464,10 +463,10 @@ def _print_database_header(opt):
 
 
 def _clear_for_recalc(info):
-    """Equivalent of the original forceRecalculateTag handling.
+    """Handle the -s r (force recalculate) tag clearing.
 
     For each present album/track gain/peak/minmax field, set dirty and clear it.
-    Undo information is preserved (original comment "NOT Undo information!").
+    Undo information is preserved (never cleared).
     """
     if info.have_album_gain:
         info.dirty = True
@@ -490,10 +489,10 @@ def _clear_for_recalc(info):
 
 
 def _read_all_tags(opt):
-    """Equivalent of the original main()'s 'read all tags first' phase.
+    """Read every file's tags up front (the 'read all tags first' phase).
 
     Pre-reads each file's (info, file_tags) (needed for the recalc bitmask and
-    per-file skip decisions). Original order:
+    per-file skip decisions). Order:
       - initialize dirty to forceUpdateTag (before reading).
       - only read when (not skip_tag and not delete_tag); otherwise empty info.
       - if forceRecalculateTag, _clear_for_recalc after reading.
@@ -505,7 +504,7 @@ def _read_all_tags(opt):
     tags = {}
     for path in opt.files:
         if opt.skip_tag or opt.delete_tag:
-            # Don't read the tag. Empty info (calloc equivalent), dirty=force_update.
+            # Don't read the tag. Empty info, dirty=force_update.
             info = MP3GainTagInfo()
             info.dirty = opt.force_update_tag
             tags[path] = (info, FileTags())
@@ -520,15 +519,15 @@ def _read_all_tags(opt):
 
 
 def _compute_recalc(opt, tags):
-    """Equivalent of the original main()'s recalc bitmask computation.
+    """Compute the recalc bitmask for each file plus the shared album bitmask.
 
     album_recalc = (force_recalc or skip_tag) ? FULL : 0.
     When (not skip_tag and not delete_tag and not force_recalc), check whether the
     already-stored info is sufficient: set bits on each file's info.recalc (track
     side) and album_recalc (album side). Album checks only when 'more than one
     file and not apply_track and not analysis_track'. curAlbum* comparison uses
-    exact float equality (!=), matching the original (no epsilon). Finally each
-    file's info.recalc |= album_recalc.
+    exact float equality (!=), no epsilon. Finally each file's info.recalc |=
+    album_recalc.
 
     Returns: album_recalc (already OR'd into every file's info.recalc).
     """
@@ -539,7 +538,7 @@ def _compute_recalc(opt, tags):
     album_recalc = FULL_RECALC if (opt.force_recalculate_tag or opt.skip_tag) else 0
 
     if (not opt.skip_tag) and (not opt.delete_tag) and (not opt.force_recalculate_tag):
-        # Based on the first file's album values (original: tagInfo[fileStart].album*).
+        # Based on the first file's album values.
         first_info = tags[files[0]][0]
         cur_album_gain = first_info.album_gain
         cur_album_peak = first_info.album_peak
@@ -567,7 +566,7 @@ def _compute_recalc(opt, tags):
             if not info.have_min_max_gain:
                 info.recalc |= MIN_MAX_GAIN_RECALC
 
-    # Propagate album recalc to each file (original: tagInfo[].recalc |= albumRecalc).
+    # Propagate album recalc to each file.
     for path in files:
         tags[path][0].recalc |= album_recalc
 
@@ -579,11 +578,10 @@ def _compute_recalc(opt, tags):
 # ------------------------------------------------------------------
 
 def _run_undo(opt, path, info, file_tags):
-    """Equivalent of the original undoChanges branch.
+    """Implements the -u (undo) branch.
 
-    Applies the reverse gain from the tag's undo info. The original sets
-    directGain to avoid double tag-writes; here change_gain_and_tag applies+writes
-    in one go.
+    Applies the reverse gain from the tag's undo info. change_gain_and_tag applies
+    and writes the tag in one go.
     """
     have_undo = info is not None and info.have_undo
     nonzero = have_undo and (info.undo_left or info.undo_right)
@@ -610,7 +608,7 @@ def _run_undo(opt, path, info, file_tags):
 
 
 def _run_direct_single(opt, path, info, file_tags):
-    """Equivalent of the original directSingleChannelGain branch (-l).
+    """Implements the -l (single-channel direct gain) branch.
 
     whichChannel: 0 == left, else right. STEREO/dual only (writer rejects joint
     stereo / mono).
@@ -637,7 +635,7 @@ def _run_direct_single(opt, path, info, file_tags):
 
 
 def _run_direct(opt, path, info, file_tags):
-    """Equivalent of the original directGain branch (-g). Same gain on both channels."""
+    """Implements the -g (direct gain) branch. Same gain on both channels."""
     val = opt.direct_gain_val
     if not opt.quiet_mode:
         print(f"Applying gain change of {val} to {path}...", file=sys.stderr)
@@ -658,7 +656,7 @@ def _run_direct(opt, path, info, file_tags):
 # ------------------------------------------------------------------
 
 def _quantize_steps(db_change, opt):
-    """Equivalent of the original main()'s dB->step quantize order.
+    """Apply the dB->step quantize order.
 
     dBGainMod(-d) is added to dB BEFORE quantize; db_to_steps quantizes; then
     mp3GainMod(-m) is added to the step count. Returns: (modified dBchange, steps).
@@ -670,11 +668,11 @@ def _quantize_steps(db_change, opt):
 
 
 def _query_user_for_clipping(path, steps):
-    """Equivalent of the original queryUserForClipping (stdin y/n prompt).
+    """Prompt on stdin (y/n) before a change that might clip.
 
     Prints the WARNING line, then repeatedly asks "Make change? [y/n]:". First
-    letter Y -> True, N -> False. EOF -> N (False). The original reads char by
-    char via getchar(); we reproduce via the first char of an input() line.
+    letter Y -> True, N -> False. EOF -> N (False). Read as the first char of an
+    input() line.
     """
     print(f"\nWARNING: {path} may clip with mp3 gain change {steps}",
           file=sys.stderr)
@@ -686,17 +684,17 @@ def _query_user_for_clipping(path, steps):
         try:
             line = input()
         except EOFError:
-            return False  # original: EOF -> 'N'
+            return False  # EOF -> 'N'
         ch = line[:1].upper()
         if ch == "Y":
             return True
         if ch == "N":
             return False
-        # Not Y/N -> ask again (matches the original while loop).
+        # Not Y/N -> ask again.
 
 
 def _auto_clip_track(steps, max_sample):
-    """Equivalent of the original Track autoClip.
+    """Track auto-clip (-k) computation.
 
     intMaxNoClipGain = floor(4*log10(32767/maxsample)/log10(2)). If the suggested
     steps exceed this, lower it. Returns (new steps, True) if lowered, else
@@ -711,7 +709,7 @@ def _auto_clip_track(steps, max_sample):
 
 
 def _auto_clip_album(steps, max_max_sample):
-    """Equivalent of the original Album autoClip.
+    """Album auto-clip (-k) computation.
 
     intMaxNoClipGain = floor(-4*log10(maxmaxsample)/log10(2)) (maxmaxsample is the
     normalized album peak). If suggested steps exceed it, lower. Called once,
@@ -731,7 +729,7 @@ def _analyze_one(opt, path, info, file_tags):
 
     Skips decode (ffmpeg) / scan_gain per info.recalc bits (D-2, the consequence
     of the ffmpeg decoder exception -- CLAUDE.md 1.1/7). Resulting numbers match
-    the original.
+    mp3gain.
 
     Returns: (hist, peak, min_gain, max_gain, raw_db, info, file_tags)
       - hist: loudness histogram (None unless FULL recalc).
@@ -744,11 +742,11 @@ def _analyze_one(opt, path, info, file_tags):
     """
     recalc = info.recalc if info is not None else FULL_RECALC
     need_decode = bool(recalc & (FULL_RECALC | AMP_RECALC))
-    # min/max global_gain is a frame-side value (no decoding needed). The original
-    # scanFrameGain runs on ANY recalc path (FULL/AMP/MIN_MAX), so min/max is
-    # always produced whenever any recalc is requested -- e.g. under -s s (FULL
-    # only) or -x (AMP only). Binding it to MIN_MAX_GAIN_RECALC alone dropped
-    # min/max to 0/0 in those cases; widen to match the original.
+    # min/max global_gain is a frame-side value (no decoding needed). The frame
+    # scan runs on ANY recalc path (FULL/AMP/MIN_MAX), so min/max is always
+    # produced whenever any recalc is requested -- e.g. under -s s (FULL only) or
+    # -x (AMP only). Binding it to MIN_MAX_GAIN_RECALC alone dropped min/max to
+    # 0/0 in those cases; widen to keep min/max consistent with mp3gain.
     need_scan = bool(recalc & (FULL_RECALC | AMP_RECALC | MIN_MAX_GAIN_RECALC))
 
     # --- peak: ffmpeg result if decoding, else tag value ---
@@ -789,7 +787,7 @@ def _analyze_one(opt, path, info, file_tags):
         hist = None
         raw = info.track_gain if (info is not None and info.have_track_gain) else 0.0
 
-    # Analysis success -> fill 89dB-referenced track values (original curTag update).
+    # Analysis success -> fill 89dB-referenced track values into the tag info.
     if info is not None:
         _fill_track_info(info, raw, peak, min_gain, max_gain)
 
@@ -797,7 +795,7 @@ def _analyze_one(opt, path, info, file_tags):
 
 
 def _print_track_suggestion(opt, db_change, steps, max_sample, max_gain, min_gain):
-    """Equivalent of the original non-database Track suggestion (stdout, %f=6dp)."""
+    """Print the non-database Track suggestion (stdout, %f=6dp)."""
     print(f'Recommended "Track" dB change: {db_change:f}')
     print(f'Recommended "Track" mp3 gain change: {steps}')
     if max_sample * pow(2.0, steps / 4.0) > 32767.0:
@@ -809,16 +807,16 @@ def _print_track_suggestion(opt, db_change, steps, max_sample, max_gain, min_gai
 
 
 def _print_track_database(opt, path, steps, db_change, max_sample, max_gain, min_gain):
-    """Equivalent of the original database Track row."""
+    """Print the database Track row."""
     print(f"{path}\t{steps}\t{db_change:f}\t{max_sample:f}\t{max_gain}\t{min_gain}")
     sys.stdout.flush()
 
 
 def _print_album_suggestion(opt, db_change, steps, results):
-    """Equivalent of the original non-database Album suggestion.
+    """Print the non-database Album suggestion.
 
     results: list of (path, hist, peak, min_gain, max_gain, info, file_tags).
-    Per-file clip warning uses trackPeak * 2^(steps/4) > 1.0 (original unit).
+    Per-file clip warning uses trackPeak * 2^(steps/4) > 1.0.
     """
     print("")
     print(f'Recommended "Album" dB change for all files: {db_change:f}')
@@ -830,7 +828,7 @@ def _print_album_suggestion(opt, db_change, steps, results):
 
 
 def _write_tag_only(opt, path, info, file_tags):
-    """When skipping the apply (but dirty), write only the tag (original 'Writing tag information')."""
+    """When skipping the apply (but dirty), write only the tag ('Writing tag information')."""
     if (not opt.skip_tag) and info is not None and info.dirty:
         print(f"Writing tag information for {path}")
         _write_mp3gain_tag(path, info, file_tags,
@@ -838,7 +836,7 @@ def _write_tag_only(opt, path, info, file_tags):
 
 
 def _do_apply(opt, path, steps, info, file_tags):
-    """Common gain apply (original 'Applying mp3 gain change of N to ...' + apply)."""
+    """Common gain apply ('Applying mp3 gain change of N to ...' + apply)."""
     print(f"Applying mp3 gain change of {steps} to {path}...")
     if opt.skip_tag:
         apply_gain(path, steps, wrap=opt.wrap_gain)
@@ -849,7 +847,7 @@ def _do_apply(opt, path, steps, info, file_tags):
 
 
 def _apply_track(opt, path, steps, max_sample, info, file_tags):
-    """Equivalent of the original main()'s applyTrack apply branch (incl. C-3 clip).
+    """Implements the Track apply branch (-r), including the C-3 clip handling.
 
     intGainChange==0: "No changes..." + if dirty "...but tag needs update" + tag only.
     !=0: autoClip(-k) lowers -> or if -c absent and clip condition holds, stdin
@@ -882,7 +880,7 @@ def _apply_track(opt, path, steps, max_sample, info, file_tags):
 
 
 def _apply_album_one(opt, path, steps, peak, info, file_tags):
-    """Equivalent of the original main()'s applyAlbum per-file loop (incl. C-3 clip).
+    """Implements the Album apply per-file loop (-a), including the C-3 clip handling.
 
     steps already reflects the Album autoClip lowering (handled outside the loop).
     intGainChange==0: "\nNo changes..." (leading newline) + tag only if dirty.
@@ -909,10 +907,10 @@ def _apply_album_one(opt, path, steps, peak, info, file_tags):
 
 
 def _run_analysis(opt, tags, album_recalc):
-    """Equivalent of the original main()'s analysis path (C-3 + D-2).
+    """Implements the analysis path (C-3 + D-2).
 
     tags: {path: (info, file_tags)} (pre-read + recalc bitmask applied).
-    album_recalc: album recalc bitmask (GetAlbumGain vs tag album value).
+    album_recalc: album recalc bitmask (recompute vs tag album value).
 
     Per file: analyze, print Track suggestion (or apply if -r); if the album
     condition holds, collect per-file results and print the Album suggestion at
@@ -921,12 +919,12 @@ def _run_analysis(opt, tags, album_recalc):
     """
     rc = 0
     num_files = len(opt.files)
-    # Original album condition: argc-fileStart>1 && !applyTrack && !analysisTrack.
+    # Album condition: more than one file && !applyTrack && !analysisTrack.
     do_album = (num_files > 1) and (not opt.apply_track) and (not opt.analysis_track)
 
     # (path, hist, peak, min_gain, max_gain, info, file_tags) -- analyzed & enough samples
     album_results = []
-    # All files that analyzed OK (fileok) -- for the update file tags block.
+    # All files that analyzed OK -- for the update file tags block.
     ok_files = []
 
     for path in opt.files:
@@ -941,7 +939,7 @@ def _run_analysis(opt, tags, album_recalc):
             continue
 
         hist, peak, min_gain, max_gain, raw_db, info, file_tags = analyzed
-        max_sample = peak * 32768.0  # back to original scale just before output
+        max_sample = peak * 32768.0  # back to the 16-bit scale just before output
 
         if raw_db is NOT_ENOUGH_SAMPLES:
             print(f"Not enough samples in {path} to do analysis", file=sys.stderr)
@@ -959,7 +957,7 @@ def _run_analysis(opt, tags, album_recalc):
             _print_track_suggestion(opt, db_change, steps,
                                     max_sample, max_gain, min_gain)
 
-        # Track apply (original applyTrack branch, C-3 clip included).
+        # Track apply branch (C-3 clip included).
         if opt.apply_track:
             _apply_track(opt, path, steps, max_sample, info, file_tags)
 
@@ -967,7 +965,7 @@ def _run_analysis(opt, tags, album_recalc):
             album_results.append(
                 (path, hist, peak, min_gain, max_gain, info, file_tags))
 
-    # Album aggregate / suggest / apply (original: numFiles>0 && !applyTrack && !analysisTrack)
+    # Album aggregate / suggest / apply (numFiles>0 && !applyTrack && !analysisTrack)
     if do_album and album_results:
         # album dB: recompute if FULL recalc, else first file's tag album/track value.
         if opt.max_amp_only:
@@ -988,7 +986,7 @@ def _run_analysis(opt, tags, album_recalc):
             max_max_gain = max(r[4] for r in album_results)
             min_min_gain = min(r[3] for r in album_results)
 
-            # Fill album values into every file's info (original (!skipTag)&&(numFiles>1||applyAlbum)).
+            # Fill album values into every file's info ((!skipTag) && (numFiles>1 || applyAlbum)).
             if not opt.skip_tag:
                 for path, _h, _p, _mn, _mx, info, _ft in album_results:
                     if info is not None:
@@ -1004,9 +1002,9 @@ def _run_analysis(opt, tags, album_recalc):
             elif not opt.apply_album:
                 _print_album_suggestion(opt, db_change, steps, album_results)
 
-            # Album apply (original applyAlbum branch: same step for all files).
+            # Album apply branch: the same step for all files.
             if opt.apply_album:
-                # Album autoClip lowering happens once, outside the loop (original /*MAA*/).
+                # Album autoClip lowering happens once, outside the loop.
                 if opt.auto_clip:
                     new_steps, clipped = _auto_clip_album(steps, max_max_sample)
                     if clipped:
@@ -1017,7 +1015,7 @@ def _run_analysis(opt, tags, album_recalc):
                 for path, _h, peak, _mn, _mx, info, file_tags in album_results:
                     _apply_album_one(opt, path, steps, peak, info, file_tags)
 
-    # update file tags (original end block): only on a pure analysis path, write dirty tags.
+    # update file tags: only on a pure analysis path, write dirty tags.
     if (not opt.apply_track) and (not opt.apply_album) and \
             (not opt.direct_gain) and (not opt.direct_single_channel_gain) and \
             (not opt.delete_tag) and (not opt.skip_tag) and (not opt.check_tag_only):
@@ -1032,14 +1030,14 @@ def _run_analysis(opt, tags, album_recalc):
 
 
 def _run_check_tag_only(opt):
-    """Equivalent of the original main()'s checkTagOnly branch (-s c).
+    """Implements the -s c (check tag only) branch.
 
     Reads tags only, prints Track/Album suggestions / peak / min/max. No decoding.
     intGainChange / intAlbumGainChange are the unmodified
     trackGain/(5*log10 2) round-half-away (db_to_steps directly). The clip warning
-    uses, as in the original, track_peak * 2^(steps/4) > 1.0 (Album side also
-    references track_peak -- not albumPeak; faithful original reproduction).
-    Strings are the original English verbatim; peak is x32768 just before output.
+    uses track_peak * 2^(steps/4) > 1.0 (the Album side also references
+    track_peak, not albumPeak, to match mp3gain output). Strings are the mp3gain
+    English verbatim; peak is x32768 just before output.
     """
     for path in opt.files:
         info, _file_tags = read_mp3gain_tags(path, opt.use_id3)
@@ -1117,11 +1115,10 @@ def _run_check_tag_only(opt):
 
 
 def _run_delete_tag(opt, path):
-    """Equivalent of the original main()'s deleteTag branch (-s d).
+    """Implements the -s d (delete tag) branch.
 
-    Without reading the tag (original read step (!skipTag)&&(!deleteTag)), removes
-    the APE tag, and the ID3v2 tag too when use_id3. Non-database prints to stderr;
-    database prints an NA row.
+    Without reading the tag first, removes the APE tag, and the ID3v2 tag too when
+    use_id3. Non-database prints to stderr; database prints an NA row.
     """
     remove_mp3gain_ape_tag(path, opt.save_time)
     if opt.use_id3:
@@ -1140,7 +1137,7 @@ def _run_delete_tag(opt, path):
 # ------------------------------------------------------------------
 
 def _run_debug_scan(files):
-    """Developer diagnostic (absorbed from scan_gain.py). NOT original mp3gain.
+    """Developer diagnostic (absorbed from scan_gain.py). NOT an mp3gain command.
 
     Parses frames and dumps format, frame count, global_gain min/max, and the
     first few frames' gains. English output for dev inspection.
@@ -1188,7 +1185,7 @@ def _run_debug_scan(files):
 
 
 def _run_debug_tag(files):
-    """Developer diagnostic (absorbed from inspect_tag.py). NOT original mp3gain.
+    """Developer diagnostic (absorbed from inspect_tag.py). NOT an mp3gain command.
 
     Calls read_mp3gain_ape_tag and dumps the parsed APE tag structure (tag offset,
     tail-tag detection, recognized gain fields). English output for dev inspection.
@@ -1261,7 +1258,7 @@ def _run_debug_tag(files):
 
 
 def _run_show(files, target_db):
-    """Gain dB dev/GUI-preview command (NOT original mp3gain).
+    """Gain dB dev/GUI-preview command (NOT an mp3gain command).
 
     Calls the shared gaindb.api.analyze_file for each file and prints the
     GUI-facing summary: predicted Volume, Track Gain, clip status. This is the
@@ -1324,7 +1321,7 @@ def main(argv):
 
     rc = 0
 
-    # checkTagOnly / deleteTag do not pre-read tags (original read condition).
+    # checkTagOnly / deleteTag do not pre-read tags.
     if opt.check_tag_only:
         return _run_check_tag_only(opt)
 
@@ -1337,7 +1334,7 @@ def main(argv):
     tags = _read_all_tags(opt)
     album_recalc = _compute_recalc(opt, tags)
 
-    # Execution branch priority (original main 5.2).
+    # Execution branch priority.
     if opt.undo_changes:
         for path in opt.files:
             info, file_tags = tags[path]

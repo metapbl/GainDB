@@ -9,16 +9,16 @@ gaindb/apply_gain.py - MP3 파일의 global_gain 을 무손실 조정하는 라�
     apply_track_gain      : 한 곡에 Track ReplayGain 을 무손실 적용(89dB 기준).
     apply_album_gain      : 여러 곡에 Album ReplayGain 을 무손실 적용(단일 스텝).
     _apply_one_album_file : 앨범 게인 적용의 곡별 본체(CLI/GUI 공유).
-    _fill_track_info      : 원본 main 의 track 값 채우기(허용오차 → dirty 판정).
-    _fill_album_info      : 원본 main 의 album 값 채우기(허용오차 → dirty 판정).
+    _fill_track_info      : track 값 채우기(허용오차 → dirty 판정).
+    _fill_album_info      : album 값 채우기(허용오차 → dirty 판정).
     _album_aggregate      : 곡별 결과에서 앨범 peak/min/max 집계.
 
-auto/album 은 원본 mp3gain 의 main 순서를 따른다: 분석으로 89dB 기준 dB·peak·
-min/max 를 얻어 태그(info)에 먼저 채우고(원본 허용오차 비교로 dirty 판정),
-그 위에서 change_gain_and_tag 가 적용분만큼 재차감하며 태그를 갱신한다.
-skip_tag 면 태그를 건드리지 않고 게인만 적용한다(원본 changeGain 분기).
+auto/album 은 mp3gain 과 동일한 처리 순서를 따른다: 분석으로 89dB 기준 dB·peak·
+min/max 를 얻어 태그(info)에 먼저 채우고(허용오차 비교로 dirty 판정), 그 위에서
+change_gain_and_tag 가 적용분만큼 재차감하며 태그를 갱신한다. skip_tag 면 태그를
+건드리지 않고 게인만 적용한다.
 
-use_id3 면 APE 대신 ID3v2 로 태그를 읽고/쓴다(원본 -s i 동등).
+use_id3 면 APE 대신 ID3v2 로 태그를 읽고/쓴다(mp3gain -s i 와 동일한 결과).
 
 주의: 파일을 직접 수정한다. 되돌리려면 undo(태그 기반) 또는 반대 부호 수동 적용.
 클리핑 경고·자동 클립(-k)·클립 질의는 CLI(gaindb_cli.py)가 다룬다(단계 분할).
@@ -40,14 +40,14 @@ from gaindb.tag import (
     change_gain_and_tag,
 )
 
-# 원본 허용오차 (main 루프).
+# 허용오차 (적용 루프에서 dirty 판정에 쓰는 실측 기준값).
 _GAIN_EPS = 0.01        # track/album gain: dB
 _PEAK_EPS = 3.3         # track peak: ±32768 스케일에서의 차이
 _ALBUM_PEAK_EPS = 0.0001  # album peak: 정규화 스케일에서의 차이
 
 
 def _fill_track_info(info, db_gain, peak, min_gain, max_gain):
-    """원본 main 의 track 값 채우기(허용오차 비교 → dirty/세팅).
+    """track 값 채우기(허용오차 비교 → dirty/세팅).
 
     db_gain: 89dB 기준 raw dB. peak: 정규화 peak. min/max: scan_gain 결과.
     값을 info 에 채우고, 무언가 바뀌면 info.dirty 를 켠다.
@@ -79,7 +79,7 @@ def _fill_track_info(info, db_gain, peak, min_gain, max_gain):
 
 
 def _fill_album_info(info, db_gain, album_peak, album_min, album_max):
-    """원본 main 의 album 값 채우기(허용오차 비교 → dirty/세팅).
+    """album 값 채우기(허용오차 비교 → dirty/세팅).
 
     album_peak 은 곡별 track_peak 의 max(정규화). album_min/max 는 곡별 min/max 의
     min/max. db_gain 은 89dB 기준 album raw dB.
@@ -121,13 +121,13 @@ def apply_track_gain(
     on_progress=None,
 ) -> dict:
     """
-    한 MP3 파일에 Track ReplayGain 을 무손실 적용한다(원본 applyTrack 순서).
+    한 MP3 파일에 Track ReplayGain 을 무손실 적용한다.
 
     흐름: decode → analyze_track(89dB raw dB) + track_peak + scan_gain(min/max)
     → (태그 기록 시) read 로 info 채우기 → dB+mod → 스텝 양자화 + mp3_gain_mod
     → change_gain_and_tag(적용분 재차감) 또는 skip_tag 시 apply_gain.
 
-    use_id3 면 APE 대신 ID3v2 경로로 태그를 읽고/쓴다(원본 -s i).
+    use_id3 면 APE 대신 ID3v2 경로로 태그를 읽고/쓴다(mp3gain -s i 와 동일).
 
     씨앗 주입(GUI 이중 디코딩 제거): seed_db_gain·seed_peak·seed_min_gain·
     seed_max_gain 을 모두 주면 decode/analyze/track_peak/scan_gain 을 건너뛰고
@@ -178,18 +178,18 @@ def apply_track_gain(
         del left, right
         min_gain, max_gain = scan_gain(path)
 
-    # 태그 기록 모드면 기존 태그를 읽어 track 값으로 채운다(원본 순서).
+    # 태그 기록 모드면 기존 태그를 읽어 track 값으로 채운다(mp3gain 처리 순서).
     info = None
     file_tags = None
     if not skip_tag:
         info, file_tags = read_mp3gain_tags(path, use_id3)
         _fill_track_info(info, db_gain, peak, min_gain, max_gain)
 
-    # 89dB raw dB 에 dB 보정을 더한 뒤 정수 스텝으로 양자화(원본 순서).
+    # 89dB raw dB 에 dB 보정을 더한 뒤 정수 스텝으로 양자화(mp3gain 처리 순서).
     steps = db_to_steps(db_gain + db_gain_mod) + mp3_gain_mod
 
     if steps == 0:
-        # 게인 변화 없음. 태그가 dirty 면 태그만 기록(원본 동작).
+        # 게인 변화 없음. 태그가 dirty 면 태그만 기록(mp3gain 과 동일한 동작).
         tag_written = False
         if (not skip_tag) and info.dirty:
             _write_mp3gain_tag(path, info, file_tags, use_id3=use_id3)
@@ -246,15 +246,15 @@ def _apply_one_album_file(
 ) -> dict:
     """앨범 게인 적용의 곡별 본체(CLI apply_album_gain 과 GUI api 가 공유).
 
-    원본 album 곡별 루프와 동일: 태그 기록 모드면 기존 태그를 읽어 track 값과
+    앨범 게인 곡별 처리와 동일: 태그 기록 모드면 기존 태그를 읽어 track 값과
     album 값을 둘 다 채운 뒤(track 먼저, album 다음), 정해진 그룹 공통 steps 를
     적용한다. steps==0 이면 dirty 태그만 기록하고 오디오는 안 건드린다.
 
     steps 는 그룹 공통값(호출자가 db_to_steps(album_db + mod)로 미리 계산해
-    넘긴다) — 전 곡 동일 스텝이 원본 앨범 게인의 핵심(상대 음량 보존).
+    넘긴다) — 전 곡 동일 스텝이 앨범 게인의 핵심(상대 음량 보존).
 
     track_db 가 NOT_ENOUGH_SAMPLES 면 그 곡의 track 값은 채우지 않고 album 값만
-    채운다(원본 동일: track 분석 실패해도 album 은 진행).
+    채운다(track 분석 실패해도 album 은 진행 — mp3gain 과 동일한 동작).
 
     should_cancel/on_progress: 적용 프레임 순회로 통과(초장시간 곡 취소·진행률).
 
@@ -295,7 +295,7 @@ def apply_album_gain(
     use_id3: bool = False,
 ) -> dict:
     """
-    여러 MP3 파일에 Album ReplayGain 을 무손실 적용한다(원본 album 순서).
+    여러 MP3 파일에 Album ReplayGain 을 무손실 적용한다.
 
     흐름: 각 곡 decode → 히스토그램 누적 + 곡별 track_peak/min/max 수집 →
     album dB(누적) + album_peak(곡별 peak 의 max) + album_min/max(곡별 min/max
@@ -306,7 +306,7 @@ def apply_album_gain(
     (태그 결과가 정확히 일치하도록). 이 CLI 경로는 종전대로 통짜 decode_pcm 을
     쓴다(결과 불변). 스트리밍·씨앗·취소가 필요한 GUI 는 api 계층이 담당한다.
 
-    use_id3 면 APE 대신 ID3v2 경로로 태그를 읽고/쓴다(원본 -s i).
+    use_id3 면 APE 대신 ID3v2 경로로 태그를 읽고/쓴다(mp3gain -s i 와 동일).
 
     반환 dict:
       - status: "ok" | "no_change" | "not_enough_samples"

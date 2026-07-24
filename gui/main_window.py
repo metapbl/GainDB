@@ -123,6 +123,7 @@ from gui.logging import (
     log_error, log_analysis_track, log_analysis_album, log_change,
 )
 from gui.dialogs.logs_dialog import LogsDialog
+from gui.dialogs.about_dialog import AboutDialog
 from gui.resources import app_icon
 from gui.i18n import resolve_language, save_language, install_translator
 from gaindb.api import (
@@ -545,6 +546,13 @@ class MainWindow(QMainWindow):
             "Reset all column widths to their defaults"))
         self.act_reset_columns.triggered.connect(self._reset_column_widths)
 
+        # About — 프로그램 정보·라이선스·서드파티 고지 다이얼로그.
+        self.act_about = QAction(
+            self.tr("About %1").replace("%1", "Gain dB"), self)
+        self.act_about.setToolTip(self.tr(
+            "Show program information and license notices"))
+        self.act_about.triggered.connect(self._on_about)
+
     def _wire_menu_actions(self):
         """툴바 Track 액션이 만들어진 뒤 메뉴에 배치한다(액션 공유)."""
         self.menu_file.addAction(self.act_add_files)
@@ -569,12 +577,13 @@ class MainWindow(QMainWindow):
         self.menu_options.addAction(self.act_reset_columns)
 
     def _build_language_menu(self):
-        """Language 메뉴를 구성한다.
+        """Language 메뉴를 구성하고, 그 뒤에 Help 메뉴를 맨 오른쪽에 둔다.
 
         English/한국어를 QActionGroup 으로 상호배타 체크한다. 현재 언어에 체크를
         표시하고, 다른 언어를 고르면 _on_language_selected 가 저장+즉시 전환한다.
         언어 표기 자체는 각 언어의 자기 이름(English / 한국어)이라 tr() 대상이
         아니다(어느 언어로 보든 자기 이름은 동일하게 보이는 게 관례).
+        Help 메뉴는 관례상 맨 오른쪽이므로 Language 다음에 추가한다.
         """
         mb = self.menuBar()
         self.menu_language = mb.addMenu(self.tr("Language"))
@@ -601,6 +610,10 @@ class MainWindow(QMainWindow):
             self.act_lang_en.setChecked(True)
 
         self._lang_group.triggered.connect(self._on_language_selected)
+
+        # Help 메뉴(맨 오른쪽): About 액션은 _build_menubar 에서 생성됨.
+        self.menu_help = mb.addMenu(self.tr("Help"))
+        self.menu_help.addAction(self.act_about)
 
     def _on_language_selected(self, action: QAction):
         """언어 메뉴 선택: 같은 언어면 무시, 아니면 저장 + 즉시 전환."""
@@ -630,6 +643,7 @@ class MainWindow(QMainWindow):
         self.menu_analysis.setTitle(self.tr("Analysis"))
         self.menu_modify.setTitle(self.tr("Modify"))
         self.menu_options.setTitle(self.tr("Options"))
+        self.menu_help.setTitle(self.tr("Help"))
         self.menu_language.setTitle(self.tr("Language"))
 
         # Track 액션.
@@ -673,6 +687,9 @@ class MainWindow(QMainWindow):
         self.act_reset_columns.setText(self.tr("Reset Column Widths"))
         self.act_reset_columns.setToolTip(self.tr(
             "Reset all column widths to their defaults"))
+        self.act_about.setText(self.tr("About %1").replace("%1", "Gain dB"))
+        self.act_about.setToolTip(self.tr(
+            "Show program information and license notices"))
 
         # target 라벨/노트.
         self.lbl_target.setText(self.tr("Target Volume:"))
@@ -967,6 +984,11 @@ class MainWindow(QMainWindow):
     def _on_open_logs(self):
         """Options → Logs...: 로그 설정 다이얼로그를 연다."""
         dlg = LogsDialog(self._log_config, self)
+        dlg.exec()
+
+    def _on_about(self):
+        """Help → About: 프로그램 정보 다이얼로그를 연다."""
+        dlg = AboutDialog(self)
         dlg.exec()
 
     def _safe_log(self, func, *args):

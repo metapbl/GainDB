@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """useId3 분기 통합 테스트.
 
 mp3gain 의 useId3 write/read 분기 동작 중, 통합 스위트가 아직 안 덮던

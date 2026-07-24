@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """Entry point for `python -m gui`.
 
 Independent PySide6 front-end for the MP3 gain tool.

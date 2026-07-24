@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """③-a 분석 통합 테스트 (CLI 경로).
 
 mp3gain 의 분석 동작을 gaindb_cli.py 경로에서 검증한다.

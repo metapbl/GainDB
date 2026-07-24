@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """gui/workers.py — 백그라운드 워커(QThread) 계층."""
 
 from __future__ import annotations

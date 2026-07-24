@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """통합 테스트 공통 인프라.
 
 원칙(CLAUDE.md 9항 영구 제약): 테스트는 fixture 원본을 절대 건드리지 않는다.

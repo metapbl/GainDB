@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 r"""gui/i18n.py — 다국어(한글/영문) 국제화 인프라(독립 구현).
 
 런타임 문자열 테이블 교체 + 영문 폴백 + 언어 메뉴 수동 전환 + 선택 언어

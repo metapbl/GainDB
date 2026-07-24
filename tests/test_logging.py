@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """tests/test_logging.py — gui/logging.py 순수 함수 검증(원본 음원·ffmpeg·Qt 불요).
 
 로그 형식·활성 판정(enabled+path)·append 누적·쓰기가능 검사·dB 반올림(정밀값)을

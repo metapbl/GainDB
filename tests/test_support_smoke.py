@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """공통 인프라 자체 점검(smoke).
 
 인프라가 실제로 동작하는지만 확인한다: CLI 헬퍼가 -v 를 실행하는지,

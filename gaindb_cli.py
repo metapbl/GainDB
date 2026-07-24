@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """
 gaindb_cli.py - Gain dB unified CLI (independent re-implementation of the mp3gain option scheme)
 

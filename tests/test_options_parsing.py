@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """④ 옵션 파싱 단위 테스트 (parse_args 직접 호출, 외부 의존 없음).
 
 mp3gain 의 옵션 체계를 파싱 단위로 검증한다.

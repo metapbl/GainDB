@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """ID3v2 (RVA2 + TXXX) 태그 읽기/쓰기 — mp3gain 과 동일한 결과·포맷을 산출하는
 독립 구현. 공개 사양(ID3v2.4·RVA2·TXXX)만 차용한다.
 

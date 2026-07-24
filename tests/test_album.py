@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """Album 계층 통합 테스트(1단계 코어 검증).
 
 검증 항목:

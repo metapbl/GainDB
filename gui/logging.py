@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 r"""gui/logging.py — 로그 파일 기록(독립 구현).
 
 세 종류의 로그를 파일에 append 한다(관찰된 동작만 차용):

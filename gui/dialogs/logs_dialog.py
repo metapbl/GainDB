@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 r"""gui/dialogs/logs_dialog.py — 로그 설정 다이얼로그(독립 구현).
 
 "Options → Logs..." 로 여는 창으로, Error/Analysis/Change 세 로그의 파일

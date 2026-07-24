@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """② round-trip 무손실 + 옵션 파싱 + 채널 모드별 -l 동작.
 
 모든 테스트는 fixture 의 tempfile 사본에서만 동작한다(9항 영구 제약).

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """gui/resources.py — 리소스(아이콘 등) 경로 해석 헬퍼.
 
 개발 실행(python -m gui)과 PyInstaller 번들(onefile/onedir) 양쪽에서 동일하게

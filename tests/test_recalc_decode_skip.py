@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """D-2 recalc 디코딩 스킵 통합 테스트 (in-process).
 
 이 파일은 decode_pcm 호출 "횟수"를 측정해야 하므로, 다른 통합 테스트와 달리

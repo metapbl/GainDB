@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """테스트 fixture 합성 생성기 (git 공개, 산출물은 _local/test_audio/ 로).
 
 저작권 음원을 쓰지 않는다(완전 독립 노선). 고정 시드 대역제한 노이즈 +

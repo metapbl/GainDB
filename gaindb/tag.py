@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """gaindb/tag.py — 태그 처리 (4단계).
 
 APEv2 태그를 읽고 쓰고 제거하는 독립 구현. mp3gain 과 결과·포맷을 일치시키되

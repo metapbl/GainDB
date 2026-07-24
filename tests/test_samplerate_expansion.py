@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """6단계 샘플레이트 확장 검증 (32k / MPEG2·MPEG2.5).
 
 세 부류:

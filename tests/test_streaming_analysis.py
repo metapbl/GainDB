@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """TrackAnalyzer 스트리밍 분석 = 통짜 분석 동일성 테스트.
 
 진척 로그(10.2)의 "스트리밍 결과는 통짜 처리와 비트 단위 동일(diff=0)"을

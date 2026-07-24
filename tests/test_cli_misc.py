@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """잔여 CLI 분기 통합 테스트.
 
 ③(분석/태그/클립)이 아직 안 덮은 잔여 분기를 모은다. 전부 mp3gain 과

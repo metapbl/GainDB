@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """gui/ — PySide6 프런트엔드 (8단계, 독립 구현).
 
 메인 창의 화면 구성·동작을 관찰해 독립 구현한다. 코어(gaindb)는 subprocess 가

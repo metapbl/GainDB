@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """
 gaindb.writer - MP3 global_gain 무손실 조정 (쓰기)
 

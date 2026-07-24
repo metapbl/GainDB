@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """
 gaindb.frame - MP3 Layer III 프레임 파서 (읽기 전용)
 

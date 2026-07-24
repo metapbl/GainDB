@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """③-c 클립 통합 테스트 (CLI 경로).
 
 mp3gain 의 클립 처리 동작을 gaindb_cli.py 경로에서 검증한다.

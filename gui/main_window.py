@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 r"""gui/main_window.py — 메인 창(8단계: Track + Album, 태그 스캔·분석·게인·팝업).
 
 메인 창의 화면 구성·동작을 관찰해 독립 구현한다. 파일/폴더 추가(버튼 +

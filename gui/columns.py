@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 r"""gui/columns.py — 리스트뷰 컬럼 정의(상수 테이블).
 
 메인 창의 컬럼 구성을 관찰해 정의한다. MVP 는 Track 묶음(Volume / Track Gain /

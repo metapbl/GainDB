@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 META PUBLIC
 """255/0 클램프 비가역성 단위 테스트 (fixture·ffmpeg 불필요, 항상 실행).
 
 writer._apply_one 은 global_gain(8bit, 0~255)에 change 를 더하되 상·하한을

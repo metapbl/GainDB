@@ -8,13 +8,13 @@
   3) LowRateAnalysisTest — decode_pcm+analyze_track 이 각 샘플레이트에서
                            예외 없이 유한 dB 를 내는지(계수 테이블 실동작).
 
-원본 mp3gain.exe 와의 dB 정답 대조는 통합 스위트 밖(manual_checks/
+mp3gain 과의 dB 정답 대조는 통합 스위트 밖(manual_checks/
 compare_exe_lowrate.py, git 제외)에서 수동 수행한다 — 외부 exe 의존을
-통합 스위트에 넣지 않기 위함(12.1 mutagen 사례와 동일 방침).
+통합 스위트에 넣지 않기 위함(mutagen 사례와 동일 방침).
 
 모든 fixture 는 git 제외 변형이라 부재 시 각 테스트가 SkipTest 로 건너뛴다.
 round-trip 은 음수 스텝 먼저(-3)로 한다: 이 fixture 들은 max global_gain=255
-(상한)라 +N 을 먼저 하면 255 클램프로 비가역이 되기 때문(11항목).
+(상한)라 +N 을 먼저 하면 255 클램프로 비가역이 되기 때문(9항).
 min 은 128~144 라 하한(0)·0-gain 클램프에서 멀어 -3 은 안전하다.
 """
 

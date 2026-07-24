@@ -1,9 +1,9 @@
-"""useId3 분기 통합 테스트 (verify_5c 흡수).
+"""useId3 분기 통합 테스트.
 
-원본 mp3gain 의 useId3 write/read 분기 동작 중, 통합 스위트가 아직 안 덮던
-고유 항목을 흡수한다. 라이브러리 함수를 직접 호출한다(mutagen 미사용).
+mp3gain 의 useId3 write/read 분기 동작 중, 통합 스위트가 아직 안 덮던
+고유 항목을 검증한다. 라이브러리 함수를 직접 호출한다(mutagen 미사용).
 
-검증(원본 동작 재현):
+검증(mp3gain 과 동일한 동작):
 - APE→ID3 마이그레이션: 먼저 APE 로 게인을 적용해 stale APE 를 만든 뒤,
   use_id3=True 로 다시 적용하면 ID3v2 에 기록되고 stale APE 가 제거된다.
   undo 는 누적된다(APE 적용분 + ID3 적용분).
@@ -11,9 +11,10 @@
   정보가 있으면 dirty(업그레이드 강제)로 표시된다.
 - APE 회귀: use_id3=False 경로는 기존대로 APE 에만 기록(ID3 불변).
 - 음수 반환 경로: write_mp3gain_id3_tag 가 파일을 못 열면 음수 반환 →
-  _write_mp3gain_tag 는 stale APE 제거를 건너뛰어 예외 없이 통과(원본 >=0 조건).
+  _write_mp3gain_tag 는 stale APE 제거를 건너뛰어 예외 없이 통과
+  (음수 반환이면 건너뛰는 조건).
 
-원본 불간섭(11항목): 모든 작업은 tempfile 사본에서만(BaseGainTest).
+fixture 불간섭(9항 영구 제약): 모든 작업은 tempfile 사본에서만(BaseGainTest).
 """
 
 from __future__ import annotations
@@ -111,7 +112,7 @@ class UseId3MigrationTest(BaseGainTest):
         self.assertLess(rc, 0, "missing-file write must return negative")
 
         # _write_mp3gain_tag 도 음수 경로에서 stale APE 제거를 건너뛰어
-        # 예외 없이 통과해야 한다(원본 >=0 조건).
+        # 예외 없이 통과해야 한다(음수 반환이면 건너뛰는 조건).
         try:
             _write_mp3gain_tag(missing, MP3GainTagInfo(), FileTags(),
                                use_id3=True)

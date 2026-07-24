@@ -1,15 +1,15 @@
-"""D-2 recalc 디코딩 스킵 통합 테스트 (in-process, verify_cli_d2 흡수).
+"""D-2 recalc 디코딩 스킵 통합 테스트 (in-process).
 
 이 파일은 decode_pcm 호출 "횟수"를 측정해야 하므로, 다른 통합 테스트와 달리
 CLI 를 subprocess 가 아닌 in-process(gaindb_cli.main 직접 호출)로 돌리고
 gaindb_cli.decode_pcm 을 가로챈다(subprocess 로는 monkeypatch 불가).
 
-원본 불간섭(11항목)은 BaseGainTest 의 tempfile 사본 + FixtureGuard 로 지킨다.
+fixture 불간섭(9항)은 BaseGainTest 의 tempfile 사본 + FixtureGuard 로 지킨다.
 run_cli(subprocess) 대신 _run_inproc 를 쓴다.
 
-검증(원본 mp3gain 동작 재현):
-- recalc 비트마스크(FULL/AMP/MIN_MAX)의 결과인 디코딩 스킵 — ffmpeg 디코더
-  예외(1.1)의 직접적 귀결. 태그 완비 파일 재분석은 decode_pcm 을 부르지 않는다.
+검증(mp3gain 과 동일한 동작):
+- recalc 비트마스크(FULL/AMP/MIN_MAX)의 결과인 디코딩 스킵 — 디코더 예외
+  (2.1)의 직접적 귀결. 태그 완비 파일 재분석은 decode_pcm 을 부르지 않는다.
 - -s u(force_update): dirty 만 강제, have_* 유지 → recalc==0 → decode 스킵.
 - -s r(force_recalc): have_* 끄고 재계산(undo 보존) → decode 호출.
 - update file tags: 순수 분석 경로에서 dirty 곡의 태그 기록.
@@ -54,7 +54,7 @@ class RecalcDecodeSkipTest(BaseGainTest):
     def _run_inproc(self, args):
         """gaindb_cli.main(["gaindb_cli.py", *args]) 를 in-process 호출.
 
-        stdout/stderr 를 캡처해 (rc, out, err) 반환. 원본 불간섭은 상위
+        stdout/stderr 를 캡처해 (rc, out, err) 반환. fixture 불간섭은 상위
         BaseGainTest 의 tempfile 사본 + tearDown FixtureGuard 로 보장된다.
         """
         out, err = io.StringIO(), io.StringIO()
@@ -122,7 +122,7 @@ class RecalcDecodeSkipTest(BaseGainTest):
 
         post, _ = read_mp3gain_tags(f, False)
         self.assertTrue(post.have_track_gain, "-s r must refill track gain")
-        # undo 는 보존되어야 한다(원본 'NOT Undo information!').
+        # undo 는 보존되어야 한다.
         self.assertTrue(post.have_undo
                         and post.undo_left == undo_l
                         and post.undo_right == undo_r,
@@ -145,7 +145,7 @@ class RecalcDecodeSkipTest(BaseGainTest):
         f = self.copy_fixture("test_gain_44k.mp3")
         before = self._audio_body(f)
 
-        # 음수 스텝 먼저(-g -3) → -u 복원(255 상한 회피, 11항목).
+        # 음수 스텝 먼저(-g -3) → -u 복원(255 상한 회피, 9항).
         self._run_inproc(["-g", "-3", f])
         self.assertNotEqual(before, self._audio_body(f),
                             "-g -3 must change audio body")

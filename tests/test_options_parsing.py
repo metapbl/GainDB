@@ -1,6 +1,6 @@
 """④ 옵션 파싱 단위 테스트 (parse_args 직접 호출, 외부 의존 없음).
 
-원본 mp3gain 의 옵션 체계 재현을 검증한다(verify_cli_ab 의 파싱 부분 이식).
+mp3gain 의 옵션 체계를 파싱 단위로 검증한다.
 2글자 옵션 인식, 인자 옵션(다음 토큰), -s 서브옵션, -a 가 -r 을 덮음,
 붙여쓰기(-g5) 거부→파일 취급, 미인식 옵션 경고 후 계속, 다중 파일.
 게인 적용은 하지 않으므로 음원·ffmpeg 불필요(순수 파싱).
@@ -30,7 +30,7 @@ class OptionParsingUnitTest(unittest.TestCase):
         self.assertEqual(o.files, ["file.mp3"])
 
     def test_a_overrides_r(self):
-        # 원본: -r 뒤 -a 면 나중 것(-a)이 이긴다.
+        # -r 뒤 -a 면 나중 것(-a)이 이긴다.
         o = _p("-r", "-a", "f.mp3")
         self.assertTrue(o.apply_album and not o.apply_track)
 
@@ -71,10 +71,10 @@ class OptionParsingUnitTest(unittest.TestCase):
         self.assertEqual(o.files, ["-g5", "f.mp3"])
 
     def test_unrecognized_option_warns_and_continues(self):
-        # 미인식 2글자 옵션은 경고만 하고 계속(원본 동작). 파일은 정상 수집.
-        # 파서가 원본처럼 stderr 로 "I don't recognize option -z" 를 내므로
-        # (gaindb_cli.py, file=sys.stderr), 여기서 그 출력을 캡처해 콘솔로
-        # 새지 않게 하고, 경고 문구가 실제로 나왔는지도 함께 확인한다.
+        # 미인식 2글자 옵션은 경고만 하고 계속(mp3gain 과 동일). 파일은 정상 수집.
+        # 파서가 mp3gain 과 동일하게 stderr 로 "I don't recognize option -z"
+        # 를 내므로(gaindb_cli.py, file=sys.stderr), 여기서 그 출력을 캡처해
+        # 콘솔로 새지 않게 하고, 경고 문구가 실제로 나왔는지도 함께 확인한다.
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
             o = _p("-z", "f.mp3")

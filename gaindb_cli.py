@@ -84,6 +84,7 @@ localization is the responsibility of the future GUI layer (step 6), not the CLI
 import sys
 from math import pow, log10, floor
 
+from gaindb import __version__, PROGNAME
 from gaindb.frame import parse_file
 from gaindb.writer import apply_gain, scan_gain
 from gaindb.tag import (
@@ -104,8 +105,7 @@ from gaindb.analysis import (
 from gaindb.apply_gain import _fill_track_info, _fill_album_info
 from gaindb.api import analyze_file, DEFAULT_TARGET_DB
 
-VERSION = "0.5.0"
-PROGNAME = "Gain dB"
+VERSION = __version__
 
 # recalc bitmask (mp3gain-compatible values).
 FULL_RECALC = 1

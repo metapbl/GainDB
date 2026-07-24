@@ -30,7 +30,7 @@ from gaindb import api
 
 # 한 "앨범"으로 묶을 44.1k fixture 후보(있는 것만 사용).
 _ALBUM_FIXTURES = [
-    "Debussy - Arabesque No.1.mp3",
+    "test_gain_44k.mp3",
     "test_stereo_44k.mp3",
     "test_mono_44k.mp3",
 ]

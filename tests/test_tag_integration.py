@@ -25,7 +25,7 @@ from tests._support import BaseGainTest
 class ApeTagTest(BaseGainTest):
     """APE 태그(기본 경로) write / read / round-trip / remove."""
 
-    FIXTURE = "Debussy - Arabesque No.1.mp3"
+    FIXTURE = "test_gain_44k.mp3"
 
     def test_apply_writes_ape_gain_fields(self):
         # -r 적용 후 APE 태그에 track gain/peak/min-max 필드가 기록되어야 한다.
@@ -89,7 +89,7 @@ class ApeTagTest(BaseGainTest):
 class Id3TagTest(BaseGainTest):
     """ID3v2 태그(-s i 경로) write / read / round-trip / remove."""
 
-    FIXTURE = "Debussy - Arabesque No.1.mp3"
+    FIXTURE = "test_gain_44k.mp3"
 
     def test_apply_and_check_id3(self):
         # -s i 로 ID3v2 태그에 기록 후, -s c -s i 로 다시 읽어 제안 출력(read RT).

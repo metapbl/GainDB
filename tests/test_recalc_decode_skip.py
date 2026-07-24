@@ -70,7 +70,7 @@ class RecalcDecodeSkipTest(BaseGainTest):
 
     # -- 태그 완비 재분석 → decode 스킵 -------------------------------------
     def test_full_tags_skip_decode_on_reanalysis(self):
-        f = self.copy_fixture("Debussy - Arabesque No.1.mp3")
+        f = self.copy_fixture("test_gain_44k.mp3")
 
         # 1차 순수 분석: 디코딩 발생 + 태그 완비(update file tags 로 기록).
         with _DecodeCounter() as dc1:
@@ -92,7 +92,7 @@ class RecalcDecodeSkipTest(BaseGainTest):
 
     # -- -s u: dirty 강제하되 decode 스킵 -----------------------------------
     def test_force_update_no_decode(self):
-        f = self.copy_fixture("Debussy - Arabesque No.1.mp3")
+        f = self.copy_fixture("test_gain_44k.mp3")
         # 태그 완비 상태로 만든다.
         self._run_inproc([f])
 
@@ -108,7 +108,7 @@ class RecalcDecodeSkipTest(BaseGainTest):
 
     # -- -s r: 재계산 → decode 호출 + undo 보존 -----------------------------
     def test_force_recalc_decodes_and_preserves_undo(self):
-        f = self.copy_fixture("10cm - 사랑은 은하수 다방에서.mp3")
+        f = self.copy_fixture("test_gain_48k.mp3")
         # -r 로 적용(undo 가 생기도록).
         self._run_inproc(["-r", f])
         pre, _ = read_mp3gain_tags(f, False)
@@ -130,7 +130,7 @@ class RecalcDecodeSkipTest(BaseGainTest):
 
     # -- update file tags: 순수 분석 경로에서 dirty 곡 태그 기록 --------------
     def test_pure_analysis_writes_dirty_tags(self):
-        f = self.copy_fixture("Debussy - Arabesque No.1.mp3")
+        f = self.copy_fixture("test_gain_44k.mp3")
         none_info, _ = read_mp3gain_tags(f, False)
         self.assertFalse(none_info.have_track_gain,
                          "fresh copy must have no track gain")
@@ -142,7 +142,7 @@ class RecalcDecodeSkipTest(BaseGainTest):
 
     # -- 선행읽기 회귀: -g → -u 본문 복원 -----------------------------------
     def test_direct_gain_undo_roundtrip_inproc(self):
-        f = self.copy_fixture("Debussy - Arabesque No.1.mp3")
+        f = self.copy_fixture("test_gain_44k.mp3")
         before = self._audio_body(f)
 
         # 음수 스텝 먼저(-g -3) → -u 복원(255 상한 회피, 11항목).

@@ -48,7 +48,7 @@ def _id3_info(path):
 
 class UseId3MigrationTest(BaseGainTest):
 
-    FIXTURE = "Debussy - Arabesque No.1.mp3"
+    FIXTURE = "test_gain_44k.mp3"
 
     def test_id3_write_removes_stale_ape(self):
         path = self.copy_fixture(self.FIXTURE)

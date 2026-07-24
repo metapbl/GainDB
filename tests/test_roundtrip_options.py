@@ -18,7 +18,7 @@ import unittest
 from tests._support import BaseGainTest
 
 # 채널 모드별 fixture 파일명.
-JOINT_STEREO = "Debussy - Arabesque No.1.mp3"   # mode 1
+JOINT_STEREO = "test_gain_44k.mp3"   # mode 1
 MONO = "test_mono_44k.mp3"                       # mode 3
 STEREO = "test_stereo_44k.mp3"                   # mode 0
 

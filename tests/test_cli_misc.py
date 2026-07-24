@@ -81,7 +81,7 @@ class MaxAmpOnlyTest(BaseGainTest):
     """-x maxAmpOnly: dB=0.000000, maxsample 의미값."""
 
     def test_x_zero_db_and_maxsample(self):
-        path = self.copy_fixture("10cm - 사랑은 은하수 다방에서.mp3")
+        path = self.copy_fixture("test_gain_48k.mp3")
         r = self.run_cli(["-x", path])
         self.assertEqual(r.returncode, 0, msg=r.stderr)
         db = _find_float(r'"Track" dB change: (-?\d+\.\d+)', r.stdout)
@@ -96,7 +96,7 @@ class MaxAmpOnlyTest(BaseGainTest):
 class GainModOrderTest(BaseGainTest):
     """-d/-m 보정 순서: -d 는 dB 선반영, -m 은 스텝 후반영."""
 
-    FIXTURE = "Debussy - Arabesque No.1.mp3"
+    FIXTURE = "test_gain_44k.mp3"
 
     def test_d_adds_to_db_before_quantize(self):
         path = self.copy_fixture(self.FIXTURE)
@@ -127,7 +127,7 @@ class GainModOrderTest(BaseGainTest):
 class NoChangeAndSkipTagTest(BaseGainTest):
     """No changes(스텝 0) + -s s(skip_tag)."""
 
-    FIXTURE = "Debussy - Arabesque No.1.mp3"
+    FIXTURE = "test_gain_44k.mp3"
 
     def test_zero_step_no_changes(self):
         path = self.copy_fixture(self.FIXTURE)
@@ -173,7 +173,7 @@ class ClipFormulaAndIgnoreTest(BaseGainTest):
         self.assertEqual(steps, expect)
 
     def test_ignore_clip_applies_without_prompt(self):
-        path = self.copy_fixture("10cm - 사랑은 은하수 다방에서.mp3")
+        path = self.copy_fixture("test_gain_48k.mp3")
         before = self.audio_body_sha256(path)
         # -c: 클립이어도 질의 없이 그대로 적용. stdin 안 줘도 EOFError 안 나야 함.
         r = self.run_cli(["-r", "-c", "-m", "50", path])
@@ -187,7 +187,7 @@ class ClipFormulaAndIgnoreTest(BaseGainTest):
 class CheckTagDetailTest(BaseGainTest):
     """-s c 상세: 수치 대조 + 비파괴 + database 11칸."""
 
-    FIXTURE = "Debussy - Arabesque No.1.mp3"
+    FIXTURE = "test_gain_44k.mp3"
 
     def test_check_tag_reports_stored_values(self):
         path = self.copy_fixture(self.FIXTURE)

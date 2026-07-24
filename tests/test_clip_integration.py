@@ -24,7 +24,7 @@ from tests._support import BaseGainTest
 class TrackAutoClipTest(BaseGainTest):
     """-k Track autoClip: 큰 스텝을 상한으로 낮춰 적용."""
 
-    FIXTURE = "Debussy - Arabesque No.1.mp3"
+    FIXTURE = "test_gain_44k.mp3"
 
     def test_autoclip_lowers_and_applies(self):
         path = self.copy_fixture(self.FIXTURE)
@@ -38,7 +38,7 @@ class TrackAutoClipTest(BaseGainTest):
 class ClipPromptTest(BaseGainTest):
     """-c 미지정 시 stdin y/n/EOF 프롬프트."""
 
-    FIXTURE = "Debussy - Arabesque No.1.mp3"
+    FIXTURE = "test_gain_44k.mp3"
 
     def test_prompt_appears_when_clipping(self):
         path = self.copy_fixture(self.FIXTURE)
@@ -80,8 +80,8 @@ class AlbumAutoClipTest(BaseGainTest):
     """-a -k Album autoClip: 하향은 루프 밖 1회."""
 
     def test_album_autoclip_once(self):
-        a = self.copy_fixture("Debussy - Arabesque No.1.mp3")
-        b = self.copy_fixture("10cm - 사랑은 은하수 다방에서.mp3")
+        a = self.copy_fixture("test_gain_44k.mp3")
+        b = self.copy_fixture("test_gain_48k.mp3")
         r = self.run_cli(["-a", "-k", "-m", "30", a, b])
         self.assertEqual(r.returncode, 0, msg=r.stderr)
         self.assertIn("Applying auto-clipped mp3 gain change of", r.stdout)

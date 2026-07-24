@@ -47,7 +47,7 @@ class TrackAnalysisTest(BaseGainTest):
 
     def test_pure_analysis_outputs_track_suggestion(self):
         # 어떤 fixture 든 하나 확보(없으면 copy_fixture 가 SkipTest).
-        path = self.copy_fixture("Debussy - Arabesque No.1.mp3")
+        path = self.copy_fixture("test_gain_44k.mp3")
         before = self.audio_body_sha256(path)
 
         r = self.run_cli([path])
@@ -67,7 +67,7 @@ class TrackAnalysisTest(BaseGainTest):
                          "pure analysis must not modify audio frames")
 
     def test_database_format_track_row(self):
-        path = self.copy_fixture("Debussy - Arabesque No.1.mp3")
+        path = self.copy_fixture("test_gain_44k.mp3")
         r = self.run_cli(["-o", path])
         self.assertEqual(r.returncode, 0, msg=r.stderr)
         # -o: 헤더 + 파일별 탭 구분 행. 헤더 필드 존재 + 데이터 행 파일명 포함.
@@ -84,7 +84,7 @@ class TrackApplyTest(BaseGainTest):
     """-r Track 적용의 오디오 변화 / No changes 분기."""
 
     def test_apply_track_changes_audio(self):
-        path = self.copy_fixture("Debussy - Arabesque No.1.mp3")
+        path = self.copy_fixture("test_gain_44k.mp3")
         before = self.audio_body_sha256(path)
 
         r = self.run_cli(["-r", path])
@@ -109,8 +109,8 @@ class AlbumAnalysisTest(BaseGainTest):
 
     def _two_fixtures(self):
         # 44.1k + 48k 혼합(있는 것만). 둘 다 있어야 Album 경로가 의미 있음.
-        a = self.copy_fixture("Debussy - Arabesque No.1.mp3")
-        b = self.copy_fixture("10cm - 사랑은 은하수 다방에서.mp3")
+        a = self.copy_fixture("test_gain_44k.mp3")
+        b = self.copy_fixture("test_gain_48k.mp3")
         return a, b
 
     def test_album_suggestion_lines(self):
@@ -177,7 +177,7 @@ class TrackDbNumericTest(BaseGainTest):
         return gain_from_histograms([hist])
 
     def test_cli_track_db_matches_core(self):
-        path = self.copy_fixture("Debussy - Arabesque No.1.mp3")
+        path = self.copy_fixture("test_gain_44k.mp3")
 
         ref = self._library_track_db(path)
 

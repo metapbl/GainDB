@@ -93,9 +93,10 @@ GaindB/
 │     └─ gaindb_ko.qm      # 한국어 번역 컴파일본
 ├─ assets/
 │  └─ GainDB.png           # 트레이·앱 아이콘
-├─ tests/                  # 통합 테스트 스위트(unittest, 외부 의존 없음, 130건 PASS)
+├─ tests/                  # 통합 테스트 스위트(unittest, 외부 의존 없음, 139건 PASS)
 │  ├─ __init__.py
 │  ├─ _support.py                   # 공용 헬퍼(FixtureGuard, audio_body_sha256 등)
+│  ├─ _gen_fixtures.py              # 합성 fixture 생성기(저작권 음원 없음, git 공개)
 │  ├─ test_support_smoke.py         # 테스트 헬퍼 자체 검증
 │  ├─ test_roundtrip_options.py     # 무손실 round-trip + 옵션 조합
 │  ├─ test_analysis_integration.py  # ReplayGain 분석 수치
@@ -104,6 +105,7 @@ GaindB/
 │  ├─ test_options_parsing.py       # CLI 옵션 파서
 │  ├─ test_recalc_decode_skip.py    # recalc 비트마스크 디코딩 스킵
 │  ├─ test_clip_integration.py      # 클리핑 판정·자동 클립(-k)
+│  ├─ test_clamp_reversibility.py   # 255/0 클램프 비가역성(값 단위, fixture 무관)
 │  ├─ test_samplerate_expansion.py  # 전 샘플레이트 계수
 │  ├─ test_album.py                 # 앨범 게인 누적·peak 이동
 │  ├─ test_logging.py               # 로그 파일 기록
@@ -120,9 +122,10 @@ GaindB/
    ├─ mp3gain/             #   원본 C·VB GUI 소스(사양·동작 참고용, 저장소·배포물에 미포함)
    ├─ manual_checks/       #   mutagen/exe 상호운용·대조 스크립트
    ├─ LICENSE_REVIEW.md    #   (비공개) 라이선스 정합성 점검 + 파일별 저작권 감사 통합 문서
-   └─ test_audio/          #   저작권 테스트 음원
+   └─ test_audio/          #   합성 fixture(_gen_fixtures.py 가 생성, git·배포물 제외)
 
-git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·`.vscode/`·`__pycache__/`·`.venv/` 를 제외한 48개 파일이다(2026-07 스캔 기준). 원본 참고 소스와 저작권 음원은 전부 `_local/` 아래로 격리되어 저장소·배포물에 포함되지 않는다. 원본 exe 는 코드가 아니라 실행 결과만 검증 기준으로 쓰므로 독립 구현 원칙 위반이 아니다(2.2 의 "관찰된 동작 차용").
+git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·`.vscode/`·`__pycache__/`·`.venv/` 를 제외한 47개 파일이다(2026-07-24 스캔, `git ls-files` 실측).
+원본 참고 소스와 저작권 음원은 전부 `_local/` 아래로 격리되어 저장소·배포물에 포함되지 않는다. 원본 exe 는 코드가 아니라 실행 결과만 검증 기준으로 쓰므로 독립 구현 원칙 위반이 아니다(2.2 의 "관찰된 동작 차용").
 
 ## 5. 원본 참고 자료 · 새 세션 시작법
 

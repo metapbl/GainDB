@@ -1,39 +1,38 @@
 r"""gui/main_window.py — 메인 창(8단계: Track + Album, 태그 스캔·분석·게인·팝업).
 
-원본 MP3GainGUI frmMain 의 화면 구성·동작을 관찰해 독립 구현한다(clean-room).
-파일/폴더 추가(버튼 + 드래그앤드롭)·Clear·헤더 클릭 자연 정렬·Delete 키 선택
-삭제·더블클릭 재생에 더해, 파일 추가 시 태그를 백그라운드 워커로 읽어 표시
-(원본 AddSingleFile), Track/Album 의 Analysis 와 Gain 을 QThread 워커로 연결한다.
-우클릭 팝업(원본 mnuPopup)으로 Clear Analysis·Undo·Remove Tags·Play 를 제공한다.
+메인 창의 화면 구성·동작을 관찰해 독립 구현한다. 파일/폴더 추가(버튼 +
+드래그앤드롭)·Clear·헤더 클릭 자연 정렬·Delete 키 선택 삭제·더블클릭 재생에
+더해, 파일 추가 시 태그를 백그라운드 워커로 읽어 표시하고, Track/Album 의
+Analysis 와 Gain 을 QThread 워커로 연결한다. 우클릭 팝업으로 Clear Analysis·
+Undo·Remove Tags·Play 를 제공한다.
 
-다국어(한글/영문, 원본 basLocalizer 재현): Language 메뉴로 English/한국어를
-고른다(QActionGroup 상호배타). 선택 시 gui.i18n.save_language 로 영속화하고
-install_translator 로 즉시 전환한다(Qt 가 LanguageChange 이벤트를 흘리면
-changeEvent 가 _retranslate_ui 를 불러 정적 UI 문자열을 다시 tr() 한다).
-화면 문자열만 tr() 대상이고, 로그 파일·에러 메시지는 영문 고정이다(합의) —
-로그는 사람이 나중에 검색·공유하는 기록이라 CLI 영문 정책과 일관시킨다.
-동적 상태바 문구(_batch_status 등)는 동사/명사 단위만 tr() 로 감싸고 숫자
-조립은 f-string 을 유지한다(작업 중 언어 변경은 드물고, 다음 갱신 때 새 언어로
-나오므로 실용적 균형 — 정적 UI 는 완전 즉시 전환).
+다국어(한글/영문): Language 메뉴로 English/한국어를 고른다(QActionGroup
+상호배타). 선택 시 gui.i18n.save_language 로 영속화하고 install_translator 로
+즉시 전환한다(Qt 가 LanguageChange 이벤트를 흘리면 changeEvent 가
+_retranslate_ui 를 불러 정적 UI 문자열을 다시 tr() 한다). 화면 문자열만 tr()
+대상이고, 로그 파일·에러 메시지는 영문 고정이다(합의) — 로그는 사람이 나중에
+검색·공유하는 기록이라 CLI 영문 정책과 일관시킨다. 동적 상태바 문구
+(_batch_status 등)는 동사/명사 단위만 tr() 로 감싸고 숫자 조립은 f-string 을
+유지한다(작업 중 언어 변경은 드물고, 다음 갱신 때 새 언어로 나오므로 실용적
+균형 — 정적 UI 는 완전 즉시 전환).
 
-로그(원본 LogErr/LogRadioAnalysis/LogAlbumAnalysis/LogChange 재현): Options →
-Logs... 로 Error/Analysis/Change 로그 경로·on/off 를 설정한다(gui/logging.py +
-gui/dialogs/logs_dialog.py). 각 워커 완료 슬롯에서 이미 보유한 결과 객체를 그대로
-포맷해 파일에 append 한다(원본은 subprocess stdout 파싱, 우리는 코어 직접 결과라
-더 단순). 로그 실패는 _safe_log 가 잡아 상태바로만 안내하고 본작업을 막지 않는다.
+로그: Options → Logs... 로 Error/Analysis/Change 로그 경로·on/off 를 설정한다
+(gui/logging.py + gui/dialogs/logs_dialog.py). 각 워커 완료 슬롯에서 이미
+보유한 결과 객체를 그대로 포맷해 파일에 append 한다(코어 직접 결과라 stdout
+파싱이 필요 없어 단순하다). 로그 실패는 _safe_log 가 잡아 상태바로만 안내하고
+본작업을 막지 않는다.
 
-트레이(원본 frmSysTray + frmMain mnuSysTray 재현): Options → "Minimize to tray"
-체크 시, 창을 최소화하면 창을 숨기고 시스템 트레이 아이콘을 띄운다(changeEvent
-로 WindowMinimized 감지 — 원본 Form_Resize 대응). 트레이 아이콘 좌클릭/더블클릭
-은 창 복원, 우클릭은 팝업(Restore/Exit)이다(원본 frmSysTray.Form_MouseMove +
-mPopupSys). X(닫기)는 원본대로 실제 종료다(트레이로 보내지 않음). macOS 는
-창을 Dock 으로 최소화하는 OS 관례가 있어 "자동 최소화→트레이"만 비활성하고
-트레이 아이콘·메뉴 자체는 동작한다(플랫폼 가드). 옵션 상태는 QSettings 에
-tray/minimize_to_tray 로 영속화한다(로그 설정과 같은 매체).
+트레이: Options → "Minimize to tray" 체크 시, 창을 최소화하면 창을 숨기고
+시스템 트레이 아이콘을 띄운다(changeEvent 로 WindowMinimized 감지). 트레이
+아이콘 좌클릭/더블클릭은 창 복원, 우클릭은 팝업(Restore/Exit)이다. X(닫기)는
+실제 종료다(트레이로 보내지 않음). macOS 는 창을 Dock 으로 최소화하는 OS
+관례가 있어 "자동 최소화→트레이"만 비활성하고 트레이 아이콘·메뉴 자체는
+동작한다(플랫폼 가드). 옵션 상태는 QSettings 에 tray/minimize_to_tray 로
+영속화한다(로그 설정과 같은 매체).
 
-메뉴바 + 툴바 공존(원본 frmMain 도 메뉴+툴바 병존). Track 액션의 QAction 을
-메뉴에도 재사용해 단축키·enabled 관리를 한 곳으로 통일한다. Album 은 신규
-QAction(Album Analysis=Ctrl+U / Album Gain=Ctrl+B / Each folder is album 체크).
+메뉴바 + 툴바 공존. Track 액션의 QAction 을 메뉴에도 재사용해 단축키·enabled
+관리를 한 곳으로 통일한다. Album 은 신규 QAction(Album Analysis=Ctrl+U /
+Album Gain=Ctrl+B / Each folder is album 체크).
 
 Album 배선의 핵심 원칙(지난 실패 예방): Album 워커의 시그널 중 Track 과 의미가
 같은 것(current/progress/file_progress/row_done/failed/done)은 검증된 기존
@@ -53,10 +52,10 @@ histogram 에 영향이 없어 씨앗을 유지한다(표시만 recompute).
 Rescan 으로 바뀐다(같은 자리에서 상태 전환). 분석/게인/파일 액션 진행 중에는
 같은 버튼이 Cancel 이다(작업 성격상 이어가기 개념이 없어 Rescan 없음).
 
-우클릭 팝업(원본 mnuPopup 재현, MVP 범위): Clear Analysis(표시 리셋·파일 미변경,
-원본 ResetAnalysis) / Undo Gain Changes(파일 변경, UndoFileGain) / Remove Tags
-(파일 변경, DeleteFileTags) / Play MP3 file(기본앱 재생). 우클릭한 행이 선택에
-없으면 그 행만 선택한 뒤 메뉴를 띄운다(데스크톱 관례 + 원본 "선택 한정" 취지).
+우클릭 팝업(MVP 범위): Clear Analysis(표시 리셋·파일 미변경) / Undo Gain
+Changes(파일 변경) / Remove Tags(파일 변경) / Play MP3 file(기본앱 재생).
+우클릭한 행이 선택에 없으면 그 행만 선택한 뒤 메뉴를 띄운다(데스크톱 관례 +
+"선택 한정" 취지).
 
 취소·진행률: 취소는 청크 경계에서 반영된다(워커가 decode 계층에 취소 콜백을
 넘겨 진행 중 ffmpeg 를 즉시 kill). 긴 곡 디코딩 중 파일 내부 진행률(0~1)을
@@ -72,20 +71,17 @@ Path\File 컬럼은 PathElideDelegate 로 그린다: 경로를 먼저 접고(C:\
 파일명을 최후까지 보존하며, 그래도 좁으면 그때만 파일명을 elide 한다.
 
 컬럼폭·정렬·창 기하 영속화(QSettings("GaindB","GaindB")): 창을 닫을 때 저장하고
-시작 시 복원한다. 원본 frmMain 의 Form_Load/Form_Unload(GetSetting/SaveSetting
-으로 Column01..·FormWidth/Height·WindowState 저장)을 관찰해 독립 구현한 것으로,
-저장 매체(QSettings)·키 문자열은 원본과 무관하고 "재기동 시 폭·창 크기·정렬
-복원" 동작만 재현한다. 로그 설정(logs/*)·트레이 설정(tray/*)·언어(i18n/*)도
-같은 QSettings 에 함께 영속화한다.
-컬럼 폭은 원본 ListView 처럼 전 컬럼 Interactive(사용자 드래그로 개별 조절,
-창 밖으로 넘치면 가로 스크롤 — 창 크기와 독립)로 두고, "Reset Column Widths"
-(원본 mnuResetColumns)는 columns.py 의 default_width 로 되돌린다. 정렬 상태
-저장은 원본에 없는 확장이다(원본은 정렬을 저장하지 않음).
+시작 시 복원한다. 저장 매체(QSettings)·키 문자열은 우리 독립 결정이고, "재기동
+시 폭·창 크기·정렬 복원" 동작만 재현한다. 로그 설정(logs/*)·트레이 설정
+(tray/*)·언어(i18n/*)도 같은 QSettings 에 함께 영속화한다.
+컬럼 폭은 전 컬럼 Interactive(사용자 드래그로 개별 조절, 창 밖으로 넘치면
+가로 스크롤 — 창 크기와 독립)로 두고, "Reset Column Widths" 는 columns.py 의
+default_width 로 되돌린다. 정렬 상태 저장은 확장 기능이다.
 
 선택 하이라이트 이어짐(완전 매끈): 스타일시트로 셀 테두리와 헤더 섹션 구분선을
 없애고, 선택 시 행 전체에 팔레트 Highlight 색을 균일하게 깔아 컬럼 경계에서
-선택색이 갈라지지 않게 한다(원본 ListView FullRowSelect 동작에 부합). 다크테마
-팔레트 색을 그대로 쓰므로 팔레트 위임 원칙을 깨지 않는다.
+선택색이 갈라지지 않게 한다(FullRowSelect 동작에 부합). 다크테마 팔레트 색을
+그대로 쓰므로 팔레트 위임 원칙을 깨지 않는다.
 
 GUI 무계산 원칙: 수치는 gaindb.api 가 계산한 것만 표시한다.
 정렬 순서는 프록시(뷰) 좌표, 실제 데이터는 원본 모델 좌표이므로
@@ -169,7 +165,7 @@ def collect_mp3_paths(paths, recurse: bool = True) -> list[str]:
 
     - 파일이면 확장자가 .mp3 일 때만 포함.
     - 폴더면 그 안의 .mp3 를 모으고, recurse 면 하위 폴더까지 훑는다
-      (원본 mnuAddSubs 기본 켜짐 동작 재현).
+      (하위 폴더 포함 기본 켜짐 동작).
     반환은 절대경로, 발견 순서 유지. 중복 제거는 모델(add_paths)이 담당.
     """
     result: list[str] = []
@@ -193,7 +189,7 @@ def collect_mp3_paths(paths, recurse: bool = True) -> list[str]:
 
 
 def open_with_default_app(path: str) -> None:
-    """OS 기본 앱으로 파일을 연다(원본 lstvMain_DblClick 의 ShellExecute 대응).
+    """OS 기본 앱으로 파일을 연다(더블클릭·팝업 Play 의 파일 열기 동작).
 
     플랫폼별 분기: Windows=os.startfile, macOS=open, Linux=xdg-open.
     실패해도 예외를 올리지 않고 호출자가 상태바로 안내하도록 예외를 전파한다.
@@ -275,7 +271,7 @@ class PathElideDelegate(QStyledItemDelegate):
         painter.restore()
 
     def initStyleOption_copy(self, option, index):
-        """option 을 복사·초기화해 반환(원본 option 을 변형하지 않기 위해)."""
+        """option 을 복사·초기화해 반환(원래 option 을 변형하지 않기 위해)."""
         from PySide6.QtWidgets import QStyleOptionViewItem
         opt = QStyleOptionViewItem(option)
         self.initStyleOption(opt, index)
@@ -483,7 +479,7 @@ class MainWindow(QMainWindow):
     # --- UI 구성 ---
 
     def _build_menubar(self):
-        """메뉴바(원본 frmMain 메뉴 재현). Track 액션은 QAction 을 툴바와 공유.
+        """메뉴바를 구성한다. Track 액션은 QAction 을 툴바와 공유.
 
         Track 액션(act_*)은 _build_toolbar 에서 만든다. 메뉴바를 먼저 만들되
         Track 액션은 _build_toolbar 뒤 _wire_menu_actions 에서 addAction 한다.
@@ -520,14 +516,14 @@ class MainWindow(QMainWindow):
         self.act_undo.setToolTip(self.tr("Undo gain changes of selected files"))
         self.act_undo.triggered.connect(self._on_ctx_undo)
 
-        # Each folder is album(원본 mnuEachAlbum) — 체크 액션, 기본 켜짐.
+        # Each folder is album — 체크 액션, 기본 켜짐.
         self.act_each_folder_album = QAction(self.tr("Each folder is album"), self)
         self.act_each_folder_album.setCheckable(True)
         self.act_each_folder_album.setChecked(True)
         self.act_each_folder_album.setToolTip(self.tr(
             "Treat each folder as a separate album (else all files = one album)"))
 
-        # Minimize to tray(원본 mnuSysTray) — 체크 액션, 기본 꺼짐.
+        # Minimize to tray — 체크 액션, 기본 꺼짐.
         self.act_minimize_to_tray = QAction(self.tr("Minimize to tray"), self)
         self.act_minimize_to_tray.setCheckable(True)
         self.act_minimize_to_tray.setChecked(self._minimize_to_tray)
@@ -535,13 +531,13 @@ class MainWindow(QMainWindow):
             "When minimized, hide the window and show a system tray icon"))
         self.act_minimize_to_tray.toggled.connect(self._on_toggle_tray_option)
 
-        # Logs...(원본 mnuLogs) — 로그 설정 다이얼로그 열기.
+        # Logs... — 로그 설정 다이얼로그 열기.
         self.act_logs = QAction(self.tr("Logs..."), self)
         self.act_logs.setToolTip(self.tr(
             "Configure error / analysis / change log files"))
         self.act_logs.triggered.connect(self._on_open_logs)
 
-        # Reset Column Widths(원본 mnuResetColumns) — 기본폭으로 되돌림.
+        # Reset Column Widths — 기본폭으로 되돌림.
         self.act_reset_columns = QAction(self.tr("Reset Column Widths"), self)
         self.act_reset_columns.setToolTip(self.tr(
             "Reset all column widths to their defaults"))
@@ -571,7 +567,7 @@ class MainWindow(QMainWindow):
         self.menu_options.addAction(self.act_reset_columns)
 
     def _build_language_menu(self):
-        """Language 메뉴(원본 basLocalizer 의 언어 메뉴 재현).
+        """Language 메뉴를 구성한다.
 
         English/한국어를 QActionGroup 으로 상호배타 체크한다. 현재 언어에 체크를
         표시하고, 다른 언어를 고르면 _on_language_selected 가 저장+즉시 전환한다.
@@ -622,7 +618,6 @@ class MainWindow(QMainWindow):
     def _retranslate_ui(self):
         """정적 UI 문자열을 현재 언어로 다시 세팅한다(즉시 전환 시 호출).
 
-        원본 basLocalizer.fillCaptions + mnuLanguage_Click 의 캡션 재적용 대응.
         메뉴 제목·액션 캡션/툴팁·툴바·트레이 메뉴·target 라벨·컨텍스트 메뉴·
         진행 버튼 기본 텍스트를 다시 tr() 한다. 컬럼 헤더는 model.headerData 가
         tr() 하므로 헤더만 갱신 신호를 보낸다. 동적 상태바 문구는 다음 갱신 때
@@ -682,8 +677,8 @@ class MainWindow(QMainWindow):
         self.lbl_target_note.setText(self.tr(
             "(ReplayGain 89 dB reference)"))
         self.lbl_target_note.setToolTip(self.tr(
-            "This target is relative to mp3gain's internal 89 dB ReplayGain "
-            "reference. It is not an absolute SPL or LUFS level."))
+            "This target is relative to the ReplayGain specification's 89 dB "
+            "reference level. It is not an absolute SPL or LUFS level."))
         self.lbl_progress.setText(self.tr("Progress:"))
 
         # 컨텍스트 메뉴.
@@ -775,8 +770,8 @@ class MainWindow(QMainWindow):
         self.lbl_target_note = QLabel(self.tr(
             "(ReplayGain 89 dB reference)"))
         self.lbl_target_note.setToolTip(self.tr(
-            "This target is relative to mp3gain's internal 89 dB ReplayGain "
-            "reference. It is not an absolute SPL or LUFS level."
+            "This target is relative to the ReplayGain specification's 89 dB "
+            "reference level. It is not an absolute SPL or LUFS level."
         ))
         target_row.addWidget(self.lbl_target_note)
         target_row.addStretch(1)
@@ -804,8 +799,8 @@ class MainWindow(QMainWindow):
         self.table.doubleClicked.connect(self._on_double_click)
         self.table.context_menu_requested.connect(self._show_context_menu)
         header = self.table.horizontalHeader()
-        # 원본 ListView 처럼 전 컬럼 Interactive(드래그한 경계가 그대로 움직이고
-        # 다른 컬럼은 유지, 창 밖으로 넘치면 가로 스크롤 — 창 크기와 독립).
+        # 전 컬럼 Interactive(드래그한 경계가 그대로 움직이고 다른 컬럼은 유지,
+        # 창 밖으로 넘치면 가로 스크롤 — 창 크기와 독립).
         # 마지막 섹션 자동 확장을 꺼야 "드래그 반대편이 움직이는" 현상이 없다.
         header.setStretchLastSection(False)
         for cdef in COLUMNS:
@@ -835,7 +830,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(self.tr("Ready"))
 
     def _build_context_menu(self):
-        """우클릭 팝업(원본 mnuPopup 재현, MVP 항목)을 구성한다."""
+        """우클릭 팝업(MVP 항목)을 구성한다."""
         self.ctx_menu = QMenu(self)
 
         self.ctx_clear_analysis = QAction(self.tr("Clear Analysis"), self)
@@ -858,7 +853,7 @@ class MainWindow(QMainWindow):
         self.ctx_play.triggered.connect(self._on_ctx_play)
         self.ctx_menu.addAction(self.ctx_play)
 
-    # --- 트레이(원본 frmSysTray + mnuSysTray 재현) ---
+    # --- 트레이(최소화→트레이 + 팝업) ---
 
     def _build_tray(self):
         """시스템 트레이 아이콘과 팝업 메뉴를 구성한다(숨김 상태로 시작).
@@ -891,8 +886,7 @@ class MainWindow(QMainWindow):
         tray_menu.addAction(self.tray_act_exit)
         self._tray.setContextMenu(tray_menu)
 
-        # 좌클릭/더블클릭 = 복원(원본 frmSysTray.Form_MouseMove 의 LBUTTONUP/
-        # DBLCLK). 우클릭은 setContextMenu 가 자동 처리(원본 RBUTTONUP).
+        # 좌클릭/더블클릭 = 복원. 우클릭은 setContextMenu 가 자동 처리.
         self._tray.activated.connect(self._on_tray_activated)
 
     def _on_tray_activated(self, reason):
@@ -929,9 +923,9 @@ class MainWindow(QMainWindow):
     def changeEvent(self, event):
         """창 상태 변화 감지(트레이 최소화 + 언어 전환).
 
-        - WindowStateChange: 옵션이 켜져 있고 최소화되면 창을 숨기고 트레이로
-          (원본 frmMain.Form_Resize 대응). macOS 는 Dock 최소화 관례라 자동
-          트레이 이동만 비활성. 트레이 없으면 무동작.
+        - WindowStateChange: 옵션이 켜져 있고 최소화되면 창을 숨기고 트레이로.
+          macOS 는 Dock 최소화 관례라 자동 트레이 이동만 비활성. 트레이 없으면
+          무동작.
         - LanguageChange: install_translator 후 Qt 가 흘리는 이벤트. 정적 UI
           문자열을 새 언어로 다시 세팅(_retranslate_ui).
         """
@@ -953,7 +947,7 @@ class MainWindow(QMainWindow):
     # --- 설정(컬럼폭·정렬·창 기하·로그·트레이) 저장/복원 ---
 
     def _load_log_config(self):
-        """QSettings 에서 로그 on/off·경로를 복원한다(원본 frmMain Form_Load 대응)."""
+        """QSettings 에서 로그 on/off·경로를 복원한다(시작 시)."""
         s = self._settings
         c = self._log_config
         c.error_enabled = s.value("logs/error_enabled", False, type=bool)
@@ -969,7 +963,7 @@ class MainWindow(QMainWindow):
             "tray/minimize_to_tray", False, type=bool)
 
     def _on_open_logs(self):
-        """Options → Logs...: 로그 설정 다이얼로그를 연다(원본 mnuLogs_Click)."""
+        """Options → Logs...: 로그 설정 다이얼로그를 연다."""
         dlg = LogsDialog(self._log_config, self)
         dlg.exec()
 
@@ -977,8 +971,8 @@ class MainWindow(QMainWindow):
         """로그 기록을 호출하되 실패해도 작업을 막지 않는다(상태바로만 안내).
 
         로그는 부가 기능이라, 파일 쓰기 실패가 분석/적용/undo 본작업을 중단시켜서는
-        안 된다(원본도 로그 실패 시 팝업만 띄우고 처리는 계속). LogWriteError 를
-        잡아 상태바에 한 줄 남기고 넘어간다. 로그 메시지 자체는 영문 고정(합의).
+        안 된다(로그 실패 시 안내만 하고 처리는 계속). LogWriteError 를 잡아
+        상태바에 한 줄 남기고 넘어간다. 로그 메시지 자체는 영문 고정(합의).
         """
         try:
             func(*args)
@@ -987,8 +981,8 @@ class MainWindow(QMainWindow):
 
     def _default_window_size(self):
         """저장된 geometry 가 없을 때, 전 컬럼 default_width 합계에 맞춰 초기
-        창 가로폭을 정한다(모든 컬럼이 잘리지 않고 딱 보이는 폭). 원본 frmMain
-        은 고정 폼 크기라 이 자동 맞춤은 우리 확장이다."""
+        창 가로폭을 정한다(모든 컬럼이 잘리지 않고 딱 보이는 폭). 고정 폼이
+        아니라 이 자동 맞춤은 우리 확장이다."""
         total = sum(cdef.default_width for cdef in COLUMNS)
 
         frame = self.table.frameWidth() * 2
@@ -1004,10 +998,10 @@ class MainWindow(QMainWindow):
     def _restore_settings(self):
         """QSettings 에서 창 기하·컬럼폭·정렬 상태를 복원한다(시작 시).
 
-        원본 frmMain.Form_Load 의 GetSetting 복원에 대응. 저장 매체·키는 원본과
-        무관하고 "재기동 시 폭·창 크기·정렬 복원" 동작만 재현한다. 컬럼폭은
-        저장 시점 컬럼 수(columns/count)가 현재 COLUMN_COUNT 와 다르면 통째로
-        건너뛰어(스키마 불일치 방어) default_width 초기값을 유지한다.
+        저장 매체·키는 우리 독립 결정이고 "재기동 시 폭·창 크기·정렬 복원"
+        동작만 제공한다. 컬럼폭은 저장 시점 컬럼 수(columns/count)가 현재
+        COLUMN_COUNT 와 다르면 통째로 건너뛰어(스키마 불일치 방어)
+        default_width 초기값을 유지한다.
         """
         geo = self._settings.value("window/geometry")
         if isinstance(geo, QByteArray) and not geo.isEmpty():
@@ -1023,8 +1017,8 @@ class MainWindow(QMainWindow):
                 if w and w > 0:
                     self.table.setColumnWidth(int(cdef.index), w)
 
-        # 정렬 복원(원본에 없는 확장). sortByColumn 재생 -> 프록시/QCollator/
-        # None 뒤로 정책이 그대로 태워진다. 저장값 없으면 NAME 오름 유지.
+        # 정렬 복원. sortByColumn 재생 -> 프록시/QCollator/None 뒤로 정책이
+        # 그대로 태워진다. 저장값 없으면 NAME 오름 유지.
         sort_col = self._settings.value("sort/column", type=int)
         if sort_col is not None and 0 <= sort_col < COLUMN_COUNT:
             order_val = self._settings.value("sort/order", type=int)
@@ -1035,8 +1029,8 @@ class MainWindow(QMainWindow):
     def _save_settings(self):
         """창 기하·컬럼폭·정렬·로그·트레이 설정을 QSettings 에 저장한다(창 닫기 시).
 
-        원본 frmMain.Form_Unload 의 SaveSetting 저장에 대응(매체·키는 독립).
-        언어(i18n/language)는 선택 순간 save_language 가 저장하므로 여기선 안 한다.
+        저장 매체·키는 우리 독립 결정이다. 언어(i18n/language)는 선택 순간
+        save_language 가 저장하므로 여기선 안 한다.
         """
         self._settings.setValue("window/geometry", self.saveGeometry())
 
@@ -1063,7 +1057,7 @@ class MainWindow(QMainWindow):
             "tray/minimize_to_tray", self._minimize_to_tray)
 
     def _reset_column_widths(self):
-        """모든 컬럼폭을 columns.py 의 default_width 로 되돌린다(원본 mnuResetColumns)."""
+        """모든 컬럼폭을 columns.py 의 default_width 로 되돌린다."""
         for cdef in COLUMNS:
             self.table.setColumnWidth(int(cdef.index), cdef.default_width)
         self.statusBar().showMessage(self.tr("Column widths reset to defaults"))
@@ -1184,7 +1178,7 @@ class MainWindow(QMainWindow):
     # --- 태그 스캔 워커 시작 ---
 
     def _start_tag_scan(self, paths: list[str]):
-        """주어진 경로들의 태그를 백그라운드로 스캔한다(원본 AddSingleFile)."""
+        """주어진 경로들의 태그를 백그라운드로 스캔한다(파일 추가 시 태그 채우기)."""
         if self._is_busy() or not paths:
             self._update_action_states()
             return
@@ -1290,7 +1284,7 @@ class MainWindow(QMainWindow):
         self._worker.start()
 
     def _on_gain(self):
-        """Track Gain 적용(원본 RadioGain 재현). ApplyWorker 로 위임한다."""
+        """Track Gain 적용. ApplyWorker 로 위임한다."""
         if self._is_busy():
             return
 
@@ -1339,7 +1333,7 @@ class MainWindow(QMainWindow):
     # --- Album Analysis / Album Gain 핸들러 ---
 
     def _on_album_analyze(self):
-        """Album Analysis(원본 album 모드 재현). 선택(없으면 전체) 전부 분석."""
+        """Album Analysis. 선택(없으면 전체) 전부 분석."""
         if self._is_busy():
             return
 
@@ -1385,7 +1379,7 @@ class MainWindow(QMainWindow):
         self._worker.start()
 
     def _on_album_gain(self):
-        """Album Gain 적용(원본 AlbumGain 재현). AlbumApplyWorker 위임."""
+        """Album Gain 적용. AlbumApplyWorker 위임."""
         if self._is_busy():
             return
 
@@ -1436,14 +1430,14 @@ class MainWindow(QMainWindow):
         self._worker.start()
 
     def _on_clear(self):
-        """Clear 버튼/단축키: 목록 전체 삭제(원본 ClearAll 대응)."""
+        """Clear 버튼/단축키: 목록 전체 삭제."""
         if self._is_busy():
             return
         self.model.clear()
         self._invalidate_album_seeds()
 
     def _on_delete_selected(self):
-        """Delete 키: 선택 행만 삭제(원본 ClearFiles). 선택 없으면 무동작."""
+        """Delete 키: 선택 행만 삭제. 선택 없으면 무동작."""
         if self._is_busy():
             return
         rows = self._selected_source_rows()
@@ -1452,7 +1446,7 @@ class MainWindow(QMainWindow):
             self._invalidate_album_seeds()
 
     def _on_double_click(self, index: QModelIndex):
-        """더블클릭한 곡을 OS 기본 앱으로 연다(원본 lstvMain_DblClick 대응)."""
+        """더블클릭한 곡을 OS 기본 앱으로 연다."""
         if not index.isValid():
             return
         r = self.proxy.mapToSource(index).row()
@@ -1488,7 +1482,7 @@ class MainWindow(QMainWindow):
     # --- 우클릭 팝업 표시 + 항목 핸들러 ---
 
     def _show_context_menu(self, global_pos):
-        """우클릭 팝업을 선택·busy 상태에 맞춰 활성화한 뒤 표시(원본 mnuPopup)."""
+        """우클릭 팝업을 선택·busy 상태에 맞춰 활성화한 뒤 표시."""
         has_sel = len(self.table.selectionModel().selectedRows()) > 0
         busy = self._is_busy()
         enable = has_sel and not busy
@@ -1499,7 +1493,7 @@ class MainWindow(QMainWindow):
         self.ctx_menu.exec(global_pos)
 
     def _on_ctx_clear_analysis(self):
-        """선택 행의 표시값만 리셋(파일 미변경, 원본 ResetAnalysis)."""
+        """선택 행의 표시값만 리셋(파일 미변경)."""
         if self._is_busy():
             return
         rows = self._selected_source_rows()
@@ -1518,15 +1512,15 @@ class MainWindow(QMainWindow):
                 f"{self.tr('file(s)')}")
 
     def _on_ctx_undo(self):
-        """선택 행의 게인 변경을 undo(파일 변경, 원본 UndoFileGain)."""
+        """선택 행의 게인 변경을 undo(파일 변경)."""
         self._start_file_action("undo")
 
     def _on_ctx_remove_tags(self):
-        """선택 행의 mp3gain 태그 제거(파일 변경, 원본 DeleteFileTags)."""
+        """선택 행의 mp3gain 태그 제거(파일 변경)."""
         self._start_file_action("remove_tags")
 
     def _on_ctx_play(self):
-        """선택 행(들)을 기본 앱으로 연다(원본 mnuPopupPlayFile)."""
+        """선택 행(들)을 기본 앱으로 연다."""
         for r in self._selected_source_rows():
             self._play_row(r)
 
@@ -1638,7 +1632,7 @@ class MainWindow(QMainWindow):
         fr = self.model.get_row(r)
         fr.set_result(result)
         self.model.row_changed(r)
-        # Analysis Log(원본 LogRadioAnalysis): 분석된 Track dB·MaxAmp 기록.
+        # Analysis Log: 분석된 Track dB·MaxAmp 기록.
         if result.get("status") == "ok" and result.get("track_db") is not None:
             self._safe_log(
                 log_analysis_track, self._log_config, path,
@@ -1646,7 +1640,7 @@ class MainWindow(QMainWindow):
 
     def _on_worker_failed(self, path: str, msg: str):
         self._failed_count += 1
-        # Error Log(원본 LogErr): 오류 한 건 기록(행 유무와 무관하게 남긴다).
+        # Error Log: 오류 한 건 기록(행 유무와 무관하게 남긴다).
         self._safe_log(log_error, self._log_config, f"{path}: {msg}")
         r = self.model.find_row_by_path(path)
         if r is None:
@@ -1681,10 +1675,10 @@ class MainWindow(QMainWindow):
     def _on_album_group_done(self, key: str, agg: dict):
         """한 앨범 그룹의 집계 완료(Analysis Log 에 AlbumdB 기록).
 
-        표시는 row_done(_on_worker_row_done)이 곡별로 처리한다. 여기서는 원본
-        LogAlbumAnalysis 대응으로 그룹의 album_db 를 로그에만 남긴다(모델 미변경).
-        원본은 곡마다 AlbumdB 를 남기나, 우리는 그룹 단위로 한 줄(대표 key)만
-        남긴다 - 앨범 dB 는 그룹당 하나라 중복을 줄인 것(합의, 10.2 로그 가독성).
+        표시는 row_done(_on_worker_row_done)이 곡별로 처리한다. 여기서는 그룹의
+        album_db 를 로그에만 남긴다(모델 미변경). 앨범 dB 는 그룹당 하나라
+        그룹 단위로 한 줄(대표 key)만 남긴다 - 중복을 줄인 것(합의, 10.2
+        로그 가독성).
         """
         if agg.get("status") == "ok" and agg.get("album_db") is not None:
             self._safe_log(
@@ -1742,9 +1736,9 @@ class MainWindow(QMainWindow):
     def _on_apply_applied(self, path: str, result: dict, steps: int = 0):
         """실제 게인이 적용된 행. shift 반영된 표시 dict 로 갱신 + Change Log.
 
-        steps 는 워커가 실제 적용한 스텝(Track/Album 공유). Change Log(원본
-        LogChange)에 steps × 정밀 dB 로 남긴다. steps==0 이면 log_change 가
-        내부에서 no-op(변경 없음은 기록 안 함).
+        steps 는 워커가 실제 적용한 스텝(Track/Album 공유). Change Log 에
+        steps × 정밀 dB 로 남긴다. steps==0 이면 log_change 가 내부에서
+        no-op(변경 없음은 기록 안 함).
         """
         self._applied_count += 1
         r = self.model.find_row_by_path(path)
@@ -1786,10 +1780,9 @@ class MainWindow(QMainWindow):
         self.progress.setValue(done)
 
     def _on_action_undone(self, path: str, undo_steps: int):
-        """undo 성공: 되돌린 스텝으로 표시를 갱신(원본 UndoFileGain 의 AlterDb).
+        """undo 성공: 되돌린 스텝으로 표시를 갱신.
 
-        Change Log(원본 LogChange)에 undo 스텝을 기록한다(원본도 undo 를
-        LogChange 로 남긴다).
+        Change Log 에 undo 스텝을 기록한다(undo 도 Change Log 로 남긴다).
         """
         self._action_done += 1
         r = self.model.find_row_by_path(path)
@@ -1863,8 +1856,8 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """창을 닫을 때 설정을 저장하고 실행 중인 워커를 취소·대기시킨 뒤 닫는다.
 
-        X(닫기)는 원본대로 실제 종료다(트레이로 보내지 않음). 트레이 아이콘이
-        떠 있으면 함께 정리한다.
+        X(닫기)는 실제 종료다(트레이로 보내지 않음). 트레이 아이콘이 떠 있으면
+        함께 정리한다.
         """
         self._save_settings()
         if self._tray is not None:

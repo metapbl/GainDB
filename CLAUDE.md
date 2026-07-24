@@ -257,7 +257,7 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 - **clear_result 는 tag_scanned 유지**: 태그 삭제·Clear Analysis 후 상태 = "태그 없는 파일 추가"와 동일이므로 Track Analysis 대상. clear_result 는 result·status 만 리셋, tag_scanned=True 유지.
 - **Track Gain steps==0 정책**: 대상 행을 steps 무관 전부 워커에 넘기고 태그 기록 판단은 코어에 위임 — steps==0 이라도 태그가 없거나 dirty 면 코어가 기록(`-r` 동작), 최신이면 디코딩 없이 no_change.
 - **로그 기능 정책**: (1) on/off UX = 체크박스 노출(enabled/path 분리). (2) dB 표기 = 정밀값 `FIVELOG10TWO`. (3) 타임스탬프 = ISO 8601 고정. (4) Album Analysis Log = 그룹당 한 줄. 구현: `gui/logging.py`(Qt 비의존) + `logs_dialog.py` + main_window 배선. QSettings `logs/*` 영속화.
-- **트레이 기능 정책**: Options 체크(기본 꺼짐, QSettings `tray/*`) + 최소화 시 창 숨김·트레이 아이콘, 좌클릭/더블클릭/팝업 Restore, 팝업 Exit. X 는 실제 종료. macOS 는 자동 트레이 이동만 비활성. 아이콘 `assets/GainDB.png`.
+- **트레이 기능 정책**: Options 체크(기본 꺼짐, QSettings `tray/*`) + 최소화 시 창 숨김·트레이 아이콘, 좌클릭/더블클릭/팝업 Restore, 팝업 Exit. X 는 실제 종료. macOS 는 자동 트레이 이동만 비활성. 아이콘 `gui/assets/GainDB.png`.
 
 ### 10.3. 현재 상태 · 다음 할 일
 

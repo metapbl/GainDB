@@ -1,6 +1,6 @@
 """③-c 클립 통합 테스트 (CLI 경로).
 
-원본 mp3gain 의 클립 처리 동작을 gaindb_cli.py 경로에서 재현·검증한다.
+mp3gain 의 클립 처리 동작을 gaindb_cli.py 경로에서 검증한다.
 클립은 -m 큰 스텝으로 인위 유도한다(-m 은 양자화 후 스텝에 더해져 클립 조건
 max_sample * 2^(steps/4) > 32767 을 확실히 넘긴다).
 
@@ -13,7 +13,7 @@ max_sample * 2^(steps/4) > 32767 을 확실히 넘긴다).
   stdout "Applying auto-clipped mp3 gain change of N to album"
         + "(Original suggested gain was M)".
 
-원본 음원 불간섭: 모든 작업은 tempfile 사본에서만(BaseGainTest).
+fixture 불간섭: 모든 작업은 tempfile 사본에서만(BaseGainTest).
 """
 
 from __future__ import annotations
@@ -69,7 +69,7 @@ class ClipPromptTest(BaseGainTest):
     def test_prompt_eof_declines(self):
         path = self.copy_fixture(self.FIXTURE)
         before = self.audio_body_sha256(path)
-        # stdin 없음(EOF) -> 원본 동작상 거부(N). 오디오 불변.
+        # stdin 없음(EOF) -> mp3gain 동작상 거부(N). 오디오 불변.
         r = self.run_cli(["-r", "-m", "30", path], stdin="")
         self.assertEqual(r.returncode, 0, msg=r.stderr)
         self.assertEqual(before, self.audio_body_sha256(path),

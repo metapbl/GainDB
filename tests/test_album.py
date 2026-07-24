@@ -7,10 +7,11 @@
      gain_from_histograms)와 비트 단위로 같은 album_db·peak·min/max 를 냄.
      (TrackAnalyzer 스트리밍=통짜는 test_streaming_analysis 에서 이미 검증됨.
       여기서는 그 동일성이 앨범 집계까지 이어짐을 diff=0 으로 고정한다.)
-  3) apply_file_album_gain 이 track+album 태그를 둘 다 기록(원본 앨범 게인
-     곡별 루프 재현). 사본에서만 동작하며 원본은 BaseGainTest 가드가 지킨다.
+  3) apply_file_album_gain 이 track+album 태그를 둘 다 기록(앨범 게인 곡별
+     적용, mp3gain 과 동일한 동작). 사본에서만 동작하며 BaseGainTest 가드가
+     fixture 를 지킨다.
 
-원본 음원 불간섭: 모든 파일 작업은 tempfile 사본에서만(copy_fixture).
+fixture 불간섭: 모든 파일 작업은 tempfile 사본에서만(copy_fixture).
 """
 
 from __future__ import annotations
@@ -175,7 +176,7 @@ class AlbumPeakShiftTest(BaseGainTest):
     track_peak 이 되게 하면 대조가 깔끔하다.
     """
 
-    # 정규화 peak 허용오차. 원본 _PEAK_EPS(+-32768 스케일 3.3)를 정규화로 환산.
+    # 정규화 peak 허용오차. _PEAK_EPS(+-32768 스케일 3.3)를 정규화로 환산.
     _PEAK_EPS_NORM = 3.3 / 32768.0
 
     def _pick_fixture(self):
@@ -247,3 +248,8 @@ class AlbumPeakShiftTest(BaseGainTest):
         self.assertNotEqual(
             shown["clip_state"], "definite",
             "false definite clip after lowering then reading at 89 dB")
+
+
+if __name__ == "__main__":
+    import unittest
+    unittest.main()

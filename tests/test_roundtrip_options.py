@@ -1,12 +1,12 @@
 """② round-trip 무손실 + 옵션 파싱 + 채널 모드별 -l 동작.
 
-모든 테스트는 원본의 tempfile 사본에서만 동작한다(11항목 영구 제약).
+모든 테스트는 fixture 의 tempfile 사본에서만 동작한다(9항 영구 제약).
 무손실 판정은 오디오 프레임 구간 해시로 한다(audio_body_sha256; 앞쪽 ID3v2·
 끝쪽 APE/ID3v1/Lyrics3 꼬리 배제).
 
 게인 방향 주의: 변형 fixture(test_mono_44k/test_stereo_44k)는 max global_gain
 이 255 에 붙어 있어(오른쪽 채널 255, 왼쪽 252) +N 을 먼저 적용하면 상한 255
-클램프로 정보가 소실되어 round-trip 이 비가역이 된다(원본 _apply_one 규칙 동일).
+클램프로 정보가 소실되어 round-trip 이 비가역이 된다(_apply_one 규칙).
 따라서 round-trip 은 음수 스텝 먼저(-3, 내렸다) 후 복원(+3 또는 undo)으로 한다.
 이 fixture 들은 min 이 141~142 라 하한(0)·0-gain 클램프에서 멀어 안전하다.
 """

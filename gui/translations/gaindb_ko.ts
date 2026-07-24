@@ -342,7 +342,7 @@
         <location filename="../main_window.py" line="680"/>
         <location filename="../main_window.py" line="773"/>
         <source>This target is relative to the ReplayGain specification&apos;s 89 dB reference level. It is not an absolute SPL or LUFS level.</source>
-        <translation>이 목표는 ReplayGain 사양의 89 dB 기준 레벨을 기준으로 한다. 절대 SPL 이나 LUFS 레벨이 아니다.</translation>
+        <translation>이 목표값은 ReplayGain 표준의 89 dB 기준에 맞춘 상대값입니다. 스피커로 나오는 실제 소리 크기(SPL)나 방송용 음량 규격(LUFS) 같은 절대 수치가 아닙니다.</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="687"/>

@@ -259,6 +259,16 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 
 ### 10.3. 현재 상태 · 완료 이력 · 다음 할 일
 
+- **테스트 fixture 합성 전환 — 코드 완료 / tests 저작권 감사 일부 미완.** 저작권 음원(Debussy·10cm)을 없애고 `tests/_gen_fixtures.py`(합성 생성기, git 공개)가 고정 시드 신호에서 13종 fixture 를 생성하도록 전환 완료. 산출물은 `_local/test_audio/`(git 제외). 전체 테스트 139건 PASS, skip=0(전환 전 82 skip).
+  - [완료·커밋] `_gen_fixtures.py` 신규 — 대역제한(200~3000Hz) 노이즈 + 다구간 진폭 포락선 + 좌우 비대칭 + 최고구간 톤 보강. parse_file 로 mpegver/sr/nchan/granule/global_gain 검증. 44.1k 계열은 `_ROUNDTRIP_SAFE`(min≥8, max≤247)로 음수스텝 round-trip 안전 보장. 실측 max=210(255 아님 — 인코더 특성상 이 신호로는 210 이 상한. "정확히 255"는 옛 fixture 의 우연한 성질이었을 뿐 테스트가 요구한 조건이 아님).
+  - [완료·커밋] `_support.py` — KNOWN_FIXTURES 중립 이름(test_gain_44k/test_gain_48k + 파생 11종), MP3_DIR 기본 `_local/test_audio/`. 로직 불변.
+  - [완료·커밋 f4ed749] `test_clamp_reversibility.py` 신규 — 255/0 클램프 비가역성 값 단위 검증 9건(fixture 무관, 항상 실행). fixture max 가 210 이라 자연히 안 타는 클램프 경계를 코드로 직접 커버.
+  - [완료·커밋 c6e28d8] 8개 테스트 파일 곡명→중립 이름 치환(총 25건): test_album/test_analysis_integration/test_cli_misc/test_clip_integration/test_recalc_decode_skip/test_roundtrip_options/test_tag_integration/test_useid3_migration.
+  - [**미완 — 다음 세션 최우선**] tests 트리 A/B/C 전수 저작권 감사(8.8). 지금까지 한 것은 (C) 중 '옛 곡명 치환'뿐. 각 테스트 파일 docstring·주석의 (B) clean-room, (C) '원본 …' 심볼·함수명·뉘앙스는 아직 미감사. 확실히 위험 없음은 `__init__.py`(빈 파일)·`test_clamp_reversibility.py`(신규 작성)뿐. 나머지 16개는 "곡명 치환 완료, 전수 감사 미완". 시작점: `Select-String -Path "tests\*.py" -Pattern "clean-room","원본"` 로 규모 파악 → 다른 소스 감사(2.3)와 동일하게 "mp3gain 과 동일한 결과/동작"으로 중립화 → 139건 재통과 → 커밋 → LICENSE_REVIEW.md #23 를 실제 소거완료로 기록.
+  - [미완] `_gen_fixtures.py` 의 `_LEGACY_NAMES`(옛 곡명 삭제 목록) 잔존 — 기능적 필요, fixture 안정화 후 제거/주석화 검토.
+  - [미완] CLAUDE.md 본문 갱신 잔여: 트리에 `_gen_fixtures.py`·`test_clamp_reversibility.py` 추가 + 추적 파일 수 조정(48→50), 9항 fixture 서술("원본 음원"→"합성 fixture", max=255→max=210 rt-safe) 정정, 10.1 검증 인프라 서술(130건→139건 PASS, skip=0, fixture 합성) 갱신.
+  - [참고] 전체 테스트 실행 시간 184초(전환 전 5.5초) — skip 되던 디코딩·분석이 전부 실행되는 것이라 정상. 필요 시 시드 길이(_SEED_SECONDS=2.5) 단축으로 최적화 여지.
+
 **현재 상태.** 1~7단계 완료, 8단계 GUI MVP + 후순위 기능 전부 실사용 완료. 라이선스 정리(완전 독립 노선·Apache 2.0) 진행 중: LICENSE/NOTICE 추가, CLAUDE.md·LICENSE_REVIEW.md 완전 독립 노선으로 정리, `_local/` 격리 완료, 파일별 저작권 위험 전수 감사(8.8) 착수. GUI 는 Track/Album 분석·게인, 우클릭 팝업, 취소, 스트리밍, 컬럼폭·정렬 저장, 로그, 트레이, 다국어(영문/한국어 실시간 전환)까지 실사용 가능.
 
 **완료 이력(계열별 요약. 개별 커밋은 git log).**

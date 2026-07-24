@@ -210,7 +210,7 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 
 - **`global_gain` 위치 계산이 프레임 파서의 핵심 난점이었음**: 사이드 정보 안의 비트 오프셋을 MPEG 버전·채널 모드별로 정확히 짚어야 함(1·6단계에서 해결·검증 완료).
 - **분석에는 디코딩 필요, 적용엔 불필요**: 음량 *적용*은 프레임 게인 필드만 건드림(디코딩 불필요). 음량 *분석*만 PCM 디코딩 필요. 두 경로 혼동 금지.
-- **0-gain·255-gain 프레임은 클램프로 비가역**: `gain==0` 이면 ±N 으로 안 바뀌고(하한 유지), `gain==255` 에 +N 하면 255 로 클램프되어 초과분이 소실된다(상한). round-trip 완전복원은 경계 프레임이 없거나 경계를 벗어나지 않는 방향으로 적용할 때만 보장된다(`_apply_one` 동작). 통합 테스트의 round-trip 은 상한 255 회피를 위해 음수 스텝 먼저(-3) 후 복원(+3 또는 undo)으로 한다 — ffmpeg 변형 fixture 의 max global_gain 이 255(오른쪽 채널)라 이 방향이 필수.
+- **0-gain·255-gain 프레임은 클램프로 비가역**: `gain==0` 이면 ±N 으로 안 바뀌고(하한 유지), `gain==255` 에 +N 하면 255 로 클램프되어 초과분이 소실된다(상한). round-trip 완전복원은 경계 프레임이 없거나 경계를 벗어나지 않는 방향으로 적용할 때만 보장된다(`_apply_one` 동작). 통합 테스트의 round-trip 은 상한/하한 클램프 회피를 위해 음수 스텝 먼저(-3) 후 복원(+3 또는 undo)으로 한다. 합성 fixture(`_gen_fixtures.py`)는 44.1k 계열 max global_gain=210(min≥8)으로 `_ROUNDTRIP_SAFE` 여유를 보장하므로 음수 방향이 안전하다. 255 클램프 자체의 비가역성은 fixture 로는 안 타므로 값 단위 테스트(`test_clamp_reversibility`)가 직접 검증한다.
 - **mono 분석 경로 주의(3dB 버그 교훈)**: ffmpeg `-ac 2` up-mix 는 mono 를 각 채널 1/√2 감쇠시켜 라우드니스가 정확히 3dB(≈10·log10 2) 낮게 나온다. mono 는 ffprobe 로 채널 수를 조회해 `-ac 1` 로 원진폭 디코딩 후 코드에서 좌우 복제해야 한다. stereo 위주 검증의 사각지대였음.
 - **표시 수식 3건(원본 실측 대조로 확정)**: (1) **Volume = 89 − raw**(현재 실제 음량, 목표 무관). (2) **적용 후 shift 부호는 하향**: raw 를 `−steps×DB_PER_STEP` 로 낮춘다(`+` 로 하면 Track Gain 이 0 으로 수렴 안 함). (3) **적용 후 peak(curr_max_amp)도 함께 이동**: `×2^(steps/4)` 갱신 후 clip 재판정. 누락하면 목표 왕복 시 거짓 clip 이 뜬다. 목표만 바꾸는 `recompute_target` 은 파일 미변경이므로 peak 를 건드리지 않는다.
 - **타 포맷 적용 불가**(8.1) / **원본 코드 직접 번역 금지**(2.2) / **원본 기능 임의 축소 금지**(2.1).
@@ -238,7 +238,7 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 7. 배포 라이선스 검토 — 전 모듈 독립 구현 부합 확인, 계수 출처 정직 기재, git·배포물 분리, 의존성 매트릭스, Apache 2.0 노선 확정, 파일별 저작권 위험 전수 감사(8.8, `_local/LICENSE_REVIEW.md` 부록 A). 최종 확인은 배포 직전 전문가 검토로 남겨둠(2.3).
 8. GUI(PySide6, `gui/`) — 파일/폴더 추가·태그 스캔·자연 정렬·유니코드·리스트 UX·Track/Album 분석·게인·우클릭 팝업(Clear Analysis/Undo/Remove Tags/Play)·취소(청크 경계 즉시 kill)·스트리밍 분석(수 시간 곡)·컬럼폭/정렬 저장·로그·트레이·다국어. 표시값은 원본 exe 실측과 일치. `api.analyze_file`(비파괴)이 CLI/GUI/AVD 공유.
 
-**검증 인프라.** 통합 테스트 스위트(`tests/`, unittest, 외부 의존 없음) — `python -m unittest discover -s tests` 전부 PASS(130건). 모든 테스트는 원본 음원 불간섭(tempfile 사본, `FixtureGuard` 오염 감시), 무손실은 `audio_body_sha256`(오디오 본문만 해시)로 판정. 도메인별 모듈(roundtrip/analysis/tag/options/recalc/clip/useid3/samplerate/album/logging + GUI 순수 함수부 `test_gui_pure`·스트리밍 동일성 `test_streaming_analysis`). mutagen 상호운용·원본 exe dB 대조는 오염 방지를 위해 `_local/manual_checks/`(git 제외)에서 로컬 수동 실행.
+**검증 인프라.** 통합 테스트 스위트(`tests/`, unittest, 외부 의존 없음) — `python -m unittest discover -s tests` 전부 PASS(139건, skip=0). fixture 는 저작권 음원이 아니라 `tests/_gen_fixtures.py`(합성 생성기, git 공개)가 고정 시드 신호에서 생성하며 산출물은 `_local/test_audio/`(git 제외); ffmpeg 필요. 모든 테스트는 fixture 불간섭(tempfile 사본, `FixtureGuard` 오염 감시), 무손실은 `audio_body_sha256`(오디오 본문만 해시)로 판정. 255/0 클램프 비가역성은 fixture 무관 값 단위 테스트(`test_clamp_reversibility`)로 별도 커버. 도메인별 모듈(roundtrip/analysis/tag/options/recalc/clip/clamp/useid3/samplerate/album/logging + GUI 순수 함수부 `test_gui_pure`·스트리밍 동일성 `test_streaming_analysis`). mutagen 상호운용·원본 exe dB 대조는 오염 방지를 위해 `_local/manual_checks/`(git 제외)에서 로컬 수동 실행.
 
 ### 10.2. 확정된 정책·결정 (구현 중 새로 정해진 것)
 
@@ -269,7 +269,7 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
   - [완료·커밋 c6e28d8] 8개 테스트 파일 곡명→중립 이름 치환(총 25건): test_album/test_analysis_integration/test_cli_misc/test_clip_integration/test_recalc_decode_skip/test_roundtrip_options/test_tag_integration/test_useid3_migration.
   - [**미완 — 다음 세션 최우선**] tests 트리 A/B/C 전수 저작권 감사(8.8). 지금까지 한 것은 (C) 중 '옛 곡명 치환'뿐. 각 테스트 파일 docstring·주석의 (B) clean-room, (C) '원본 …' 심볼·함수명·뉘앙스는 아직 미감사. 확실히 위험 없음은 `__init__.py`(빈 파일)·`test_clamp_reversibility.py`(신규 작성)뿐. 나머지 16개는 "곡명 치환 완료, 전수 감사 미완". 시작점: `Select-String -Path "tests\*.py" -Pattern "clean-room","원본"` 로 규모 파악 → 다른 소스 감사(2.3)와 동일하게 "mp3gain 과 동일한 결과/동작"으로 중립화 → 139건 재통과 → 커밋 → LICENSE_REVIEW.md #23 를 실제 소거완료로 기록.
   - [미완] `_gen_fixtures.py` 의 `_LEGACY_NAMES`(옛 곡명 삭제 목록) 잔존 — 기능적 필요, fixture 안정화 후 제거/주석화 검토.
-  - [미완] CLAUDE.md 본문 갱신 잔여: 트리에 `_gen_fixtures.py`·`test_clamp_reversibility.py` 추가 + 추적 파일 수 조정(48→50), 9항 fixture 서술("원본 음원"→"합성 fixture", max=255→max=210 rt-safe) 정정, 10.1 검증 인프라 서술(130건→139건 PASS, skip=0, fixture 합성) 갱신.
+  - [완료·커밋 aa26ec4/이번] CLAUDE.md 본문 갱신: 트리에 신규 2파일 등재 + 추적 파일 수 실측 47 반영 + test_audio 합성 설명, 9항 클램프 fixture 서술(max=210 rt-safe) 정정, 10.1 검증 인프라(139건 PASS·skip=0·fixture 합성) 갱신 완료.
   - [참고] 전체 테스트 실행 시간 184초(전환 전 5.5초) — skip 되던 디코딩·분석이 전부 실행되는 것이라 정상. 필요 시 시드 길이(_SEED_SECONDS=2.5) 단축으로 최적화 여지.
 
 **현재 상태.** 1~7단계 완료, 8단계 GUI MVP + 후순위 기능 전부 실사용 완료. 라이선스 정리(완전 독립 노선·Apache 2.0) 진행 중: LICENSE/NOTICE 추가, CLAUDE.md·LICENSE_REVIEW.md 완전 독립 노선으로 정리, `_local/` 격리 완료, 파일별 저작권 위험 전수 감사(8.8) 착수. GUI 는 Track/Album 분석·게인, 우클릭 팝업, 취소, 스트리밍, 컬럼폭·정렬 저장, 로그, 트레이, 다국어(영문/한국어 실시간 전환)까지 실사용 가능.

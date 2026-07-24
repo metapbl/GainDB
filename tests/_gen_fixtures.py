@@ -8,8 +8,8 @@
 재현성: numpy 고정 시드라 매 실행이 비트 동일 PCM 을 낸다.
 
 산출 위치: 환경변수 GAINDB_TEST_MP3_DIR 우선, 없으면 리포 루트의
-_local/test_audio/ (git 제외). 실행 시 알려진 fixture 이름과 옛 저작권
-이름을 먼저 삭제(전량 재생성)한 뒤 채운다.
+_local/test_audio/ (git 제외). 실행 시 알려진 fixture 이름을 먼저 삭제(전량
+재생성)한 뒤 채운다.
 
 생성 직후 gaindb.frame.parse_file 로 각 산출물의 mpegver/samplerate/nchan/
 granule/global_gain(min·max) 을 assert 검증한다. 하나라도 어긋나면 무엇이
@@ -108,12 +108,6 @@ _ROUNDTRIP_SAFE = {
 # max 가 (255 - 이 값)보다 작아야(상한 여유) 한다.
 _ROUNDTRIP_MARGIN = 8
 
-# 삭제할 옛 저작권 fixture 이름(전량 재생성 요구 충족).
-_LEGACY_NAMES = (
-    "Debussy - Arabesque No.1.mp3",
-    "10cm - 사랑은 은하수 다방에서.mp3",
-)
-
 
 def _db_to_lin(db: float) -> float:
     return 10.0 ** (db / 20.0)
@@ -197,9 +191,9 @@ def _ffmpeg_encode(src_wav: Path, dst_mp3: Path,
 
 
 def _clean_output() -> None:
-    """알려진 fixture + 옛 저작권 이름을 삭제(디렉터리 통째 삭제는 안 함)."""
+    """알려진 fixture 를 삭제(디렉터리 통째 삭제는 안 함)."""
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    names = list(_BASE_FIXTURES) + list(_DERIVED_FIXTURES) + list(_LEGACY_NAMES)
+    names = list(_BASE_FIXTURES) + list(_DERIVED_FIXTURES)
     for name in names:
         p = OUT_DIR / name
         if p.is_file():

@@ -104,7 +104,7 @@ from gaindb.analysis import (
 from gaindb.apply_gain import _fill_track_info, _fill_album_info
 from gaindb.api import analyze_file, DEFAULT_TARGET_DB
 
-VERSION = "0.5.0-dev"
+VERSION = "0.5.0"
 PROGNAME = "Gain dB"
 
 # recalc bitmask (mp3gain-compatible values).

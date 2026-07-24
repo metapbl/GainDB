@@ -4,9 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gaindb"
-# NOTE: pre-release version. Before the public release, bump this to the
-# final version (e.g. "0.5.0") and update VERSION in gaindb_cli.py to match.
-version = "0.5.0.dev0"
+version = "0.5.0"
 description = "Lossless MP3 volume analysis and adjustment; an independent re-implementation compatible with mp3gain."
 readme = "README.md"
 requires-python = ">=3.13"

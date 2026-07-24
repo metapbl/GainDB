@@ -13,7 +13,7 @@
 - **위치**: AVD(AV_Downloader)로 "MP3 지정" 다운로드한 음원의 음량을 고르게 맞추는 **후속 단계 도구**. 단독으로도 동작.
 - **로컬 경로**: `C:\Users\ggoyo_zhxlvdr\GaindB`
 - **협업 모델**: 1인 개발자 + AI 페어 프로그래밍. 로컬 Git. GitHub 오픈소스 공개(Apache 2.0) 예정.
-- **장기 비전**: GaindB(코어+CLI) 완성 후 PySide6 GUI 를 얹어 Windows·macOS 크로스플랫폼 프로그램으로 만든다(8단계). 나아가 기존 AVD 프로젝트(https://github.com/metapbl/AVD)와 병합해 다기능 유틸리티로 발전시키는 것이 큰 그림이다(병합은 이후 비전이며, 당면 목표는 GaindB 완성과 GUI MVP).
+- **장기 비전**: GaindB(코어+CLI) 완성 후 PySide6 GUI 를 얹어 Windows·macOS 크로스플랫폼 프로그램으로 만든다(8단계). 나아가 기존 AVD 프로젝트(https://github.com/metapbl/AVD)와 연계해 다기능 유틸리티로 발전시키는 것이 큰 그림이다. **연계 구도(확정)**: GaindB 를 독립 리포로 공개하고 GaindB 가 정본(canonical)이며, AVD 는 GaindB 의 `gaindb/` 코어를 소비하는 쪽이다. 수정은 항상 GaindB 에서 먼저 한다(정본 우선). 양쪽 모두 Apache 2.0 으로 통일돼 코드 이동에 라이선스 마찰이 없다. 소비 방식(소스 vendoring vs pip 의존)은 연계 착수 시점에 결정한다. 당면 목표는 GaindB 완성과 공개 준비 마무리이며, AVD 연계는 이후 단계다.
 
 ## 2. 핵심 원칙 (최우선 · 어떤 압축·개정에서도 약화 금지)
 

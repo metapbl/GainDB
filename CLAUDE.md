@@ -86,6 +86,7 @@ GaindB/
 │  ├─ resources.py         # 아이콘 등 리소스 헬퍼(gui/assets/ 기준)
 │  ├─ assets/
 │  │  └─ GainDB.png         # 트레이·앱 아이콘(패키지 내부, wheel 포함)
+│  │  └─ GainDB.ico         # exe 빌드용 아이콘(PyInstaller, wheel 무관)
 │  ├─ dialogs/
 │  │  ├─ __init__.py
 │  │  ├─ logs_dialog.py    # 로그 설정 다이얼로그
@@ -117,6 +118,10 @@ GaindB/
 ├─ README.md              # (공개) 영문 소개·설치·사용법·라이선스
 ├─ README.ko.md           # (공개) 한국어 소개·설치·사용법·라이선스
 ├─ pyproject.toml         # 프로젝트 메타·의존성·빌드 설정
+├─ GainDB.spec            # PyInstaller onedir 빌드 레시피(exe 배포용)
+├─ build_release.ps1      # 릴리스 빌드 스크립트(clean→빌드→라이선스 복사·검증)
+├─ licenses/              # (공개) exe 동봉용 Qt 라이선스 전문 고정본
+│  └─ qt/                 #   LGPL-3.0.txt·GPL-3.0.txt(gnu.org 정본, 빌드 시 산출물로 복사)
 ├─ requirements.txt       # 런타임 의존성 목록(numpy·scipy·PySide6)
 ├─ LICENSE                # Apache License 2.0 전문
 ├─ NOTICE                 # 독립 구현·의존성 사실 고지
@@ -221,6 +226,8 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 - **Track Gain 이중 디코딩 금지**: 씨앗(seed_db_gain·seed_peak·seed_min_gain·seed_max_gain)을 선택 주입해 유효하면 decode/analyze/scan 을 건너뛴다(결과 수치 동일). 씨앗 peak 가 None 이면 자동으로 디코딩 경로로 폴백(안전).
 - **적용 단계도 취소·진행 확인 지점을 가져야 함(취소 갇힘 교훈)**: `scan_gain`·`apply_gain` 은 순수 파이썬 순회라 디코딩이 없다. 두 함수에 should_cancel/on_progress 를 `_CALLBACK_INTERVAL`(=4096) 프레임마다 확인, 취소 시 `writer.GainCancelled`. 취소 확인은 파일 write 이전 순회 단계에서만 하므로 취소해도 파일은 원본 그대로.
 - **255 클램프(비가역)와 클리핑은 별개**: 클램프는 global_gain(8bit)이 255 넘어 잘려 undo 왕복이 깨지는 데이터 손실, 클리핑은 PCM 진폭이 ±32768 넘어 소리가 왜곡되는 청취 품질 문제. 임계값·발생 지점이 달라 한쪽만 생길 수 있다. mp3gain 은 클램프를 경고 없이 조용히 255 로 자르고 진행(우리 `_apply_one` 동일) — 결과 일치라 별도 경고 안 함(사전 경고는 MVP 제외, 10.5).
+- **exe(--windowed)에서 자식 프로세스 콘솔 깜빡임(exe 배포 특유)**: `.py`를 콘솔에서 실행하면 ffmpeg/ffprobe 가 부모 콘솔을 물려받아 창이 안 뜨지만, PyInstaller `--windowed` exe 는 콘솔이 없어 Windows 가 자식에게 새 콘솔을 할당한다(곡마다 도스창 깜빡). → `decode.py` 의 `subprocess.run`/`Popen` 에 `creationflags=_NO_WINDOW`(`getattr(subprocess,"CREATE_NO_WINDOW",0)`, 타 OS 는 0). 코어 변경이라 AVD 사본 동기화 대상.
+- **PyInstaller 아이콘은 `.ico` 필요**: exe 아이콘에 `.png` 를 주면 Pillow 없을 때 빌드 실패. `gui/assets/GainDB.png` 를 `GainDB.ico`(멀티해상도)로 변환해 리포에 두고 `.spec` 이 이를 쓴다(런타임 트레이/창 아이콘은 여전히 `.png` 사용, `resources.py` 무변경).
 
 ## 10. 진척 로그 / 정책 / 다음 시작점
 
@@ -245,6 +252,8 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 - **트레이 기능 정책**: Options 체크(기본 꺼짐, QSettings `tray/*`) + 최소화 시 창 숨김·트레이 아이콘, 좌클릭/더블클릭/팝업 Restore, 팝업 Exit. X 는 실제 종료. macOS 는 자동 트레이 이동만 비활성. 아이콘 `gui/assets/GainDB.png`.
 - **버전·이름 단일 출처(확정)**: 정본은 `gaindb/__init__.py` 의 `__version__`·`PROGNAME`. `gaindb_cli.py`(`VERSION = __version__`)와 GUI About 이 이를 읽는다. 버전업 시 `__init__.py` 한 줄만 고치면 CLI·GUI 가 함께 따라간다. `pyproject.toml` version 은 빌드 메타라 릴리스 시 수동 갱신.
 - **검증 인프라(정책)**: 통합 테스트 스위트(`tests/`, unittest, 외부 의존 없음) — `python -m unittest discover -s tests` 전부 PASS(139건, skip=0). fixture 는 `tests/_gen_fixtures.py`(합성 생성기, git 공개)가 고정 시드 신호에서 생성하며 산출물은 `_local/test_audio/`(git 제외); ffmpeg 필요. 모든 테스트는 fixture 불간섭(tempfile 사본, `FixtureGuard` 오염 감시), 무손실은 `audio_body_sha256`(오디오 본문만 해시)로 판정. 255/0 클램프 비가역성은 값 단위 테스트(`test_clamp_reversibility`)로 별도 커버. mutagen 상호운용·원본 exe dB 대조는 오염 방지를 위해 `_local/manual_checks/`(git 제외)에서 로컬 수동 실행.
+- **exe 빌드(확정)**: PyInstaller onedir + `--windowed`(`GainDB.spec`), `build_release.ps1` 이 clean→빌드→라이선스 복사·검증. onedir 로 Qt DLL 교체 가능성 유지=LGPLv3 준수(onefile 금지). 라이선스는 우리 3종 + Qt LGPL/GPL 전문(`licenses/qt/`, PySide6 6.11.1 이 텍스트 미동봉이라 고정 커밋 + 빌드 시 복사, 패키지 LICENSES 있으면 자동 복사 폴백). 근거·잔여는 비공개 라이선스 검토 문서(2.3) 1.6.1.
+- **산출물 용량 절감 보류(성능)**: onedir 산출물 ≈215MB(PySide6 ~92 + scipy ~69 + numpy ~26). `.spec` excludes 로는 안전한 절감이 어려움(scipy.signal 이 fft·spatial 등에 의존해 세밀 제외 시 앱이 깨짐, Qt 모듈 제외는 훅이 DLL 을 그대로 가져와 무효). 근본 절감은 `analysis.py` 의 scipy `lfilter` 의존을 numpy 구현으로 대체(scipy 제거 → 약 145MB)해야 하나, 코어 신호처리 변경이라 mp3gain 수치 호환 재검증 필요 → 별도 작업으로 보류(10.5). collect_submodules 제거로 빌드 시간은 단축됨.
 
 ### 10.2. 완료 요약 (구현 단계 + 후속 정리)
 
@@ -269,6 +278,7 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 - **버전 단일 출처 정리** — `gaindb/__init__.py` 에 `__version__`·`PROGNAME` 도입, `gaindb_cli.py` 가 이를 소비(커밋 bc8707a). 정책은 10.1.
 - **About 다이얼로그** — Help 메뉴에 About 추가(`gui/dialogs/about_dialog.py`, 독립 작성). ReplayGain 독립 구현 서술·Apache-2.0·서드파티(PySide6 LGPLv3 / numpy·scipy BSD / ffmpeg 외부) 고지·홈페이지 링크. 한국어 번역 완료, 버전은 단일 출처에서 표시(커밋 af750f8).
 - **GitHub 공개** — https://github.com/metapbl/GainDB 에 Apache 2.0 공개, `v0.5.0` 태그. `_local/` 추적 제외 확인.
+- **exe 릴리스 빌드·라이선스 동봉 자동화(완료)** — PyInstaller onedir(`GainDB.spec`) + `build_release.ps1`(clean→빌드→라이선스 복사·검증). Qt LGPL/GPL 전문을 `licenses/qt/` 에 고정하고 빌드 시 산출물 `licenses/` 로 복사(커밋: 빌드 레시피 2bcbdb3 · `.spec` 정리 aa68563). exe 환경 콘솔 깜빡임 수정(`decode.py`, CREATE_NO_WINDOW, 커밋 94bed9f, 139건 PASS). 아이콘 `.ico` 변환. 정식 Release 발행은 변호사 최종 검토 이후로 보류(10.4).
 
 ### 10.3. 진행 중
 
@@ -278,6 +288,7 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 
 - **공개 전/후 최종 점검(남은 것).** 공개 전 확인 체크리스트의 마지막 미완 항목은 **자격 있는 전문가(변호사) 최종 검토**다. 절차·잔여 항목은 전부 비공개 라이선스 검토 문서(2.3)가 관리한다. 이 항목이 닫히기 전에는 정식 Release 발행을 보류한다.
 - **exe 릴리스 시 라이선스 동봉 자동화(조건부 — exe 배포에 착수할 때).** PyInstaller 등으로 릴리스 바이너리를 만들 때, 빌드 산출물에 `LICENSE`·`NOTICE`·`THIRD_PARTY_LICENSES` + PySide6/Qt 의 LGPLv3/GPLv3 전문을 동봉하도록 빌드 스크립트에 자동화한다. onedir 권장(동적 링크 유지=LGPL 준수), About 의 오픈소스 고지와 함께 이행. 지금은 소스 공개 단계라 미착수 — exe 배포를 실제로 결정하는 시점에 착수하며, 그때 외부 라이선스 검토 의견을 그 단계 체크리스트로 재활용한다.
+- **exe 릴리스 빌드 인프라 — 구현 완료, 실제 배포는 변호사 검토 후.** onedir 빌드·라이선스 동봉 자동화는 완료했다(10.2·10.1·2.3 1.6.1). 남은 것은 정식 Release 발행뿐이며, 이는 위 "변호사 최종 검토" 이후로 보류한다. PyInstaller onedir 는 LGPLv3(동적 링크) 준수를 유지하므로, 배포 결정 시 그대로 사용한다.
 - **실클릭 회귀 — 반복 점검 체크리스트로 존치.** 오디오 경로(decode/scan/apply)를 실제로 건드리는 변경이 있을 때, 취소 후 `audio_body_sha256` 로 원본 무결성을 재확인한다.
 
 ### 10.5. 보류 항목 (사용자가 먼저 요구하지 않는 한 착수하지 않음 — 할 일이 아니다)
@@ -288,5 +299,6 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 - **steps==0 곡 태그 재확인 비용 — 최적화 보류(성능).** 기능이 아니라 속도 문제. 체감 지연이 실제로 생기면 모델 `has_tag` 플래그로 최신 태그 곡만 사전 제외 고려. 지금은 불필요.
 - **Constant Gain(`-g`/`-l`) GUI — 최후순위 보류(축소 아님).** 코어(`apply_gain`) 완비, CLI 로는 동작. GUI 진입점(슬라이더/입력 다이얼로그 + 워커 배선)만 안 얹은 상태.
 - **Max No-clip(`-x` 계열) GUI — 보류(축소 아님).** 계산 뼈대는 `-k`(자동 클립) 경로로 코어에 존재. GUI 진입점만 안 얹은 상태.
+- **scipy 의존 제거(용량 절감) — 보류(축소 아님·코어 변경).** `analysis.py` 의 `scipy.signal.lfilter` 를 numpy 구현으로 대체하면 scipy ~69MB 가 빠져 산출물이 크게 준다(215→약 145MB). 다만 코어 신호처리 변경이라 mp3gain 결과 수치 호환(2.1)을 테스트로 엄격히 재검증해야 한다. 사용자가 요구할 때만 별도 작업으로 착수.
 
 **CLAUDE.md 유지.** 진척이 생기면 10.2~10.5 를 갱신한다(완료→10.2, 진행중→10.3, 할일→10.4, 보류→10.5). 2 핵심 원칙을 약화시키는 압축은 금지(2·8 참조).

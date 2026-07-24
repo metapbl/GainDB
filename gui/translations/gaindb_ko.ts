@@ -313,10 +313,6 @@
         <translation>목표 볼륨:</translation>
     </message>
     <message>
-        <source>This target is relative to mp3gain&apos;s internal 89 dB ReplayGain reference. It is not an absolute SPL or LUFS level.</source>
-        <translation type="vanished">이 목표값은 mp3gain 내부의 89 dB ReplayGain 기준에 상대적인 값입니다. 절대 SPL 이나 LUFS 레벨이 아닙니다.</translation>
-    </message>
-    <message>
         <location filename="../main_window.py" line="682"/>
         <location filename="../main_window.py" line="816"/>
         <source>Progress:</source>
@@ -346,7 +342,7 @@
         <location filename="../main_window.py" line="680"/>
         <location filename="../main_window.py" line="773"/>
         <source>This target is relative to the ReplayGain specification&apos;s 89 dB reference level. It is not an absolute SPL or LUFS level.</source>
-        <translation type="unfinished"></translation>
+        <translation>이 목표는 ReplayGain 사양의 89 dB 기준 레벨을 기준으로 한다. 절대 SPL 이나 LUFS 레벨이 아니다.</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="687"/>

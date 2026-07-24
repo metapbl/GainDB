@@ -64,7 +64,7 @@
 
 GaindB/
 ├─ gaindb/                 # 코어 패키지 (순수 로직 + 분석)
-│  ├─ __init__.py
+│  ├─ __init__.py          # 버전·이름 단일 출처(__version__·PROGNAME). 버전업 시 여기만 수정
 │  ├─ frame.py             # 프레임 파서: _BitReader, 헤더 파싱, global_gain 읽기
 │  ├─ writer.py            # global_gain ±N 무손실 적용 + CRC 재계산
 │  ├─ decode.py            # ffmpeg/ffprobe 로 MP3→PCM (스트리밍 포함)

@@ -1,0 +1,6 @@
+# Runtime dependencies for Gain dB.
+# ffmpeg / ffprobe are NOT listed here: they are external programs called
+# from your PATH, not Python packages. Install them separately (see README).
+numpy>=2.0
+scipy>=1.13
+PySide6>=6.7

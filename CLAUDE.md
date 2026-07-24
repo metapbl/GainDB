@@ -113,9 +113,13 @@ GaindB/
 │  ├─ test_gui_pure.py              # GUI 순수 함수부
 │  └─ test_streaming_analysis.py    # 스트리밍=통짜 비트 동일성
 ├─ docs/                    # (공개) 필요 시 사용자용 문서.
-├─ LICENSE                 # Apache License 2.0 전문
-├─ NOTICE                  # 독립 구현·의존성 사실 고지
-├─ CLAUDE.md               # 이 컨텍스트 파일
+├─ README.md              # (공개) 영문 소개·설치·사용법·라이선스
+├─ README.ko.md           # (공개) 한국어 소개·설치·사용법·라이선스
+├─ pyproject.toml         # 프로젝트 메타·의존성·빌드 설정
+├─ requirements.txt       # 런타임 의존성 목록(numpy·scipy·PySide6)
+├─ LICENSE                # Apache License 2.0 전문
+├─ NOTICE                 # 독립 구현·의존성 사실 고지
+├─ CLAUDE.md              # 이 컨텍스트 파일
 ├─ .gitignore
 ├─ .vscode/                # 에디터 설정(git 제외)
 └─ _local/                 # 원본 참고 소스·저작권 음원·수동 검증(git·배포물 제외)
@@ -124,7 +128,7 @@ GaindB/
    ├─ LICENSE_REVIEW.md    #   (비공개) 라이선스 정합성 점검 + 파일별 저작권 감사 통합 문서
    └─ test_audio/          #   합성 fixture(_gen_fixtures.py 가 생성, git·배포물 제외)
 
-git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·`.vscode/`·`__pycache__/`·`.venv/` 를 제외한 47개 파일이다(`git ls-files` 실측).
+git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·`.vscode/`·`__pycache__/`·`.venv/` 를 제외한 51개 파일이다(`git ls-files` 실측).
 원본 참고 소스와 저작권 음원은 전부 `_local/` 아래로 격리되어 저장소·배포물에 포함되지 않는다. 원본 exe 는 코드가 아니라 실행 결과만 검증 기준으로 쓴다(2.2 의 "관찰된 동작 차용").
 
 ## 5. 원본 참고 자료 · 새 세션 시작법
@@ -265,7 +269,7 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 **다음 할 일(남은 것만).**
 
 - **README + LICENSE 헤더.** README(프로젝트 소개·설치·ffmpeg 안내·라이선스 배지) 작성, 필요 시 각 소스 파일에 Apache 2.0 짧은 헤더 추가(추가 여부는 미결정 — LICENSE_REVIEW.md 3부).
-- **공개 전 최종 점검.** 전체 빌드·테스트, AVD 의 `gaindb/` 사본 동기화, 전문가(변호사) 검토(2.3). 나머지 공개 전 체크리스트는 `_local/LICENSE_REVIEW.md`.
+- **공개 전 최종 점검.** 전체 빌드·테스트, AVD 의 `gaindb/` 사본 동기화, 전문가(변호사) 검토(2.3). 나머지 공개 전 체크리스트는 `_local/LICENSE_REVIEW.md`. **공개 시점에 버전을 정식으로 올린다** — `pyproject.toml` version(`0.5.0.dev0`)과 `gaindb_cli.py` VERSION(`0.5.0-dev`)을 정식 버전(예: `0.5.0`)으로 함께 변경.
 - **실클릭 회귀 — 반복 점검 체크리스트로 존치.** 오디오 경로(decode/scan/apply)를 실제로 건드리는 변경이 있을 때, 취소 후 `audio_body_sha256` 로 원본 무결성을 재확인한다.
 
 **보류 항목 (사용자가 먼저 요구하지 않는 한 착수하지 않음 — 다음 할 일로 보지 않는다).**

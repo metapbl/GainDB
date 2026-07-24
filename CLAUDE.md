@@ -83,7 +83,9 @@ GaindB/
 │  ├─ workers.py           # QThread 워커(분석/게인/앨범, 진행·취소)
 │  ├─ logging.py           # 로그 파일 기록(Qt 비의존)
 │  ├─ i18n.py              # 다국어 인프라(런타임 전환·로케일 폴백)
-│  ├─ resources.py         # 아이콘 등 리소스 헬퍼
+│  ├─ resources.py         # 아이콘 등 리소스 헬퍼(gui/assets/ 기준)
+│  ├─ assets/
+│  │  └─ GainDB.png         # 트레이·앱 아이콘(패키지 내부, wheel 포함)
 │  ├─ dialogs/
 │  │  ├─ __init__.py
 │  │  └─ logs_dialog.py    # 로그 보기 다이얼로그
@@ -91,8 +93,6 @@ GaindB/
 │     ├─ .gitkeep
 │     ├─ gaindb_ko.ts      # 한국어 번역 소스
 │     └─ gaindb_ko.qm      # 한국어 번역 컴파일본
-├─ assets/
-│  └─ GainDB.png           # 트레이·앱 아이콘
 ├─ tests/                  # 통합 테스트 스위트(unittest, 외부 의존 없음, 139건 PASS)
 │  ├─ __init__.py
 │  ├─ _support.py                   # 공용 헬퍼(FixtureGuard, audio_body_sha256 등)

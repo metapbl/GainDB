@@ -20,12 +20,17 @@ from PySide6.QtGui import QIcon
 
 
 def _base_dir() -> str:
-    """리소스 탐색 기준 폴더. PyInstaller 면 _MEIPASS, 아니면 리포지토리 루트."""
+    """리소스 탐색 기준 폴더. PyInstaller 면 _MEIPASS/gui, 아니면 이 파일(gui) 폴더.
+
+    아이콘·번역본은 gui 패키지 안에 두어(assets/·translations/) 소스 실행과
+    wheel/pip 설치본 양쪽에서 동일하게 찾히도록 한다. i18n.py 의 _base_dir 과
+    같은 패턴(gui 기준)이다.
+    """
     meipass = getattr(sys, "_MEIPASS", None)
     if meipass:
-        return str(meipass)
-    # 이 파일: <root>/gui/resources.py -> 상위의 상위가 <root>.
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(str(meipass), "gui")
+    # 이 파일: <root>/gui/resources.py -> 이 파일이 있는 gui 폴더가 기준.
+    return os.path.dirname(os.path.abspath(__file__))
 
 
 def resource_path(*parts: str) -> str:
@@ -33,7 +38,7 @@ def resource_path(*parts: str) -> str:
     return os.path.join(_base_dir(), *parts)
 
 
-# 앱 아이콘 파일 경로(assets/GainDB.png). 창 아이콘·트레이 아이콘 공용.
+# 앱 아이콘 파일 경로(gui/assets/GainDB.png). 창 아이콘·트레이 아이콘 공용.
 APP_ICON_PATH = resource_path("assets", "GainDB.png")
 
 

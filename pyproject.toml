@@ -26,5 +26,8 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["gaindb", "gui", "gui.dialogs"]
+packages = ["gaindb", "gui", "gui.dialogs", "gui.assets", "gui.translations"]
 py-modules = ["gaindb_cli"]
+
+[tool.setuptools.package-data]
+gui = ["assets/*.png", "translations/*.qm"]

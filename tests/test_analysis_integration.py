@@ -1,8 +1,8 @@
 """③-a 분석 통합 테스트 (CLI 경로).
 
-원본 mp3gain 의 분석 동작을 gaindb_cli.py 경로에서 재현·검증한다.
+mp3gain 의 분석 동작을 gaindb_cli.py 경로에서 검증한다.
 - 순수 분석(옵션 없음): stdout 에 Track 제안 라인들, 오디오 프레임 불변.
-  (원본은 분석만 해도 dirty 태그를 파일 끝에 기록하므로 전체 파일 해시는
+  (mp3gain 은 분석만 해도 dirty 태그를 파일 끝에 기록하므로 전체 파일 해시는
    바뀔 수 있다 — 무결성 판정은 반드시 audio_body_sha256[프레임 구간]으로.)
 - -r: Track 적용. 제안 스텝≠0 이면 "Applying mp3 gain change of N to ..."
   (stdout) + 오디오 프레임 변화. ==0 이면 "No changes..." + 불변.
@@ -11,7 +11,7 @@
   (ffmpeg 부재 시 skip. CLI 는 양자화 전 dB 를 출력하므로 라이브러리 검증보다
    느슨한 허용오차로 경로 정합성만 확인.)
 
-원본 음원 불간섭: 모든 작업은 tempfile 사본에서만(11항목, BaseGainTest).
+fixture 불간섭: 모든 작업은 tempfile 사본에서만(9항, BaseGainTest).
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ import unittest
 
 from tests._support import BaseGainTest
 
-# CLI 제안 라인 정규식(원본 영문 verbatim 기준).
+# CLI 제안 라인 정규식(mp3gain 영문 출력 기준).
 _RE_TRACK_DB = re.compile(r'Recommended "Track" dB change:\s*(-?\d+\.\d+)')
 _RE_TRACK_STEP = re.compile(r'Recommended "Track" mp3 gain change:\s*(-?\d+)')
 _RE_APPLYING = re.compile(r'Applying mp3 gain change of (-?\d+) to ')
@@ -53,7 +53,7 @@ class TrackAnalysisTest(BaseGainTest):
         r = self.run_cli([path])
         self.assertEqual(r.returncode, 0, msg=r.stderr)
 
-        # 원본 Track 제안 라인들이 stdout 에 모두 존재해야 한다.
+        # Track 제안 라인들이 stdout 에 모두 존재해야 한다.
         self.assertIn('Recommended "Track" dB change:', r.stdout)
         self.assertIn('Recommended "Track" mp3 gain change:', r.stdout)
         self.assertIn("Max PCM sample at current gain:", r.stdout)
@@ -141,7 +141,7 @@ class AlbumAnalysisTest(BaseGainTest):
                 elif b in ln:
                     applied[b] = int(m.group(1))
 
-        # Album 은 전 파일에 단일(동일) 스텝을 적용한다(원본 동작).
+        # Album 은 전 파일에 단일(동일) 스텝을 적용한다(mp3gain 과 동일한 동작).
         if applied:
             steps = set(applied.values())
             # 0 스텝 파일은 "No changes" 로 빠질 수 있으므로, 적용된 것들끼리
@@ -190,3 +190,7 @@ class TrackDbNumericTest(BaseGainTest):
         self.assertLessEqual(
             abs(cli_db - ref), self._TOL_DB,
             f"CLI Track dB {cli_db} vs core {ref} exceeds {self._TOL_DB} dB")
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,7 +1,7 @@
-"""잔여 CLI 분기 통합 테스트 (verify_cli_c1/c2/c3/d1 흡수).
+"""잔여 CLI 분기 통합 테스트.
 
-③(분석/태그/클립)이 아직 안 덮은 잔여 분기를 모은다. 전부 원본 mp3gain
-동작 재현 검증이다.
+③(분석/태그/클립)이 아직 안 덮은 잔여 분기를 모은다. 전부 mp3gain 과
+동일한 동작 검증이다.
 - -x maxAmpOnly: dB change==0.000000, maxsample 의미값.
 - -d/-m 보정 순서: -d 는 dB 에 선반영(양자화 전), -m 은 스텝에 후반영.
 - No changes 분기: -d 로 스텝 0 → "No changes ... are necessary" + 본문 불변.
@@ -13,7 +13,7 @@
 - min/max 스캔 회귀: -s s / -x 등 어느 recalc 경로에서도 global_gain
   min/max 가 0/0 이 아니라 실제 값으로 출력됨(scan_gain 과 대조).
 
-원본 불간섭(11항목): 모든 작업은 tempfile 사본에서만(BaseGainTest).
+fixture 불간섭(9항): 모든 작업은 tempfile 사본에서만(BaseGainTest).
 """
 
 from __future__ import annotations
@@ -241,7 +241,7 @@ class MinMaxScanRegressionTest(BaseGainTest):
 
     버그: min/max 스캔이 MIN_MAX_GAIN_RECALC 비트에만 묶여 있어, 그 비트가
     없는 recalc 경로(-s s 는 FULL 만, -x 는 AMP 만)에서 Max/Min global_gain 이
-    0/0 으로 떨어졌다. 원본 mp3gain 은 scanFrameGain 을 어느 recalc 경로에서든
+    0/0 으로 떨어졌다. mp3gain 은 어느 recalc 경로에서든 min/max 스캔을
     실행하므로 min/max 는 항상 나온다. 이를 재현·고정한다.
 
     기대값은 scan_gain(사본)을 직접 불러 동적으로 구한다(fixture 가 ffmpeg 로

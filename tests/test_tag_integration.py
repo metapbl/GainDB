@@ -1,9 +1,9 @@
 """③-b 태그 통합 테스트 (CLI 경로).
 
-원본 mp3gain 의 태그 동작을 gaindb_cli.py 경로에서 재현·검증한다.
+mp3gain 의 태그 동작을 gaindb_cli.py 경로에서 검증한다.
 APE(기본) / ID3v2(-s i) 두 경로 각각 write / read / remove / round-trip.
 
-무손실 복원(round-trip) 원칙(11항목 영구 제약):
+무손실 복원(round-trip) 원칙(9항 영구 제약):
 - 반드시 음수 스텝 먼저(-g -3 → -u). 양수 먼저는 255 상한 클램프로 비가역.
 - undo 후 MP3GAIN_UNDO 0,0 태그가 남아 전체 파일 해시는 달라질 수 있으므로,
   판정은 audio_body_sha256(프레임 구간)로 한다.
@@ -12,9 +12,9 @@ APE(기본) / ID3v2(-s i) 두 경로 각각 write / read / remove / round-trip.
 
 ID3 경로 태그는 --debug-tag(APE 전용)로 못 보므로, -s c -s i(check_tag_only
 + use_id3)로 CLI 가 ID3 태그를 읽어 제안을 출력하는지로 read 를 검증한다
-(원본 -s c 가 use_id3 에 따라 해당 태그를 읽는 동작과 일치).
+(-s c 가 use_id3 에 따라 해당 태그를 읽는 mp3gain 동작과 일치).
 
-원본 음원 불간섭: 모든 작업은 tempfile 사본에서만(BaseGainTest).
+fixture 불간섭: 모든 작업은 tempfile 사본에서만(BaseGainTest).
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ class ApeTagTest(BaseGainTest):
 
         u = self.run_cli(["-u", path])
         self.assertEqual(u.returncode, 0, msg=u.stderr)
-        # undo 상태 메시지는 stderr(원본 verbatim).
+        # undo 상태 메시지는 stderr(mp3gain 과 동일한 출력).
         self.assertIn("Undoing mp3gain changes", u.stderr)
 
         after = self.audio_body_sha256(path)

@@ -150,7 +150,7 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 4. **[완료] 태그 처리** — APEv2·ID3v2 읽기·쓰기·갱신·제거, scan_gain, change_gain_and_tag, undo, auto/album 연결.
 5. **[완료] CLI / 옵션 / 일괄 처리** — mp3gain 옵션 전부 재현, 클리핑 경고·자동 클립(`-k`), database 출력(`-o`) 포함.
 6. **[완료] 샘플레이트 확장(호환 완결)** — ReplayGain 사양 전 샘플레이트를 코어에 추가·검증.
-7. **[완료] 배포 라이선스 정합성 준비·검토** — 상세는 `_local/LICENSE_REVIEW.md`. 최종 확인은 배포 직전 전문가 검토로 남겨둔다(2.3).
+7. **[완료] 배포 라이선스 정합성 준비·검토** — 정책·감사·공개 전 체크리스트·최종 확인 절차는 모두 `_local/LICENSE_REVIEW.md` 가 관리한다(원칙은 2.3).
 8. **[MVP 완료·잔여 점검 중] GUI (PySide6, 독립 구현)** — 원본 MP3GainGUI 의 외관·기능·동작을 결과 일치시키되 코드는 독립 구현(2). 기존 코어 + CLI 위에 얹는 프런트엔드. Windows·macOS 크로스플랫폼. 확정된 아키텍처·MVP 범위·표시 정책·AVD 연결·잔여 항목은 **10.2·10.3 참조**.
 
 ## 7. 개발 환경 · 작업 흐름
@@ -234,7 +234,7 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 4. 태그(`tag.py` APE·`id3.py` ID3v2 — read/write/remove/round-trip, scan_gain, change_gain_and_tag, auto/album, 꼬리 보존, useId3 분기).
 5. CLI(`gaindb_cli.py`) — mp3gain 옵션 전부 재현. recalc 비트마스크로 디코딩 스킵(수치 일치). CLI I/O 는 영문만(다국어는 GUI 책임).
 6. 샘플레이트 확장 — ReplayGain 전 샘플레이트(32k / MPEG2·2.5 계열) 코어 추가, exe 대조 min/max 전부 일치.
-7. 배포 라이선스 검토 — 완료. 상세는 `_local/LICENSE_REVIEW.md`(정책·의존성 매트릭스·파일별 감사·체크리스트). 최종 확인은 배포 직전 전문가 검토로 남겨둠(2.3).
+7. 배포 라이선스 검토 — 완료. 정책·의존성 매트릭스·파일별 감사·공개 전 체크리스트·최종 확인 절차는 모두 `_local/LICENSE_REVIEW.md` 가 관리(원칙은 2.3).
 8. GUI(PySide6, `gui/`) — 파일/폴더 추가·태그 스캔·자연 정렬·유니코드·리스트 UX·Track/Album 분석·게인·우클릭 팝업(Clear Analysis/Undo/Remove Tags/Play)·취소(청크 경계 즉시 kill)·스트리밍 분석(수 시간 곡)·컬럼폭/정렬 저장·로그·트레이·다국어. 표시값은 원본 exe 실측과 일치. `api.analyze_file`(비파괴)이 CLI/GUI/AVD 공유.
 
 **검증 인프라.** 통합 테스트 스위트(`tests/`, unittest, 외부 의존 없음) — `python -m unittest discover -s tests` 전부 PASS(139건, skip=0). fixture 는 `tests/_gen_fixtures.py`(합성 생성기, git 공개)가 고정 시드 신호에서 생성하며 산출물은 `_local/test_audio/`(git 제외); ffmpeg 필요. 모든 테스트는 fixture 불간섭(tempfile 사본, `FixtureGuard` 오염 감시), 무손실은 `audio_body_sha256`(오디오 본문만 해시)로 판정. 255/0 클램프 비가역성은 값 단위 테스트(`test_clamp_reversibility`)로 별도 커버. mutagen 상호운용·원본 exe dB 대조는 오염 방지를 위해 `_local/manual_checks/`(git 제외)에서 로컬 수동 실행.
@@ -269,9 +269,11 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 
 **README·라이선스 헤더·의존성 파일 — 완료.** 영문 `README.md` + 한국어 `README.ko.md`(소개·설치·ffmpeg 안내·사용법·라이선스 배지) 작성, `pyproject.toml`·`requirements.txt` 추가(커밋 ccc2cf1). ffmpeg 는 미동봉(A) 확정 — README 에 플랫폼별 다운로드처(gyan.dev/evermeet.cx/johnvansickle) + PATH 등록 안내. 소스 라이선스 헤더는 SPDX 2줄(Apache-2.0 + FileCopyrightText 2026 META PUBLIC)로 39개 `.py` 에 삽입(커밋 faeb9e4). 추적 파일 52개, 139건 PASS 유지.
 
+**버전 0.5.0 승격 · AVD 사본 동기화 — 완료.** `pyproject.toml` version 과 `gaindb_cli.py` VERSION 을 `0.5.0` 으로 함께 올림(커밋 3615722). 승격 후 139건 PASS(skip=0), `python -m build` 로 `dist/gaindb-0.5.0.tar.gz`·`gaindb-0.5.0-py3-none-any.whl` 생성 확인(데이터 파일·LICENSE·NOTICE 동봉 정상). AVD 의 `gaindb/` 사본 동기화도 완료.
+
 **다음 할 일(남은 것만).**
 
-- **공개 전 최종 점검.** 전체 빌드·테스트, AVD 의 `gaindb/` 사본 동기화, 전문가(변호사) 검토(2.3). 나머지 공개 전 체크리스트는 `_local/LICENSE_REVIEW.md`. **공개 시점에 버전을 정식으로 올린다** — `pyproject.toml` version(`0.5.0.dev0`)과 `gaindb_cli.py` VERSION(`0.5.0-dev`)을 정식 버전(예: `0.5.0`)으로 함께 변경.
+- **공개 전 최종 점검(남은 것).** 공개 전 확인 체크리스트 완결 — 절차·잔여 항목은 전부 `_local/LICENSE_REVIEW.md` 가 관리한다(원칙은 2.3).
 - **실클릭 회귀 — 반복 점검 체크리스트로 존치.** 오디오 경로(decode/scan/apply)를 실제로 건드리는 변경이 있을 때, 취소 후 `audio_body_sha256` 로 원본 무결성을 재확인한다.
 
 **보류 항목 (사용자가 먼저 요구하지 않는 한 착수하지 않음 — 다음 할 일로 보지 않는다).**

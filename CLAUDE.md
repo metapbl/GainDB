@@ -131,7 +131,7 @@ GaindB/
 ├─ .vscode/                # 에디터 설정(git 제외)
 └─ _local/                 # 원본 참고 소스·저작권 음원·수동 검증(git·배포물 제외)
    ├─ mp3gain/             #   원본 C·VB GUI 소스(사양·동작 참고용)
-   ├─ manual_checks/       #   mutagen/exe 상호운용·대조 스크립트
+   ├─ manual_checks/       #   원본 exe 결과 대조 등 수동 검증(파일 구성은 로컬 사정)
    ├─ LICENSE_REVIEW.md    #   (비공개) 라이선스 정합성 점검 + 파일별 저작권 감사 통합 문서(2.3)
    └─ test_audio/          #   합성 fixture(_gen_fixtures.py 가 생성, git·배포물 제외)
 
@@ -143,7 +143,7 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 - **원본 C 소스는 로컬 `_local/mp3gain/src/` 에 보관**. git·배포물 제외. Claude 는 이 폴더를 직접 읽지 못하므로, Claude 가 필요한 함수/구간을 지목하면 사용자가 해당 파일에서 찾아 붙여넣어 제공한다.
 - **원본 Windows GUI(MP3GainGUI)는 VB 로 작성된, CLI `mp3gain.exe` 를 호출하는 프런트엔드**다. 소스를 로컬에 보관(git·배포물 제외). GUI 관련 작업에서 화면 구성·동작을 관찰·참고하되 코드는 옮기지 않는다(2.2).
 - **이 미러의 `.c` 는 크롤 불가**(`application/octet-stream` MIME). 그래서 C·VB 소스는 로컬 보관 + 사용자가 붙여넣어 제공. Claude 가 크롤로 가져오려 시도하지 말 것.
-- 원본 exe 는 코드가 아니라 실행 결과만 검증 기준으로 쓴다(2.2 의 "관찰된 동작 차용"). mutagen 상호운용·exe dB 대조는 `_local/manual_checks/` 에서 로컬 수동 실행.
+- 원본 exe 는 코드가 아니라 실행 결과만 검증 기준으로 쓴다(2.2 의 "관찰된 동작 차용"). 원본 exe dB 대조는 `_local/` 의 수동 검증 스크립트로 로컬 실행.
 
 ## 6. 새 세션 시작법
 
@@ -251,7 +251,7 @@ git 이 추적하는 것(= GitHub 공개 대상)은 위 트리에서 `_local/`·
 - **로그 기능 정책**: (1) on/off UX = 체크박스 노출(enabled/path 분리). (2) dB 표기 = 정밀값 `FIVELOG10TWO`. (3) 타임스탬프 = ISO 8601 고정. (4) Album Analysis Log = 그룹당 한 줄. 구현: `gui/logging.py`(Qt 비의존) + `logs_dialog.py` + main_window 배선. QSettings `logs/*` 영속화.
 - **트레이 기능 정책**: Options 체크(기본 꺼짐, QSettings `tray/*`) + 최소화 시 창 숨김·트레이 아이콘, 좌클릭/더블클릭/팝업 Restore, 팝업 Exit. X 는 실제 종료. macOS 는 자동 트레이 이동만 비활성. 아이콘 `gui/assets/GainDB.png`.
 - **버전·이름 단일 출처(확정)**: 정본은 `gaindb/__init__.py` 의 `__version__`·`PROGNAME`. `gaindb_cli.py`(`VERSION = __version__`)와 GUI About 이 이를 읽는다. 버전업 시 `__init__.py` 한 줄만 고치면 CLI·GUI 가 함께 따라간다. `pyproject.toml` version 은 빌드 메타라 릴리스 시 수동 갱신.
-- **검증 인프라(정책)**: 통합 테스트 스위트(`tests/`, unittest, 외부 의존 없음) — `python -m unittest discover -s tests` 전부 PASS(139건, skip=0). fixture 는 `tests/_gen_fixtures.py`(합성 생성기, git 공개)가 고정 시드 신호에서 생성하며 산출물은 `_local/test_audio/`(git 제외); ffmpeg 필요. 모든 테스트는 fixture 불간섭(tempfile 사본, `FixtureGuard` 오염 감시), 무손실은 `audio_body_sha256`(오디오 본문만 해시)로 판정. 255/0 클램프 비가역성은 값 단위 테스트(`test_clamp_reversibility`)로 별도 커버. mutagen 상호운용·원본 exe dB 대조는 오염 방지를 위해 `_local/manual_checks/`(git 제외)에서 로컬 수동 실행.
+- **검증 인프라(정책)**: 통합 테스트 스위트(`tests/`, unittest, 외부 의존 없음) — `python -m unittest discover -s tests` 전부 PASS(139건, skip=0). fixture 는 `tests/_gen_fixtures.py`(합성 생성기, git 공개)가 고정 시드 신호에서 생성하며 산출물은 `_local/test_audio/`(git 제외); ffmpeg 필요. 모든 테스트는 fixture 불간섭(tempfile 사본, `FixtureGuard` 오염 감시), 무손실은 `audio_body_sha256`(오디오 본문만 해시)로 판정. 255/0 클램프 비가역성은 값 단위 테스트(`test_clamp_reversibility`)로 별도 커버. 원본 exe dB 대조는 오염 방지를 위해 `_local/`(git 제외)의 수동 검증 스크립트로 로컬 실행.
 - **exe 빌드(확정)**: PyInstaller onedir + `--windowed`(`GainDB.spec`), `build_release.ps1` 이 clean→빌드→라이선스 복사·검증. onedir 로 Qt DLL 교체 가능성 유지=LGPLv3 준수(onefile 금지). 라이선스는 우리 3종 + Qt LGPL/GPL 전문(`licenses/qt/`, PySide6 6.11.1 이 텍스트 미동봉이라 고정 커밋 + 빌드 시 복사, 패키지 LICENSES 있으면 자동 복사 폴백). 근거·잔여는 비공개 라이선스 검토 문서(2.3) 1.6.1.
 - **산출물 용량 절감 보류(성능)**: onedir 산출물 ≈215MB(PySide6 ~92 + scipy ~69 + numpy ~26). `.spec` excludes 로는 안전한 절감이 어려움(scipy.signal 이 fft·spatial 등에 의존해 세밀 제외 시 앱이 깨짐, Qt 모듈 제외는 훅이 DLL 을 그대로 가져와 무효). 근본 절감은 `analysis.py` 의 scipy `lfilter` 의존을 numpy 구현으로 대체(scipy 제거 → 약 145MB)해야 하나, 코어 신호처리 변경이라 mp3gain 수치 호환 재검증 필요 → 별도 작업으로 보류(10.5). collect_submodules 제거로 빌드 시간은 단축됨.
 

@@ -43,10 +43,12 @@ class GroupByAlbumTest(BaseGainTest):
     """group_by_album 순수 로직(파일 불필요)."""
 
     def test_each_folder_is_album_groups_by_dirname(self):
+        # 플랫폼 네이티브 구분자로 경로를 구성한다(Windows 전용 리터럴 금지 —
+        # POSIX 에서는 백슬래시가 경로 구분자가 아니라 그룹핑이 깨진다).
         paths = [
-            r"C:\music\albumA\01.mp3",
-            r"C:\music\albumA\02.mp3",
-            r"C:\music\albumB\01.mp3",
+            os.path.join("music", "albumA", "01.mp3"),
+            os.path.join("music", "albumA", "02.mp3"),
+            os.path.join("music", "albumB", "01.mp3"),
         ]
         groups = api.group_by_album(paths, each_folder_is_album=True)
         self.assertEqual(len(groups), 2)
@@ -61,8 +63,8 @@ class GroupByAlbumTest(BaseGainTest):
 
     def test_whole_list_single_group(self):
         paths = [
-            r"C:\music\albumA\01.mp3",
-            r"C:\music\albumB\01.mp3",
+            os.path.join("music", "albumA", "01.mp3"),
+            os.path.join("music", "albumB", "01.mp3"),
         ]
         groups = api.group_by_album(paths, each_folder_is_album=False)
         self.assertEqual(len(groups), 1)

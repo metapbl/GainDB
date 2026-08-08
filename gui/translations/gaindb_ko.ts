@@ -15,13 +15,13 @@
     </message>
     <message>
         <location filename="../dialogs/about_dialog.py" line="67"/>
-        <source>This program is an independent Python implementation of the ReplayGain algorithm, producing gain results compatible with mp3gain.</source>
-        <translation>이 프로그램은 ReplayGain 알고리즘을 파이썬으로 독립 구현한 것으로, mp3gain 과 동일한 게인 결과를 냅니다.</translation>
+        <source>This program is a Python re-implementation of mp3gain, producing gain results compatible with it. Portions are adapted from the mp3gain sources (LGPL v2.1 or later).</source>
+        <translation>이 프로그램은 mp3gain 을 파이썬으로 재구현한 것으로, mp3gain 과 동일한 게인 결과를 냅니다. 코드의 일부는 mp3gain 소스(LGPL v2.1 이상)를 개작한 것입니다.</translation>
     </message>
     <message>
         <location filename="../dialogs/about_dialog.py" line="77"/>
-        <source>Licensed under the Apache License, Version 2.0.</source>
-        <translation>Apache License, Version 2.0 에 따라 배포됩니다.</translation>
+        <source>Licensed under the GNU LGPL v2.1 or later. Contains code adapted from mp3gain, Copyright (C) 2001-2009 Glen Sawyer and contributors.</source>
+        <translation>GNU LGPL v2.1 이상에 따라 배포됩니다. mp3gain(Copyright (C) 2001-2009 Glen Sawyer 외)에서 개작한 코드를 포함합니다.</translation>
     </message>
     <message>
         <location filename="../dialogs/about_dialog.py" line="86"/>

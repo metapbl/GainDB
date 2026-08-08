@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 META PUBLIC
 """255/0 클램프 비가역성 단위 테스트 (fixture·ffmpeg 불필요, 항상 실행).
 

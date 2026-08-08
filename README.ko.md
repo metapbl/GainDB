@@ -7,7 +7,7 @@ MP3 프레임의 `global_gain` 필드를 직접 조정해 음량을 바꾸므로
 없습니다. mp3gain 의 결과(동작·태그 포맷·출력·수치)와 호환되도록 일치시킨
 독립 재구현입니다.
 
-![License](https://img.shields.io/badge/license-Apache--2.0-blue)
+![License](https://img.shields.io/badge/license-LGPL--2.1--or--later-blue)
 ![Python](https://img.shields.io/badge/python-3.13%2B-blue)
 
 ## 기능
@@ -110,18 +110,21 @@ GUI 는 파일/폴더 목록, Track/Album 분석·게인, 우클릭 메뉴, 취�
 
 ## mp3gain 과의 관계
 
-Gain dB 는 **독립 재구현**입니다. 결과가 호환되도록 mp3gain 의 관찰된 동작,
-명령줄 옵션 체계, 파일·태그 포맷을 재현하지만, mp3gain 의 원본 소스 코드를
-포함하거나 그로부터 파생하지 **않습니다.** 음량 분석은 공개된 ReplayGain
-사양을 따르며, 필터 계수 값은 여러 독립 구현이 공유하는 공개 표준 수치입니다.
-자세한 내용은 `NOTICE` 파일을 참고하세요.
+Gain dB 는 **mp3gain 의 Python 재구현**입니다. 결과가 호환되도록 mp3gain 의
+관찰된 동작, 명령줄 옵션 체계, 파일·태그 포맷을 재현합니다. 코드의 일부
+(특히 태그 처리·무손실 게인 기록 모듈)는 GNU LGPL v2.1 이상으로 배포되는
+mp3gain C 소스를 기반으로 개작한 것이며, Gain dB 전체도 같은 라이선스로
+배포됩니다. 음량 분석은 공개된 ReplayGain 사양을 따르며, 필터 계수 값은
+여러 독립 구현이 공유하는 공개 표준 수치입니다. 자세한 내용은 `NOTICE`
+파일을 참고하세요.
 
 ## 라이선스
 
-Gain dB 는 **Apache License, Version 2.0** 으로 배포됩니다. 전문은 `LICENSE`
-파일, 고지·의존성 안내는 `NOTICE` 파일을 참고하세요.
+Gain dB 는 **GNU Lesser General Public License v2.1 이상
+(LGPL-2.1-or-later)** 으로 배포됩니다. 전문은 `LICENSE` 파일, 고지(mp3gain
+저작권 고지 포함)·의존성 안내는 `NOTICE` 파일을 참고하세요.
 
 의존성 라이선스: numpy·scipy 는 BSD-3-Clause, PySide6(Qt for Python)는
 LGPLv3 입니다. ffmpeg 는 동봉하지 않고 PATH 에서 호출합니다. 만약 ffmpeg
 빌드를 이 소프트웨어와 함께 배포한다면 LGPL 빌드를 쓰고 해당 라이선스를
-준수하세요(GPL 빌드는 이 프로젝트의 라이선스와 호환되지 않습니다).
+준수하세요.

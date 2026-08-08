@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 META PUBLIC
 """④ 옵션 파싱 단위 테스트 (parse_args 직접 호출, 외부 의존 없음).
 

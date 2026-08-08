@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 META PUBLIC
 """gui/dialogs/about_dialog.py - About dialog (independent implementation).
 
@@ -8,7 +8,7 @@ external). The name and version come from gaindb.__init__ (single source of
 truth); the icon comes from gui.resources.app_icon.
 
 i18n: user-facing strings are wrapped in tr() (context "AboutDialog"). License
-names (Apache License 2.0, LGPL v3, BSD 3-Clause) and bundled file names
+names (LGPL v2.1, LGPL v3, BSD 3-Clause) and bundled file names
 (LICENSE, NOTICE, THIRD_PARTY_LICENSES) are proper nouns and stay verbatim even
 in translation. The dialog is created/destroyed modally, so it is shown in the
 language in effect at creation time (no live LanguageChange handling needed).
@@ -64,9 +64,9 @@ class AboutDialog(QDialog):
 
         # --- Description ---
         desc = QLabel(self.tr(
-            "This program is an independent Python implementation of the "
-            "ReplayGain algorithm, producing gain results compatible with "
-            "mp3gain."
+            "This program is a Python re-implementation of mp3gain, "
+            "producing gain results compatible with it. Portions are "
+            "adapted from the mp3gain sources (LGPL v2.1 or later)."
         ), self)
         desc.setWordWrap(True)
         layout.addWidget(desc)
@@ -74,7 +74,9 @@ class AboutDialog(QDialog):
         # --- Copyright + license ---
         copyright_label = QLabel(
             "\u00a9 2026 META PUBLIC\n"
-            + self.tr("Licensed under the Apache License, Version 2.0."),
+            + self.tr("Licensed under the GNU LGPL v2.1 or later. "
+                      "Contains code adapted from mp3gain, "
+                      "Copyright (C) 2001-2009 Glen Sawyer and contributors."),
             self)
         copyright_label.setWordWrap(True)
         layout.addWidget(copyright_label)

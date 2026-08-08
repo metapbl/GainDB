@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 META PUBLIC
 """TrackAnalyzer 스트리밍 분석 = 통짜 분석 동일성 테스트.
 

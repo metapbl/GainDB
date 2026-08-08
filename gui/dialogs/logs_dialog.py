@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 META PUBLIC
 r"""gui/dialogs/logs_dialog.py — 로그 설정 다이얼로그(독립 구현).
 

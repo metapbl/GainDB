@@ -8,7 +8,7 @@ the loudness of MP3 files **without re-encoding**, by editing the MP3
 reproduces the results (behaviour, tag formats, output, numbers) of
 mp3gain while remaining compatible with it.
 
-![License](https://img.shields.io/badge/license-Apache--2.0-blue)
+![License](https://img.shields.io/badge/license-LGPL--2.1--or--later-blue)
 ![Python](https://img.shields.io/badge/python-3.13%2B-blue)
 
 ## What it does
@@ -115,22 +115,25 @@ and English/Korean localization.
 
 ## How this project relates to mp3gain
 
-Gain dB is an **independent re-implementation.** It reproduces the
+Gain dB is a **Python re-implementation of mp3gain.** It reproduces the
 observable behaviour, the command-line option scheme, and the file and tag
-formats of mp3gain so that results are compatible, but it does **not**
-contain or derive from any of mp3gain's original source code. Loudness
-analysis follows the publicly documented ReplayGain specification; the
-filter coefficient values are public standard numbers shared across
-independent implementations. See the `NOTICE` file for details.
+formats of mp3gain so that results are compatible. Portions of the code
+(in particular the tag handling and the lossless gain-writing modules) are
+based on, and adapted from, the mp3gain C sources, which are licensed
+under the GNU LGPL v2.1 or later; Gain dB as a whole is distributed under
+the same license. Loudness analysis follows the publicly documented
+ReplayGain specification; the filter coefficient values are public
+standard numbers shared across independent implementations. See the
+`NOTICE` file for details.
 
 ## License
 
-Gain dB is licensed under the **Apache License, Version 2.0**. See the
-`LICENSE` file for the full text and `NOTICE` for attribution and
-dependency notices.
+Gain dB is licensed under the **GNU Lesser General Public License,
+version 2.1 or (at your option) any later version (LGPL-2.1-or-later)**.
+See the `LICENSE` file for the full text and `NOTICE` for attribution
+(including the mp3gain copyright notices) and dependency notices.
 
 Dependency licenses: numpy and scipy are BSD-3-Clause; PySide6 (Qt for
 Python) is LGPLv3. ffmpeg is not bundled and is called from your PATH; if
 you choose to distribute an ffmpeg build alongside this software, use an
-LGPL build and follow its license terms (GPL builds are not compatible
-with this project's licensing).
+LGPL build and follow its license terms.

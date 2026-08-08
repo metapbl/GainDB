@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 META PUBLIC
 """GUI 순수 함수부 테스트(원본 음원·ffmpeg 불필요, 항상 실행).
 

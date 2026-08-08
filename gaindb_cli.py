@@ -1,10 +1,18 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 META PUBLIC
+# SPDX-FileCopyrightText: 2001-2009 Glen Sawyer and the mp3gain contributors
+#
+# The command-line option scheme and the execution-branch ordering of
+# this CLI follow those of mp3gain's mp3gain.c
+# (mp3gain, https://sourceforge.net/projects/mp3gain/,
+#  Copyright (C) 2001-2009 Glen Sawyer and contributors),
+# licensed under the GNU LGPL v2.1 or later. This file is distributed
+# under the same LGPL terms as part of Gain dB.
 """
-gaindb_cli.py - Gain dB unified CLI (independent re-implementation of the mp3gain option scheme)
+gaindb_cli.py - Gain dB unified CLI (mp3gain-compatible option scheme)
 
-Reproduces the option parsing and execution branches of the mp3gain CLI, written
-independently from public specifications and observed behaviour.
+Reproduces the option parsing and execution branches of the mp3gain CLI so
+that results and usage remain compatible. Help/usage prose is written anew.
 
 ================================================================================
 CLI I/O SPECIFICATION (user interface contract)
@@ -12,7 +20,7 @@ CLI I/O SPECIFICATION (user interface contract)
 Invocation:
     python gaindb_cli.py [options] <infile> [<infile 2> ...]
 
-Option tokens (mp3gain-compatible scheme; independent re-implementation):
+Option tokens (mp3gain-compatible scheme):
     A token is an option ONLY if it is exactly two characters and begins with
     '-' or '/'. The option argument, when required, is ALWAYS the next token
     (glued arguments like "-g3" are rejected -- agreed exception, CLAUDE.md 5.4).

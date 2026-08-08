@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 META PUBLIC
 """테스트 fixture 합성 생성기 (git 공개, 산출물은 _local/test_audio/ 로).
 

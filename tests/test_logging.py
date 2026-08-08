@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 META PUBLIC
 """tests/test_logging.py — gui/logging.py 순수 함수 검증(원본 음원·ffmpeg·Qt 불요).
 

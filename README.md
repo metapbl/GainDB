@@ -4,9 +4,7 @@ English | [한국어](README.ko.md)
 
 Lossless MP3 volume analysis and adjustment. Gain dB analyzes and changes
 the loudness of MP3 files **without re-encoding**, by editing the MP3
-`global_gain` field directly. It is an independent re-implementation that
-reproduces the results (behaviour, tag formats, output, numbers) of
-mp3gain while remaining compatible with it.
+`global_gain` field directly. It is a Python re-implementation of mp3gain; some modules are adapted from the mp3gain C sources and it is distributed under the same LGPL terms.
 
 ![License](https://img.shields.io/badge/license-LGPL--2.1--or--later-blue)
 ![Python](https://img.shields.io/badge/python-3.13%2B-blue)

@@ -1,11 +1,14 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 META PUBLIC
-"""원본 mp3gain CLI 와의 결과 대조 (PRD §1 성공 기준, D038, D048).
+"""원본 mp3gain CLI 와의 결과 대조 (PRD §1 성공 기준, D038, D049).
 
 같은 fixture 사본 두 벌에 원본 mp3gain 과 gaindb_cli 를 각각 실행해 비교한다.
-- `-o -a -c`(분석 + Album 적용): dB 는 0.1dB 이내, 나머지(스텝·peak·global gain
-  min/max)는 정확히 같음
-- `-s c -o`(적용 뒤 태그): dB 열은 0.1dB 이내, 나머지 열은 정확히 같음
+- `-o -a -c`(분석 + Album 적용): dB 는 0.1dB 이내, peak 는 상대 1e-4 이내,
+  나머지(스텝·global gain min/max)는 정확히 같음
+- `-s c -o`(적용 뒤 태그): dB 열은 0.1dB 이내, peak 열은 상대 1e-4 이내, 나머지
+  열은 정확히 같음
+peak 는 디코더(mpglib vs ffmpeg)에 따라 미세하게 다르고, 원본 mp3gain 끼리도 OS
+마다 다르다(D049).
 - `-u`(undo) 뒤: 오디오 본문 해시가 원본과 같음
 
 mp3gain 이 PATH 에 없으면 건너뛴다(로컬 Windows·CI Windows). CI 의 Ubuntu·macOS
@@ -25,6 +28,7 @@ from tests._support import BaseGainTest
 MP3GAIN = shutil.which("mp3gain")
 FIXTURES = ("test_gain_44k.mp3", "test_stereo_44k.mp3", "test_mono_44k.mp3")
 DB_TOL = 0.1
+PEAK_REL_TOL = 1e-4
 
 
 def _table(stdout: str) -> dict[str, list[str]]:
@@ -62,7 +66,8 @@ class Mp3gainParityTest(BaseGainTest):
         self.assertEqual(r.returncode, 0, f"{side} {args}: {r.stderr}")
         return r.stdout
 
-    def _assert_tables_equal(self, args: tuple[str, ...], db_cols: set[int]) -> None:
+    def _assert_tables_equal(self, args: tuple[str, ...], db_cols: set[int],
+                             peak_cols: set[int]) -> None:
         want = _table(self._run("mp3gain", *args))
         got = _table(self._run("gaindb", *args))
         print(f"\n[mp3gain {' '.join(args)}]\n  mp3gain: {want}\n  gaindb:  {got}")
@@ -73,6 +78,9 @@ class Mp3gainParityTest(BaseGainTest):
                 with self.subTest(args=args, row=key, col=i):
                     if i in db_cols:
                         self.assertLessEqual(abs(float(g) - float(w)), DB_TOL)
+                    elif i in peak_cols:
+                        self.assertLessEqual(abs(float(g) - float(w)),
+                                             PEAK_REL_TOL * abs(float(w)))
                     else:
                         self.assertEqual(float(g), float(w))
 
@@ -82,9 +90,9 @@ class Mp3gainParityTest(BaseGainTest):
         print(f"\nmp3gain version: {(mp3gain_version.stdout + mp3gain_version.stderr).strip()}")
 
         # 열: MP3 gain, dB gain, Max Amplitude, Max global_gain, Min global_gain
-        self._assert_tables_equal(("-o", "-a", "-c"), db_cols={1})
+        self._assert_tables_equal(("-o", "-a", "-c"), db_cols={1}, peak_cols={2})
         # 위 5열 + Album gain, Album dB gain, Album Max Amplitude, Album Max/Min global_gain
-        self._assert_tables_equal(("-s", "c", "-o"), db_cols={1, 6})
+        self._assert_tables_equal(("-s", "c", "-o"), db_cols={1, 6}, peak_cols={2, 7})
 
         for side in self.sides:
             self._run(side, "-u")

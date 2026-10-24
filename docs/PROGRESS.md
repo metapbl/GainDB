@@ -1,15 +1,16 @@
 # PROGRESS — Gain dB (GaindB)
 
 ## 상태
-- 단계: 8 구현 · 계획: docs/plans/2026-10-25-v060-release.md (active, 2026-10-25 승인) · 작업 0 완료(커밋 대기)
-- 버전: 0.5.1 · 테스트 139건 OK, 약 3분 (.venv Python 3.15.1, 2026-10-25)
-- 갱신: 2026-10-25 · 마지막 커밋: `4b9abb4 fix(tests): use portable path separators in group_by_album tests; bump version to 0.5.1`
+- 단계: 8 구현 · 계획: docs/plans/2026-10-25-v060-release.md (active, 2026-10-25 승인) · 작업 0~7 완료, 작업 8 CI 실패 조사 중
+- 버전: 0.5.1 · 테스트 150건 (로컬 OK, skip 1 = mp3gain 대조), 약 3분 (.venv Python 3.15.1)
+- 갱신: 2026-10-25 · 마지막 커밋: `b65e07c ci: run tests on Windows, macOS and Ubuntu with mp3gain parity` (push됨)
 
 ## 다음 할 일
-1. 작업 1 서술 정리 — README.md:7, README.ko.md:8, gui docstring 7곳. 이후 계획 파일 순서대로(2 ~ 10)
+1. 작업 8 CI 초록 만들기 — 미해결 2건 해결 후 재실행. 이후 작업 9 Release, 10 인수 확인
 
 ## 미해결
-- 없음
+- CI Ubuntu `test_clip_integration.test_prompt_yes_applies` 실패 — 단서: 프롬프트 `y`가 무시됨. 가설: ffmpeg/ffprobe가 stdin을 물려받아 먼저 읽음(`gaindb/decode.py`에 stdin 지정 없음, Windows는 재현 안 됨). run 40121876187
+- CI mp3gain 대조 peak 불일치(상대 3e-6 이내, 원본끼리도 OS마다 다름) — OPEN O18, D048 재검토
 
 ## 확인 대기 (사람만 확인 가능)
 - Release 전 Windows GUI 직접 클릭 1회 — 기대 결과: ffmpeg 못 찾음 대화상자 모양·링크, Album 분석·적용·undo가 정상

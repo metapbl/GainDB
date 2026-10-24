@@ -234,3 +234,7 @@ A: "승인합니다"
 Q: mp3gain 대조에서 peak(Max Amplitude, REPLAYGAIN_*_PEAK)를 어떻게 비교하나 (추천: 상대 1% 이내 + 로그)
 A: "정확히 같아야합니다"
 → D048. PRD §1 "같다"의 정의는 그대로(peak 포함 태그 값 일치, dB 필드만 0.1dB 이내)
+### Q047 · 2026-10-25 · 단계 8 (작업 8) · [U] · O18 peak 비교 재검토
+Q: CI에서 peak가 상대 3e-6 이내로 다르고 원본 mp3gain끼리도 OS마다 다름. D048(정확히 같음)을 어떻게 바꾸나 (추천: 상대 1e-4 이내)
+A: "추천안으로하고 나머지는 승인" (나머지 = decode.py ffmpeg/ffprobe stdin=DEVNULL 수정과 push)
+→ D049 (D048 대체). PRD §1 "같다"의 정의에 peak 필드 상대 1e-4 이내 추가

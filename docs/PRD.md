@@ -8,7 +8,7 @@
 - 해결할 문제: MP3 파일들의 음량을 재인코딩 없이(무손실) 고르게 맞춘다. mp3gain과 같은 결과를 내는 Python 재구현으로, Windows·macOS GUI까지 제공한다. [X] (D002)
 - 사용자 (누가, 몇 명, 어떤 기기): 개발자 본인(AVD로 받은 MP3의 후속 처리) + GitHub 공개 사용자. Windows·macOS 데스크톱. [X]
 - 성공 기준 (관찰 가능한 장면 하나): 폴더의 MP3를 GUI에서 Album 분석·적용하면 원본 mp3gain과 같은 dB·태그가 나오고, undo 하면 오디오가 원본과 비트 단위로 같게 돌아온다. [U] (D029)
-  - "같다"의 정의: dB는 0.1dB 이내(D005), global gain 최솟값·최댓값과 적용 스텝은 정확히 같음, 태그는 `-s c -o`로 읽은 REPLAYGAIN_*·MP3GAIN_* 값이 같음(dB 필드는 0.1dB 이내), undo 뒤 audio_body_sha256 같음. 대조 대상은 CI 러너의 패키지 mp3gain(버전은 CI 로그에 기록). [AI]
+  - "같다"의 정의: dB는 0.1dB 이내(D005), global gain 최솟값·최댓값과 적용 스텝은 정확히 같음, 태그는 `-s c -o`로 읽은 REPLAYGAIN_*·MP3GAIN_* 값이 같음(dB 필드는 0.1dB 이내, peak 필드는 상대 1e-4 이내 — D049), undo 뒤 audio_body_sha256 같음. 대조 대상은 CI 러너의 패키지 mp3gain(버전은 CI 로그에 기록). [AI]
 - 기한과 수명 (언제까지, 다 쓰면 폐기/유지): 공개 후 계속 유지. 이후 AVD와 연계해 다기능 유틸리티로 발전. [X] (D012)
 
 ## 2. 범위

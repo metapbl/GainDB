@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 META PUBLIC
-r"""gui/i18n.py — 다국어(한글/영문) 국제화 인프라(독립 구현).
+r"""gui/i18n.py — 다국어(한글/영문) 국제화 인프라.
 
 런타임 문자열 테이블 교체 + 영문 폴백 + 언어 메뉴 수동 전환 + 선택 언어
 영속화라는 동작을 Qt 표준 국제화 메커니즘으로 재현한다. 재현 대상은 이

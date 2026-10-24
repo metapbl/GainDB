@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 META PUBLIC
 r"""gui/main_window.py — 메인 창(8단계: Track + Album, 태그 스캔·분석·게인·팝업).
 
-메인 창의 화면 구성·동작을 관찰해 독립 구현한다. 파일/폴더 추가(버튼 +
+메인 창의 화면 구성·동작을 관찰해 작성했다. 파일/폴더 추가(버튼 +
 드래그앤드롭)·Clear·헤더 클릭 자연 정렬·Delete 키 선택 삭제·더블클릭 재생에
 더해, 파일 추가 시 태그를 백그라운드 워커로 읽어 표시하고, Track/Album 의
 Analysis 와 Gain 을 QThread 워커로 연결한다. 우클릭 팝업으로 Clear Analysis·

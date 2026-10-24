@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 META PUBLIC
-r"""gui/logging.py — 로그 파일 기록(독립 구현).
+r"""gui/logging.py — 로그 파일 기록.
 
 세 종류의 로그를 파일에 append 한다(관찰된 동작만 차용):
   - Error Log:    처리 중 오류를 남긴다.

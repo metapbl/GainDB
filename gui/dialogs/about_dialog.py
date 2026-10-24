@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 META PUBLIC
-"""gui/dialogs/about_dialog.py - About dialog (independent implementation).
+"""gui/dialogs/about_dialog.py - About dialog.
 
 Shows the program name, version, a one-line description, copyright, license,
 and third-party component notices (PySide6/Qt LGPLv3, NumPy/SciPy BSD, ffmpeg

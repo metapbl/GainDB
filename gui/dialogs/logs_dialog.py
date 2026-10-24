@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 # SPDX-FileCopyrightText: 2026 META PUBLIC
-r"""gui/dialogs/logs_dialog.py — 로그 설정 다이얼로그(독립 구현).
+r"""gui/dialogs/logs_dialog.py — 로그 설정 다이얼로그.
 
 "Options → Logs..." 로 여는 창으로, Error/Analysis/Change 세 로그의 파일
 경로를 지정한다(화면 구성·동작만 관찰 차용).

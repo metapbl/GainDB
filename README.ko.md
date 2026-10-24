@@ -4,7 +4,9 @@
 
 MP3 파일의 음량을 **무손실(재인코딩 없이)** 로 분석·조정하는 도구입니다.
 MP3 프레임의 `global_gain` 필드를 직접 조정해 음량을 바꾸므로 재인코딩이
-없습니다. mp3gain 기반 Python 재구현이며, 일부 모듈은 원본 C 소스의 개작입니다.
+없습니다. mp3gain 소스를 읽고 Python으로 리팩토링한 재구현(일부 모듈은 원본
+개작, LGPL 유지)으로, mp3gain 의 결과(동작·태그 포맷·출력·수치)와 호환되도록
+일치시켰습니다.
 
 ![License](https://img.shields.io/badge/license-LGPL--2.1--or--later-blue)
 ![Python](https://img.shields.io/badge/python-3.13%2B-blue)

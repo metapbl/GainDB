@@ -23,3 +23,6 @@ _local/
 .vscode/
 Thumbs.db
 .DS_Store
+
+# Claude Code personal settings
+.claude/settings.local.json

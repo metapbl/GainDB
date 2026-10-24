@@ -16,7 +16,7 @@ tempdir)를 상속하지 않고 unittest.TestCase 를 직접 쓴다. collect_mp3
 
 PySide6 미설치 환경에서는 모듈 로드가 실패하므로 상단에서 통째로 SkipTest
 한다. FileTableModel 은 QObject(위젯 아님)라 QApplication 없이 인스턴스화되나,
-안전을 위해 모듈 로드 시 QCoreApplication 이 없으면 하나 만들어 둔다.
+안전을 위해 모듈 로드 시 QApplication 이 없으면 하나 만들어 둔다.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ import unittest
 
 # PySide6/gui 의존은 있을 때만. 없으면 이 모듈 전체를 건너뛴다.
 try:
-    from PySide6.QtCore import QCoreApplication
+    from PySide6.QtWidgets import QApplication
     from gui.main_window import collect_mp3_paths
     from gui.model import FileTableModel
     from gaindb.api import (
@@ -40,8 +40,10 @@ try:
 
     # QObject 계열 인스턴스화를 위해 애플리케이션 객체를 한 번 확보한다
     # (위젯이 아니라 필수는 아니지만, Qt 초기화 경고를 피하기 위한 안전장치).
-    if QCoreApplication.instance() is None:
-        _app = QCoreApplication([])
+    # 같은 프로세스의 위젯 테스트(test_ffmpeg_locate)가 쓸 수 있게 QApplication.
+    if QApplication.instance() is None:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        _app = QApplication([])
 except Exception as _exc:  # noqa: BLE001 - import 실패 사유를 skip 메시지로
     _HAVE_GUI = False
     _IMPORT_ERROR = _exc

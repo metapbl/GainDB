@@ -95,6 +95,7 @@ GUI 무계산 원칙: 수치는 gaindb.api 가 계산한 것만 표시한다.
 
 from __future__ import annotations
 
+import html
 import os
 import subprocess
 import sys
@@ -107,7 +108,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox,
     QTableView, QToolBar, QProgressBar, QPushButton, QFileDialog,
     QAbstractItemView, QHeaderView, QRubberBand, QStyledItemDelegate, QMenu,
-    QSystemTrayIcon, QStyle, QApplication,
+    QSystemTrayIcon, QStyle, QApplication, QMessageBox,
 )
 
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence
@@ -129,6 +130,7 @@ from gui.i18n import resolve_language, save_language, install_translator
 from gaindb.api import (
     DEFAULT_TARGET_DB, recompute_target, shift_after_apply, group_by_album,
 )
+from gaindb.decode import DecodeError, find_ffmpeg
 
 # 진행바 세분 합산 스케일. 정수 진행바에 소수 진행(파일 내부 fraction)을 싣기
 # 위한 배율. 1000 이면 0.1% 단위(소수점 한 자리)까지 표현된다.
@@ -137,6 +139,12 @@ _PROGRESS_SCALE = 1000
 # QSettings 조직/앱 이름(크로스플랫폼: Win=레지스트리, macOS=plist).
 _SETTINGS_ORG = "GaindB"
 _SETTINGS_APP = "GaindB"
+
+# ffmpeg 를 못 찾았을 때 대화상자가 가리키는 README 설치 안내 절(언어별).
+_FFMPEG_HELP_URL = {
+    "ko": "https://github.com/metapbl/GainDB/blob/main/README.ko.md#ffmpeg-설치",
+    "en": "https://github.com/metapbl/GainDB/blob/main/README.md#installing-ffmpeg",
+}
 
 # 리스트뷰 스타일시트: 셀 테두리·헤더 섹션 구분선을 없애 선택 하이라이트가
 # 컬럼 경계에서 갈라지지 않고 행 전체로 이어지게 한다(완전 매끈). 선택 배경은
@@ -1267,6 +1275,21 @@ class MainWindow(QMainWindow):
         if folder:
             self._add_from([folder])
 
+    def _ffmpeg_missing(self) -> bool:
+        """분석 시작 전 ffmpeg 확인(F6). 없으면 안내 대화상자를 한 번 띄우고 True."""
+        try:
+            find_ffmpeg()
+        except DecodeError as exc:
+            url = _FFMPEG_HELP_URL.get(self._current_language, _FFMPEG_HELP_URL["en"])
+            QMessageBox.warning(
+                self, self.tr("ffmpeg not found"),
+                self.tr("Analysis needs ffmpeg and ffprobe, but they were not found.")
+                + "<br><br>" + html.escape(str(exc)) + "<br><br>"
+                + f'<a href="{url}">' + self.tr("How to install ffmpeg") + "</a>",
+            )
+            return True
+        return False
+
     def _on_analyze(self):
         if self._is_busy():
             return
@@ -1281,6 +1304,9 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(self.tr(
                 "Nothing to analyze (all selected files already have values)"
             ))
+            return
+
+        if self._ffmpeg_missing():
             return
 
         target_db = self.spin_target.value()
@@ -1370,6 +1396,9 @@ class MainWindow(QMainWindow):
 
         if not paths:
             self.statusBar().showMessage(self.tr("No files to analyze"))
+            return
+
+        if self._ffmpeg_missing():
             return
 
         each_folder = self.act_each_folder_album.isChecked()

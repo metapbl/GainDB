@@ -37,7 +37,7 @@ no equivalent in other formats. Other formats are out of scope.
 ## Requirements
 
 - **Python 3.13 or newer.**
-- **ffmpeg and ffprobe on your PATH.** Gain dB does not bundle ffmpeg; it
+- **ffmpeg and ffprobe.** Gain dB does not bundle ffmpeg; it
   calls it as an external process for PCM decoding. Install it yourself
   (see below).
 - **Python packages:** numpy, scipy (analysis) and PySide6 (GUI). These are
@@ -52,6 +52,14 @@ Download a build for your platform and make sure both `ffmpeg` and
   essentials" build)
 - **macOS:** https://evermeet.cx/ffmpeg/
 - **Linux:** https://johnvansickle.com/ffmpeg/ (static builds)
+
+Gain dB looks on your PATH first. If they are not there, it also checks
+these folders in order, using a folder only if it holds both programs:
+
+- **Windows:** `%LOCALAPPDATA%\Microsoft\WinGet\Links` (winget),
+  `C:\ffmpeg\bin`, `%ProgramFiles%\ffmpeg\bin`
+- **macOS:** `/opt/homebrew/bin`, `/usr/local/bin` (Homebrew; covers apps
+  started from Finder, which do not see your shell PATH)
 
 ## Installation
 

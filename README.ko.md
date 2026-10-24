@@ -35,7 +35,7 @@ Gain dB 는 **설계상 MP3 전용**입니다. 무손실 게인 기법은 MP3 �
 ## 요구 사항
 
 - **Python 3.13 이상.**
-- **PATH 에 ffmpeg 와 ffprobe.** Gain dB 는 ffmpeg 를 동봉하지 않고 PCM
+- **ffmpeg 와 ffprobe.** Gain dB 는 ffmpeg 를 동봉하지 않고 PCM
   디코딩을 위해 외부 프로세스로 호출합니다. 사용자가 직접 설치하세요(아래 참조).
 - **파이썬 패키지:** numpy, scipy(분석)와 PySide6(GUI). `requirements.txt`
   로 설치합니다.
@@ -48,6 +48,14 @@ Gain dB 는 **설계상 MP3 전용**입니다. 무손실 게인 기법은 MP3 �
 - **Windows:** https://www.gyan.dev/ffmpeg/builds/ ("release essentials" 빌드)
 - **macOS:** https://evermeet.cx/ffmpeg/
 - **Linux:** https://johnvansickle.com/ffmpeg/ (static builds)
+
+Gain dB 는 PATH 를 먼저 보고, 없으면 아래 폴더를 순서대로 확인합니다.
+두 프로그램이 모두 있는 폴더만 사용합니다:
+
+- **Windows:** `%LOCALAPPDATA%\Microsoft\WinGet\Links`(winget),
+  `C:\ffmpeg\bin`, `%ProgramFiles%\ffmpeg\bin`
+- **macOS:** `/opt/homebrew/bin`, `/usr/local/bin`(Homebrew. Finder 로 실행한
+  앱은 셸 PATH 를 보지 못하므로 이 폴더로 찾습니다)
 
 ## 설치
 

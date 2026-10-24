@@ -115,6 +115,42 @@ class NoFfmpegTest(BaseGainTest):
         self.assertIn("Searched: PATH", output)
         self.assertEqual([_sha256(Path(f)) for f in files], before)
 
+    def _window(self, lang: str):
+        """offscreen MainWindow. 사용자 설정을 건드리지 않게 QSettings 이름을 바꾼다."""
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtCore import QSettings
+        from PySide6.QtWidgets import QApplication
+        import gui.main_window as mw
+        QApplication.instance() or QApplication([])
+        for p in (mock.patch.object(mw, "_SETTINGS_ORG", "GaindBTest"),
+                  mock.patch.object(mw, "_SETTINGS_APP", "GaindBTest"),
+                  mock.patch.object(mw, "resolve_language", return_value=lang)):
+            p.start()
+            self.addCleanup(p.stop)
+        self.addCleanup(lambda: QSettings("GaindBTest", "GaindBTest").clear())
+        win = mw.MainWindow()
+        self.addCleanup(win.deleteLater)
+        win.model.add_paths([os.path.join(self._tmpdir, "a.mp3"),
+                             os.path.join(self._tmpdir, "b.mp3")])
+        return mw, win
+
+    def _assert_dialog_blocks(self, lang: str, handler: str, worker: str, anchor: str):
+        mw, win = self._window(lang)
+        with mock.patch.object(mw.QMessageBox, "warning") as warn, \
+                mock.patch.object(mw, worker) as w:
+            getattr(win, handler)()
+        self.assertEqual(warn.call_count, 1)
+        self.assertIn(anchor, warn.call_args.args[2])
+        w.assert_not_called()
+
+    def test_gui_album_shows_dialog_once_and_does_not_start(self):
+        self._assert_dialog_blocks("en", "_on_album_analyze", "AlbumAnalyzeWorker",
+                                   "README.md#installing-ffmpeg")
+
+    def test_gui_track_ko_links_korean_readme(self):
+        self._assert_dialog_blocks("ko", "_on_analyze", "AnalyzeWorker",
+                                   "README.ko.md#ffmpeg-설치")
+
     def test_cli_check_tags_needs_no_ffmpeg(self):
         f = self.copy_fixture("test_gain_44k.mp3")
         rc, output = self._run_inproc(["-s", "c", f])

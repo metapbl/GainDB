@@ -230,3 +230,7 @@ A: "네 승인합니다"
 Q: 문서 구성(CLAUDE.md·PROGRESS·REFERENCE·settings·훅)을 승인하는가. git 추적 범위는 추천안(모두 추적, settings.local.json만 제외)으로 둠
 A: "승인합니다"
 → CLAUDE.md 첫 줄 <!-- metarche -->, D047
+### Q046 · 2026-10-25 · 단계 8 (작업 6) · [U] · O17 peak 비교
+Q: mp3gain 대조에서 peak(Max Amplitude, REPLAYGAIN_*_PEAK)를 어떻게 비교하나 (추천: 상대 1% 이내 + 로그)
+A: "정확히 같아야합니다"
+→ D048. PRD §1 "같다"의 정의는 그대로(peak 포함 태그 값 일치, dB 필드만 0.1dB 이내)

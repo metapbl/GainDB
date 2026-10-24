@@ -133,6 +133,7 @@ def _probe_stream_info(path: Path) -> tuple[int, int, float]:
     try:
         proc = subprocess.run(
             cmd, capture_output=True, check=True,
+            stdin=subprocess.DEVNULL,  # 사용자 stdin(클리핑 y/n 응답)을 가로채지 않게
             creationflags=_NO_WINDOW,
         )
     except FileNotFoundError as exc:
@@ -184,8 +185,10 @@ def _spawn_ffmpeg(path: Path, out_channels: int) -> subprocess.Popen:
         "-",
     ]
     try:
+        # Linux 등의 ffmpeg 는 키 입력용으로 stdin 을 읽어 클리핑 y/n 응답을 삼킨다.
         return subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            cmd, stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             creationflags=_NO_WINDOW,
         )
     except FileNotFoundError as exc:

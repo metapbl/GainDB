@@ -238,3 +238,7 @@ A: "정확히 같아야합니다"
 Q: CI에서 peak가 상대 3e-6 이내로 다르고 원본 mp3gain끼리도 OS마다 다름. D048(정확히 같음)을 어떻게 바꾸나 (추천: 상대 1e-4 이내)
 A: "추천안으로하고 나머지는 승인" (나머지 = decode.py ffmpeg/ffprobe stdin=DEVNULL 수정과 push)
 → D049 (D048 대체). PRD §1 "같다"의 정의에 peak 필드 상대 1e-4 이내 추가
+### Q048 · 2026-10-25 · 단계 8 (작업 9 전) · [U] · AVD 동기화 시점·문구·함정
+Q: 코어 변경(find_ffmpeg, stdin)의 AVD 사본 동기화 시점 / gaindb_cli·README License의 "called from PATH" 문구 수정 / 함정 T13~T15 추가
+A: "avd는 gaindb작업이 완전히 종료되고 그 이후에 적용하는 것이 맞다고 생각하고있습니다. 1,2 추천대로, 함정추가승인, 작업9진행"
+→ D050. 문구 2건은 작업 9 버전 올림 커밋에서 수정, T13~T15 REFERENCE 추가

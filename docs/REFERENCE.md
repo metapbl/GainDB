@@ -62,6 +62,9 @@
 | T10 | exe에서 곡마다 콘솔 창 깜빡임 | `--windowed` exe는 자식에게 새 콘솔 할당 | subprocess에 CREATE_NO_WINDOW (94bed9f) | legacy 9 |
 | T11 | PyInstaller 빌드 실패 | 아이콘 .png는 Pillow 필요 | `gui/assets/GainDB.ico` 사용 | legacy 9 |
 | T12 | global_gain 값이 엉뚱함 | 사이드 정보 비트 오프셋이 MPEG 버전·채널 모드별로 다름 | frame.py 파서 기준, 샘플레이트 테스트로 고정 | legacy 9 |
+| T13 | Linux·macOS에서 클리핑 질문에 파이프로 준 `y`가 무시됨 (Windows는 정상) | ffmpeg/ffprobe가 부모 stdin을 물려받아 키 입력용으로 먼저 읽음 | 자식 프로세스는 `stdin=subprocess.DEVNULL` (dd4c421) | test_clip_integration (CI Ubuntu) |
+| T14 | 전체 테스트가 위젯 테스트에서 0xC0000409로 죽음 (단독 실행은 통과) | discover가 모든 모듈을 먼저 import하는데, test_gui_pure가 그때 `QCoreApplication`을 만들어 위젯 생성 불가 | 테스트의 Qt 앱은 offscreen `QApplication`으로 통일 | test_gui_pure, test_ffmpeg_locate |
+| T15 | 편집한 Windows 경로에 `\f`·`\b` 제어 문자가 들어감 | Bash heredoc으로 넘긴 Python 문자열에서 `\\`가 `\`로 바뀜 | 백슬래시가 든 편집은 Edit 도구로. 편집 뒤 제어 문자 검사 | 작업 3 (2026-10-25) |
 
 ## R§5 환경·도구
 - 개발 PC: Windows 11, PowerShell 7, Python 3.15 (`py` launcher; `python`은 스토어 별칭). `.venv`는 재생성 필요(D046).

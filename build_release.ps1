@@ -102,8 +102,15 @@ if ($missing) {
     throw "Build aborted: bundled licenses incomplete."
 }
 
+# --- 5. zip the whole onedir folder for GitHub Releases ------------------------
+$version = python -c "import gaindb; print(gaindb.__version__)"
+$zipPath = Join-Path $distDir "$appName-$version-windows.zip"
+Write-Host "-- zipping $zipPath" -ForegroundColor Yellow
+Compress-Archive -Path $appDir -DestinationPath $zipPath -Force
+
 Write-Host ""
 Write-Host "=== BUILD OK ===" -ForegroundColor Cyan
 Write-Host "App:      $appDir"
 Write-Host "Licenses: $licOutDir"
+Write-Host "Zip:      $zipPath"
 Write-Host "Reminder: distribute the WHOLE folder (onedir keeps Qt DLLs replaceable = LGPLv3)." -ForegroundColor DarkCyan

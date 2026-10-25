@@ -134,6 +134,6 @@ Gain dB 는 **GNU Lesser General Public License v2.1 이상
 저작권 고지 포함)·의존성 안내는 `NOTICE` 파일을 참고하세요.
 
 의존성 라이선스: numpy·scipy 는 BSD-3-Clause, PySide6(Qt for Python)는
-LGPLv3 입니다. ffmpeg 는 동봉하지 않고 PATH 에서 호출합니다. 만약 ffmpeg
+LGPLv3 입니다. ffmpeg 는 동봉하지 않고 PATH 또는 알려진 설치 폴더에서 찾아 호출합니다. 만약 ffmpeg
 빌드를 이 소프트웨어와 함께 배포한다면 LGPL 빌드를 쓰고 해당 라이선스를
 준수하세요.

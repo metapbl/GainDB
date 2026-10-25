@@ -181,7 +181,7 @@ class Options:
 def _show_version(out=sys.stderr):
     # Version banner: "<name> version <ver>". The ffmpeg note is Gain-dB-specific.
     print(f"{PROGNAME} version {VERSION}", file=out)
-    print("PCM decoding via ffmpeg (called from PATH)", file=out)
+    print("PCM decoding via ffmpeg (found on PATH or in a known install folder)", file=out)
 
 
 def _err_usage():
@@ -191,7 +191,7 @@ def _err_usage():
     not via an in-tree decoder.
     """
     _show_version()
-    print("PCM decoding uses ffmpeg (called from PATH)", file=sys.stderr)
+    print("PCM decoding uses ffmpeg (found on PATH or in a known install folder)", file=sys.stderr)
     print(f"Usage: {PROGNAME} [options] <infile> [<infile 2> ...]", file=sys.stderr)
     print("  --use -? or -h for a full list of options", file=sys.stderr)
     sys.exit(1)
@@ -258,7 +258,7 @@ def _full_usage():
     """
     _show_version()
     e = sys.stderr
-    print("PCM decoding uses ffmpeg (called from PATH)", file=e)
+    print("PCM decoding uses ffmpeg (found on PATH or in a known install folder)", file=e)
     print(f"Usage: {PROGNAME} [options] <infile> [<infile 2> ...]", file=e)
     print("options:", file=e)
     print("\t-v - print the version number", file=e)

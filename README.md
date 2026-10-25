@@ -143,6 +143,6 @@ See the `LICENSE` file for the full text and `NOTICE` for attribution
 (including the mp3gain copyright notices) and dependency notices.
 
 Dependency licenses: numpy and scipy are BSD-3-Clause; PySide6 (Qt for
-Python) is LGPLv3. ffmpeg is not bundled and is called from your PATH; if
+Python) is LGPLv3. ffmpeg is not bundled and is found on your PATH or in a known install folder; if
 you choose to distribute an ffmpeg build alongside this software, use an
 LGPL build and follow its license terms.

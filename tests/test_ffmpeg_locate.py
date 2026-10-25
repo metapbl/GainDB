@@ -151,6 +151,24 @@ class NoFfmpegTest(BaseGainTest):
         self._assert_dialog_blocks("ko", "_on_analyze", "AnalyzeWorker",
                                    "README.ko.md#ffmpeg-설치")
 
+    def test_gui_track_gain_on_unanalyzed_rows_shows_dialog(self):
+        self._assert_dialog_blocks("en", "_on_gain", "ApplyWorker",
+                                   "README.md#installing-ffmpeg")
+
+    def test_gui_album_gain_without_album_analysis_shows_dialog(self):
+        self._assert_dialog_blocks("en", "_on_album_gain", "AlbumApplyWorker",
+                                   "README.md#installing-ffmpeg")
+
+    def test_gui_track_gain_on_analyzed_rows_needs_no_ffmpeg(self):
+        mw, win = self._window("en")
+        for r in range(win.model.row_count()):
+            win.model.get_row(r).set_result({"status": "ok", "track_db": 0.0})
+        with mock.patch.object(mw.QMessageBox, "warning") as warn, \
+                mock.patch.object(mw, "ApplyWorker") as w:
+            win._on_gain()
+        warn.assert_not_called()
+        w.assert_called_once()
+
     def test_cli_check_tags_needs_no_ffmpeg(self):
         f = self.copy_fixture("test_gain_44k.mp3")
         rc, output = self._run_inproc(["-s", "c", f])

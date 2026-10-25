@@ -1354,6 +1354,12 @@ class MainWindow(QMainWindow):
             ))
             return
 
+        # 미분석 행은 워커가 먼저 분석(디코딩)하므로 그때만 ffmpeg 를 확인한다.
+        unanalyzed = any(self.model.get_row(r).needs_analysis() for r in rows
+                         if self.model.get_row(r) is not None)
+        if unanalyzed and self._ffmpeg_missing():
+            return
+
         target_db = self.spin_target.value()
         self._analyzed_count = 0
         self._applied_count = 0
@@ -1452,6 +1458,10 @@ class MainWindow(QMainWindow):
         # 대상 경로에 해당하는 씨앗만 추려 넘긴다(나머지는 워커가 분석).
         seed_raws = {p: self._album_raws[p]
                      for p in paths if p in self._album_raws}
+        # 히스토그램 씨앗이 없는 곡은 워커가 분석(디코딩)하므로 그때만 ffmpeg 를 확인한다.
+        if any("histogram" not in seed_raws.get(p, {}) for p in paths) \
+                and self._ffmpeg_missing():
+            return
 
         target_db = self.spin_target.value()
         self._analyzed_count = 0

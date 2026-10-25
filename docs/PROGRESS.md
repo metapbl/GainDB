@@ -1,13 +1,14 @@
 # PROGRESS — Gain dB (GaindB)
 
 ## 상태
-- 단계: 8 구현 · 계획: docs/plans/2026-10-25-v060-release.md (active, 2026-10-25 승인) · 작업 0~8 완료, 작업 9는 빌드·실기기 확인 통과, 태그·Release 대기
-- 버전: 0.6.0 · 테스트 153건 (로컬 OK, skip 1 = mp3gain 대조 / CI 3개 OS 초록, run 40182562880), 약 3분 (.venv Python 3.15.1)
-- 갱신: 2026-10-25 · 마지막 커밋: `7a62dae fix(gui): check ffmpeg before Gain buttons analyze unanalyzed files` (push됨)
+- 단계: 7 계획 대기 · 계획: docs/plans/2026-10-25-v060-release.md (done 2026-10-25) · 진행 중 계획 없음
+- 버전: 0.6.0 (GitHub Release v0.6.0 게시) · 테스트 153건 (로컬 OK, skip 1 = mp3gain 대조 / CI 3개 OS 초록, run 40189347661), 약 2~3분 (.venv Python 3.15.1)
+- 갱신: 2026-10-25 · 마지막 커밋: `6811d44 docs: record v0.6.0 device checks and update release notes` (태그 v0.6.0, push됨)
 
 ## 다음 할 일
-1. 작업 9 남은 것: `git tag v0.6.0` → 태그 push → `gh release create`(docs/release-notes-0.6.0.md, build\dist\GainDB-0.6.0-windows.zip). 이후 작업 10 인수 확인
-2. AVD 사본 동기화 (D012, D050): GaindB 계획 완료 뒤에 진행. 대상: `gaindb/decode.py`(find_ffmpeg, stdin=DEVNULL)
+1. AVD 사본 동기화 (D012, D050): 사용자가 별도로 진행. 대상: `gaindb/decode.py`(find_ffmpeg, stdin=DEVNULL)
+2. PRD F6 갱신 완료 (Gain 버튼 확인 시점 반영)
+3. 다음 계획 수립 여부 결정 (/metarche plan) — PRD §2.1 이번 작업 1~4 모두 완료
 
 ## 미해결
 - 없음
@@ -24,4 +25,8 @@
 - 0.5.0 승격 (3615722) · M3G_ERR_→ID3_ERR_ (c04ee35) · 버전 단일 출처 (bc8707a) · About 다이얼로그 (af750f8)
 - exe 빌드 레시피·라이선스 동봉 (2bcbdb3, aa68563) · exe 콘솔 깜빡임 수정 (94bed9f)
 - 2026-08 Apache-2.0 → LGPL-2.1-or-later 전환 (3dd1a72) · 0.5.1 (4b9abb4)
+- 2026-10-25 metarche 이관·venv 재생성 (7957ae1) · 서술 정리 (78eb02f)
+- 2026-10-25 F6 ffmpeg 찾기 (bda35e8~4ca74e6) · GUI Gain 버튼 확인 (7a62dae) · stdin 가로채기 수정 (dd4c421)
+- 2026-10-25 mp3gain·GUI 대조 테스트 (2c9ea54, 403ceb0, 01234bf) · CI 3개 OS (b65e07c)
+- 2026-10-25 v0.6.0 Release (97f4c31, 태그 6811d44) — 계획 2026-10-25-v060-release done
 - 2026-10-25 metarche 이관: PRD 승인, 결정 46개 기록 (커밋 전)

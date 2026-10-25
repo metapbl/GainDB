@@ -4,7 +4,7 @@ Lossless MP3 volume analysis and adjustment, a Python re-implementation refactor
 
 ### New
 - **ffmpeg is found outside PATH too.** If `ffmpeg`/`ffprobe` are not on PATH, Gain dB now checks known install folders: winget Links, `C:\ffmpeg\bin`, `%ProgramFiles%\ffmpeg\bin` on Windows, and `/opt/homebrew/bin`, `/usr/local/bin` on macOS (apps started from Finder do not see your shell PATH). Both programs must come from the same place.
-- **GUI: clear message when ffmpeg is missing.** Track/Album analysis now shows one dialog with the folders that were searched and a link to the install guide, instead of failing file by file. Gain apply, undo and tag check/delete still work without ffmpeg.
+- **GUI: clear message when ffmpeg is missing.** Track/Album Analysis, and Track/Album Gain on files that still need analysis, now show one dialog with the folders that were searched and a link to the install guide, instead of failing file by file. Applying gain to already analyzed files, undo and tag check/delete still work without ffmpeg.
 
 ### Fixed
 - On Linux/macOS, an answer piped to the clipping prompt (`echo y | ...`) could be swallowed by ffmpeg. ffmpeg/ffprobe no longer read your stdin.

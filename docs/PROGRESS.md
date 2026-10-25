@@ -1,20 +1,19 @@
 # PROGRESS — Gain dB (GaindB)
 
 ## 상태
-- 단계: 8 구현 · 계획: docs/plans/2026-10-25-v060-release.md (active, 2026-10-25 승인) · 작업 0~8 완료 (CI 3개 OS 초록, run 40123515939)
-- 버전: 0.5.1 · 테스트 150건 (로컬 OK, skip 1 = mp3gain 대조 / CI Ubuntu·macOS는 대조 포함 OK), 약 3분 (.venv Python 3.15.1)
-- 갱신: 2026-10-25 · 마지막 커밋: `dd4c421 fix(decode): keep ffmpeg/ffprobe from reading the user's stdin` (push됨)
+- 단계: 8 구현 · 계획: docs/plans/2026-10-25-v060-release.md (active, 2026-10-25 승인) · 작업 0~8 완료, 작업 9는 빌드·실기기 확인 통과, 태그·Release 대기
+- 버전: 0.6.0 · 테스트 153건 (로컬 OK, skip 1 = mp3gain 대조 / CI 3개 OS 초록, run 40182562880), 약 3분 (.venv Python 3.15.1)
+- 갱신: 2026-10-25 · 마지막 커밋: `7a62dae fix(gui): check ffmpeg before Gain buttons analyze unanalyzed files` (push됨)
 
 ## 다음 할 일
-1. 작업 9 v0.6.0 Release — `gaindb/__init__.py`·`pyproject.toml` 0.6.0, `build_release.ps1`에 zip 단계, 릴리스 노트 초안. 이후 작업 10 인수 확인
+1. 작업 9 남은 것: `git tag v0.6.0` → 태그 push → `gh release create`(docs/release-notes-0.6.0.md, build\dist\GainDB-0.6.0-windows.zip). 이후 작업 10 인수 확인
 2. AVD 사본 동기화 (D012, D050): GaindB 계획 완료 뒤에 진행. 대상: `gaindb/decode.py`(find_ffmpeg, stdin=DEVNULL)
 
 ## 미해결
 - 없음
 
 ## 확인 대기 (사람만 확인 가능)
-- Release 전 Windows GUI 직접 클릭 1회 — 기대 결과: ffmpeg 못 찾음 대화상자 모양·링크, Album 분석·적용·undo가 정상
-- 오디오 경로(decode/scan/apply)를 바꾼 뒤 취소 — 기대 결과: 취소 후 audio_body_sha256이 원본과 같음
+- 없음 (2026-10-25 exe 실기기 확인 통과 — 계획 작업 9 결과~결과3)
 <!-- head:end — 이 줄 위(40줄 이내)만 자동 주입된다. 갱신은 이 위만 고친다. -->
 
 ## 완료 기록

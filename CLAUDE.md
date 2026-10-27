@@ -35,7 +35,6 @@ MP3 음량을 재인코딩 없이 분석·조정하는 도구. mp3gain 소스를
 - `docs/REFERENCE.md` — 근거·외부 사양·함정 대장. 필요한 절만 검색해 읽는다
 - `docs/plans/` — 작업 계획 (체크박스)
 - `docs/discovery/` — DECISIONS는 결정 확인용, QA_LOG는 검색만
-- `docs/legacy/CLAUDE.md` — 이관 전 문서 (참조용)
 - `_local/LICENSE_REVIEW.md` — 라이선스 검토 상세 (로컬 전용, 라이선스 작업 때만)
 
 ## 작업 기록

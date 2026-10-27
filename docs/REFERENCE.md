@@ -24,6 +24,8 @@
 - ffmpeg/ffprobe: 외부 프로세스, 동봉 안 함. Windows는 `creationflags=CREATE_NO_WINDOW` (T10). 찾는 위치는 PRD F6.
 - PySide6(LGPLv3)·numpy·scipy(BSD-3). exe는 onedir 필수(Qt DLL 교체 가능성 = LGPLv3) (D020).
 - 원본 저작권 헤더가 있는 파일: frame·id3·tag·writer·analysis·gaindb_cli. 라이선스 상세는 `_local/LICENSE_REVIEW.md`(로컬 전용).
+- 새 소스 파일을 추가하면 저작권 감사(원본 유래 식별 → 중립화 → 테스트 통과 → 커밋)를 거치고 `_local/LICENSE_REVIEW.md`에 기록한다. 기존 트리(코어·CLI·GUI·tests)는 감사 완료.
+- AVD가 `gaindb/` 코어를 소비할 때는 LGPL 의무(고지·해당 모듈 소스 제공·교체 가능성)도 함께 진다. 소비 방식(vendoring·pip)을 정할 때 다시 검토한다 (D012).
 
 ## R§3 설계 근거
 <!-- 내용은 docs/discovery/DECISIONS.md에 있다. 여기는 색인만. -->
@@ -48,6 +50,7 @@
 - D044·D045 — v0.6.0, Windows zip만
 
 ## R§4 함정 대장
+<!-- 근거 칸의 "legacy 9"는 삭제한 이관 전 문서 §9: git show 7957ae1:docs/legacy/CLAUDE.md -->
 | ID | 증상 | 원인 | 대처 | 근거 |
 |---|---|---|---|---|
 | T1 | mono 곡 라우드니스가 정확히 3dB 낮음 | ffmpeg `-ac 2` 업믹스가 채널당 1/√2 감쇠 | ffprobe로 채널 수 조회, mono는 `-ac 1` 디코딩 후 코드에서 복제 | legacy 9 |
@@ -65,6 +68,7 @@
 | T13 | Linux·macOS에서 클리핑 질문에 파이프로 준 `y`가 무시됨 (Windows는 정상) | ffmpeg/ffprobe가 부모 stdin을 물려받아 키 입력용으로 먼저 읽음 | 자식 프로세스는 `stdin=subprocess.DEVNULL` (dd4c421) | test_clip_integration (CI Ubuntu) |
 | T14 | 전체 테스트가 위젯 테스트에서 0xC0000409로 죽음 (단독 실행은 통과) | discover가 모든 모듈을 먼저 import하는데, test_gui_pure가 그때 `QCoreApplication`을 만들어 위젯 생성 불가 | 테스트의 Qt 앱은 offscreen `QApplication`으로 통일 | test_gui_pure, test_ffmpeg_locate |
 | T15 | 편집한 Windows 경로에 `\f`·`\b` 제어 문자가 들어감 | Bash heredoc으로 넘긴 Python 문자열에서 `\\`가 `\`로 바뀜 | 백슬래시가 든 편집은 Edit 도구로. 편집 뒤 제어 문자 검사 | 작업 3 (2026-10-25) |
+| T16 | exe 용량(≈215MB)을 `.spec` excludes로 줄이면 앱이 깨지거나 효과 없음 | scipy.signal이 fft·spatial 등에 의존, Qt 모듈은 훅이 DLL을 그대로 가져옴 | 근본 절감은 scipy `lfilter`를 numpy로 대체(≈145MB)뿐. 보류 항목(PRD §2.3), 하면 mp3gain 수치 재검증 | legacy 10.1 |
 
 ## R§5 환경·도구
 - 개발 PC: Windows 11, PowerShell 7, Python 3.15 (`py` launcher; `python`은 스토어 별칭). `.venv`는 재생성 필요(D046).

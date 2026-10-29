@@ -16,8 +16,11 @@
       "PowerShell(rm *_local*)"
     ],
     "deny": [
-      "Read(./.env)",
-      "Read(./.env.*)"
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(!.env.example)",
+      "Read(*.pem)",
+      "Read(*.key)"
     ]
   },
   "hooks": {

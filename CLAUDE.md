@@ -16,7 +16,7 @@ MP3 음량을 재인코딩 없이 분석·조정하는 도구. mp3gain 소스를
 - 전체 테스트: `.venv\Scripts\python.exe -m unittest discover -s tests` (작업마다 실행)
 - 실행: `.venv\Scripts\python.exe gaindb_cli.py -h` · `.venv\Scripts\python.exe -m gui`
 - 편집 때 자동 검사: `.claude/hooks/check.ps1`이 실행 (`py -m py_compile`)
-- 릴리스 빌드: `pwsh -File build_release.ps1` (실행 전 확인)
+- 릴리스 빌드: `pwsh -File build_release.ps1` (실행 전 확인). 빌드 전 `.venv\Scripts\python.exe -m pip_audit -r requirements.txt` (D054)
 
 ## 이 프로젝트의 규칙
 - MP3 전용. mp3gain과 결과(동작·태그 포맷·출력·수치)를 일치시키고, 기능을 빼거나 단순화하려면 먼저 사용자와 합의한다 (D001, D002)

@@ -242,3 +242,7 @@ A: "추천안으로하고 나머지는 승인" (나머지 = decode.py ffmpeg/ffp
 Q: 코어 변경(find_ffmpeg, stdin)의 AVD 사본 동기화 시점 / gaindb_cli·README License의 "called from PATH" 문구 수정 / 함정 T13~T15 추가
 A: "avd는 gaindb작업이 완전히 종료되고 그 이후에 적용하는 것이 맞다고 생각하고있습니다. 1,2 추천대로, 함정추가승인, 작업9진행"
 → D050. 문구 2건은 작업 9 버전 올림 커밋에서 수정, T13~T15 REFERENCE 추가
+### Q049 · 2026-10-29 · PRD 변경 (보안 정책) · [U] · O19~O24 보안 묶음
+Q: O19 보안 수준(추천 기본) / O20 지역·규제(추천 해당 없음) / O21 `C:\ffmpeg\bin` 심기 위험(추천 수용·기록) / O22 의존성 검사(추천 릴리스 전 pip-audit 수동) / O23 security-guidance 플러그인(추천 미사용) / O24 사고 대응(추천 본인·기본 절차)
+A: "추천대로"
+→ D051~D056

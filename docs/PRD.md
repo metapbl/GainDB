@@ -1,6 +1,6 @@
 # PRD — Gain dB (GaindB)
 
-상태: approved (2026-10-25) | 단계: 5 확정 | 갱신: 2026-10-25
+상태: approved (2026-10-29) | 단계: 5 확정 | 갱신: 2026-10-29
 <!-- 상태가 approved (YYYY-MM-DD)가 되기 전에는 코드·뼈대·의존성 설치를 하지 않는다. -->
 <!-- 모든 항목 끝에 출처를 단다: [U] 사용자 · [X] 기존 코드·문서 · [AI] AI 기본값. 근거 결정은 (D###). -->
 
@@ -35,6 +35,7 @@
 ### 2.6 제약 (법·라이선스·비용·개인정보)
 - 전체 LGPL-2.1-or-later, 원본 저작권 헤더 6파일 고지 의무. mp3gain 소스를 읽고 리팩토링한 개작임을 밝힌다. 변호사 검토 완료. 세부는 `_local/LICENSE_REVIEW.md`(로컬 전용). [X][U] (D006, D026, D027, D025)
 - ffmpeg 미동봉(사용자 설치). PySide6 LGPLv3 → exe는 onedir. [X][U] (D028, D020)
+- 보안: 수준 기본(로컬 단일 사용자, 계정·서버·네트워크 없음), 규제 해당 없음. 상세는 `docs/SECURITY_POLICY.md`. [U] (D051~D056)
 
 ## 3. 기능
 <!-- adopt: 흐름은 기존 문서, 인수 기준은 기존 테스트(tests/)에서 추출. F6은 새로 작성. -->
@@ -128,6 +129,7 @@
 - 전체 테스트 명령과 걸리는 시간: `python -m unittest discover -s tests` (139건). 약 3분 (184초, Python 3.15.1, 2026-10-25 측정, D046). [X]
 - 편집 때 자동 검사 (확장자별 린터·타입 검사 명령): `.py` → `python -m py_compile <파일>`. [U] (D040)
 - 위험한 명령 (실행 전 확인 대상): git push, git tag, gh release, build_release.ps1, `_local/` 삭제. [U] (D041)
+- 의존성 취약점 검사: 릴리스 빌드 전 `pip-audit -r requirements.txt` 수동 실행. lock 파일 없음. [U][AI] (D054)
 - 버전 관리 (커밋 단위, 메시지 형식): 의미 단위마다 커밋, Conventional Commits, 신원 metapbl / ggoyong2@gmail.com. [X] 브랜치는 main 하나. [U] (D030)
 
 ## 7. 미결
@@ -139,3 +141,4 @@
 | 2026-10-24 | adopt: 기존 CLAUDE.md·README·코드에서 초안 역추출 | Q001~Q022 |
 | 2026-10-25 | 질의응답 반영, PRD 검사 보완 | Q023~Q043, D026~D046 |
 | 2026-10-25 | 구현 반영: peak 허용 오차(§1), F6 GUI 확인 시점에 Gain 버튼 추가 | Q046~Q048, D048~D050, 실기기 확인 |
+| 2026-10-29 | 보안 정책 추가 (§2.6, §6, `docs/SECURITY_POLICY.md`) | Q049, D051~D056 |

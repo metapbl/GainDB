@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import sys
 
+from PySide6.QtCore import QSettings
 from PySide6.QtGui import QFont, QFontInfo
 from PySide6.QtWidgets import QApplication
 
+from gui import theme
 from gui.i18n import resolve_language, install_translator
 from gui.main_window import MainWindow
 from gui.resources import app_icon
@@ -45,6 +47,8 @@ def main() -> int:
     # 앱 아이콘: 작업표시줄/창/트레이 공용. 파일이 없으면 빈 QIcon(무해).
     app.setWindowIcon(app_icon())
     _apply_platform_font(app)
+    # 창을 만들기 전에 테마를 적용한다(저장값, 기본은 시스템 따라가기).
+    theme.apply_theme(app, QSettings("GaindB", "GaindB").value("ui/theme_mode", "system"))
 
     # 다국어: 창을 만들기 전에 언어를 결정·설치해 첫 화면부터 올바른 언어로
     # 뜨게 한다(저장값 우선, 없으면 시스템 로케일 감지 — gui/i18n 참조).

@@ -14,7 +14,7 @@ Set-Location $root
 
 $appName   = "GainDB"
 $buildDir  = Join-Path $root "build"
-$distDir   = Join-Path $buildDir "dist"          # onedir output -> build\dist\GainDB\
+$distDir   = Join-Path $root "dist"              # onedir output -> dist\GainDB\
 $workDir   = Join-Path $buildDir "pyinstaller"   # PyInstaller work dir
 $appDir    = Join-Path $distDir $appName
 $licOutDir = Join-Path $appDir "licenses"

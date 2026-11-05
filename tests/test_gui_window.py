@@ -7,6 +7,7 @@ from __future__ import annotations
 import ast
 import os
 import shutil
+import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -146,6 +147,76 @@ class AlbumGainBrokenFileTest(BaseGainTest):
         r = self.run_cli(["-o", "-a", "-c", *files["cli"]])
         album_steps = int(_table(r.stdout)["Album"][0])
         self.assertEqual(set(applied.values()), {album_steps})
+
+
+class LogsDialogTest(unittest.TestCase):
+    def setUp(self) -> None:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        from gui.dialogs.logs_dialog import LogsDialog
+        from gui.logging import LogConfig
+        QApplication.instance() or QApplication([])
+        self.config = LogConfig()
+        self.dialog = LogsDialog(self.config)
+        self.addCleanup(self.dialog.deleteLater)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.path = os.path.join(self.tmp.name, "error.log")
+
+    def browse(self, result: str):
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+        from PySide6.QtWidgets import QFileDialog
+        with mock.patch.object(QFileDialog, "getSaveFileName",
+                               return_value=(result, "")) as ask:
+            QTest.mouseClick(self.dialog._error.browse, Qt.MouseButton.LeftButton)
+        ask.assert_called_once()
+
+    def test_rows_are_usable_while_log_is_off(self):
+        row = self.dialog._error
+        self.assertFalse(row.check.isChecked())
+        self.assertTrue(row.browse.isEnabled())
+        self.assertTrue(row.edit.isEnabled())
+
+    def test_choosing_a_file_turns_the_log_on(self):
+        self.browse(self.path)
+        self.assertEqual(self.dialog._error.path, self.path)
+        self.assertTrue(self.dialog._error.enabled)
+
+    def test_cancelling_the_file_dialog_changes_nothing(self):
+        self.browse("")
+        self.assertEqual(self.dialog._error.path, "")
+        self.assertFalse(self.dialog._error.enabled)
+
+    def test_ok_saves_a_typed_path(self):
+        self.dialog._error.check.setChecked(True)
+        self.dialog._error.edit.setText(self.path)
+        self.dialog._on_ok()
+        self.assertTrue(self.config.error_enabled)
+        self.assertEqual(self.config.error_path, self.path)
+
+    def test_turning_off_keeps_the_path(self):
+        self.dialog._error.set_state(True, self.path)
+        self.dialog._error.check.setChecked(False)
+        self.dialog._on_ok()
+        self.assertFalse(self.config.error_enabled)
+        self.assertEqual(self.config.error_path, self.path)
+
+
+class DialogSmokeTest(WindowTestBase):
+    """슬롯 안의 예외는 exe 에서 보이지 않으므로 대화상자 진입 경로를 직접 돌려 본다."""
+
+    def test_dialog_handlers_run(self):
+        with mock.patch.object(self.mw.AboutDialog, "exec"), \
+                mock.patch.object(self.mw.LogsDialog, "exec"), \
+                mock.patch.object(self.mw.QFileDialog, "getOpenFileNames",
+                                  return_value=([], "")), \
+                mock.patch.object(self.mw.QFileDialog, "getExistingDirectory",
+                                  return_value=""):
+            self.win._on_about()
+            self.win._on_open_logs()
+            self.win._on_add_files()
+            self.win._on_add_folder()
 
 
 class DeleteKeyTest(WindowTestBase):

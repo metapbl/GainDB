@@ -21,6 +21,7 @@ Analysis numbers, tags and CLI output are unchanged from 0.6.0. This release is 
 - **Album Gain and broken files.** One unreadable MP3 in an album made Album Gain skip every file and report nothing. The broken file is now marked as failed and the rest of the album is processed, as Album Analysis and the CLI already did.
 - **Closing the window during a file change.** The window could force-stop a worker that was still writing a file after 10 seconds. It now waits for the write to finish.
 - **Korean status bar.** Many status bar messages stayed in English in the Korean UI. They are now translated as whole sentences.
+- **Log options: Browse did nothing.** The Browse buttons in Options > Logs did not open a file dialog. They now open the file dialog, stay available while a log is off, and choosing a file turns that log on.
 - The application name was still "MP3 Gain" in places. It is now "Gain dB".
 
 ### Verification

@@ -9,8 +9,9 @@ r"""gui/dialogs/logs_dialog.py — 로그 설정 다이얼로그.
 를 판정하는 대신, 체크박스를 노출해 on/off(체크박스)와 위치(경로)를 분리한다.
 이로써 로그를 잠깐 꺼도 경로가 사라지지 않고, on/off 상태가 화면에 드러난다.
 
-각 행 구성: [☑ 체크박스 라벨] [경로 입력칸] [Browse...]. 체크박스를 끄면 그 행의
-경로칸·Browse 버튼을 비활성화하되 경로 텍스트는 유지한다. OK 시 켜진 로그의
+각 행 구성: [☑ 체크박스 라벨] [경로 입력칸] [Browse...]. 체크박스는 "기록할지"만
+정하고 경로칸·Browse 는 항상 쓸 수 있다. Browse 로 파일을 고르면 체크가 켜진다.
+OK 시 켜진 로그의
 경로가 실제로 쓰기 가능한지 검사하고, 실패하면 경고 후 창을 닫지 않는다. 검증을
 통과하면 전달받은 LogConfig 를 갱신하고 accept.
 
@@ -40,31 +41,22 @@ class _LogRow:
         self.edit = QLineEdit(parent)
         self.edit.setToolTip(tooltip)
         self.browse = QPushButton(QCoreApplication.translate("LogsDialog", "Browse..."), parent)
-        self.check.toggled.connect(self._on_toggled)
         self.browse.clicked.connect(self._on_browse)
         self._parent = parent
         self._title = label
 
-    def _on_toggled(self, checked: bool):
-        # 껐을 때 경로 텍스트는 유지하되 편집·Browse 만 잠근다(A안 핵심 장점).
-        self.edit.setEnabled(checked)
-        self.browse.setEnabled(checked)
-
     def _on_browse(self):
         start = self.edit.text().strip()
-        caption = QCoreApplication.translate("LogsDialog", "Choose %1 file").arg(self._title)
+        caption = QCoreApplication.translate("LogsDialog", "Choose %1 file").replace("%1", self._title)
         path, _ = QFileDialog.getSaveFileName(
             self._parent, caption, start, self._parent.log_filter())
         if path:
             self.edit.setText(path)
+            self.check.setChecked(True)
 
     def set_state(self, enabled: bool, path: str):
         self.edit.setText(path or "")
         self.check.setChecked(bool(enabled))
-        # toggled 가 위에서 활성 상태를 맞추지만, 초기 unchecked→unchecked 로
-        # 신호가 안 올 수 있어 명시적으로 한 번 더 반영.
-        self.edit.setEnabled(bool(enabled))
-        self.browse.setEnabled(bool(enabled))
 
     @property
     def enabled(self) -> bool:

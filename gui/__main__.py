@@ -12,6 +12,7 @@ from PySide6.QtCore import QSettings
 from PySide6.QtGui import QFont, QFontInfo
 from PySide6.QtWidgets import QApplication
 
+from gaindb import PROGNAME
 from gui import theme
 from gui.i18n import resolve_language, install_translator
 from gui.main_window import MainWindow
@@ -43,7 +44,7 @@ def _apply_platform_font(app: QApplication) -> None:
 
 def main() -> int:
     app = QApplication(sys.argv)
-    app.setApplicationName("MP3 Gain")
+    app.setApplicationName(PROGNAME)
     # 앱 아이콘: 작업표시줄/창/트레이 공용. 파일이 없으면 빈 QIcon(무해).
     app.setWindowIcon(app_icon())
     _apply_platform_font(app)

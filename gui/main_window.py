@@ -297,7 +297,8 @@ class FileTableView(QTableView):
         self._rubber_additive = False
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Delete:
+        # macOS 의 delete 키는 Backspace 로 들어온다.
+        if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
             self.delete_requested.emit()
             event.accept()
             return
@@ -500,14 +501,12 @@ class MainWindow(QMainWindow):
         # Album 신규 액션(Track act_* 는 툴바에서 생성 후 공유).
         self.act_album_analyze = QAction(self.tr("Album Analysis"), self)
         self.act_album_analyze.setShortcut(QKeySequence("Ctrl+U"))
-        self.act_album_analyze.setToolTip(self.tr(
-            "Analyze album gain per folder/group without applying (Ctrl+U)"))
+        self._set_shortcut_tip(self.act_album_analyze, self.tr("Analyze album gain per folder/group without applying"))
         self.act_album_analyze.triggered.connect(self._on_album_analyze)
 
         self.act_album_gain = QAction(self.tr("Album Gain"), self)
         self.act_album_gain.setShortcut(QKeySequence("Ctrl+B"))
-        self.act_album_gain.setToolTip(self.tr(
-            "Apply album gain to files per folder/group (Ctrl+B)"))
+        self._set_shortcut_tip(self.act_album_gain, self.tr("Apply album gain to files per folder/group"))
         self.act_album_gain.triggered.connect(self._on_album_gain)
 
         # Clear Analysis(선택 행 표시 리셋) — 팝업 핸들러 재사용.
@@ -567,6 +566,11 @@ class MainWindow(QMainWindow):
         self.act_about.setToolTip(self.tr(
             "Show program information and license notices"))
         self.act_about.triggered.connect(self._on_about)
+
+    def _set_shortcut_tip(self, action: QAction, text: str) -> None:
+        """툴팁 끝에 단축키를 OS 표기(macOS 는 ⌘)로 붙인다."""
+        shortcut = action.shortcut().toString(QKeySequence.SequenceFormat.NativeText)
+        action.setToolTip(f"{text} ({shortcut})")
 
     def _add_theme_action(self, text: str, mode: str, saved_mode: str) -> QAction:
         action = QAction(text, self)
@@ -679,26 +683,21 @@ class MainWindow(QMainWindow):
 
         # Track 액션.
         self.act_add_files.setText(self.tr("Add Files"))
-        self.act_add_files.setToolTip(self.tr("Add MP3 files to the list (Ctrl+F)"))
+        self._set_shortcut_tip(self.act_add_files, self.tr("Add MP3 files to the list"))
         self.act_add_folder.setText(self.tr("Add Folder"))
-        self.act_add_folder.setToolTip(self.tr(
-            "Add all MP3 files in a folder (Ctrl+D)"))
+        self._set_shortcut_tip(self.act_add_folder, self.tr("Add all MP3 files in a folder"))
         self.act_analyze.setText(self.tr("Track Analysis"))
-        self.act_analyze.setToolTip(self.tr(
-            "Analyze track gain without applying (Ctrl+T)"))
+        self._set_shortcut_tip(self.act_analyze, self.tr("Analyze track gain without applying"))
         self.act_gain.setText(self.tr("Track Gain"))
-        self.act_gain.setToolTip(self.tr("Apply track gain to files (Ctrl+G)"))
+        self._set_shortcut_tip(self.act_gain, self.tr("Apply track gain to files"))
         self.act_clear.setText(self.tr("Clear All"))
-        self.act_clear.setToolTip(self.tr(
-            "Clear all files from the list (Ctrl+Shift+Delete)"))
+        self._set_shortcut_tip(self.act_clear, self.tr("Clear all files from the list"))
 
         # Album 액션.
         self.act_album_analyze.setText(self.tr("Album Analysis"))
-        self.act_album_analyze.setToolTip(self.tr(
-            "Analyze album gain per folder/group without applying (Ctrl+U)"))
+        self._set_shortcut_tip(self.act_album_analyze, self.tr("Analyze album gain per folder/group without applying"))
         self.act_album_gain.setText(self.tr("Album Gain"))
-        self.act_album_gain.setToolTip(self.tr(
-            "Apply album gain to files per folder/group (Ctrl+B)"))
+        self._set_shortcut_tip(self.act_album_gain, self.tr("Apply album gain to files per folder/group"))
 
         # 분석/수정/옵션 부속 액션.
         self.act_clear_analysis.setText(self.tr("Clear Analysis"))
@@ -761,14 +760,13 @@ class MainWindow(QMainWindow):
 
         self.act_add_files = QAction(self.tr("Add Files"), self)
         self.act_add_files.setShortcut(QKeySequence("Ctrl+F"))
-        self.act_add_files.setToolTip(self.tr("Add MP3 files to the list (Ctrl+F)"))
+        self._set_shortcut_tip(self.act_add_files, self.tr("Add MP3 files to the list"))
         self.act_add_files.triggered.connect(self._on_add_files)
         tb.addAction(self.act_add_files)
 
         self.act_add_folder = QAction(self.tr("Add Folder"), self)
         self.act_add_folder.setShortcut(QKeySequence("Ctrl+D"))
-        self.act_add_folder.setToolTip(self.tr(
-            "Add all MP3 files in a folder (Ctrl+D)"))
+        self._set_shortcut_tip(self.act_add_folder, self.tr("Add all MP3 files in a folder"))
         self.act_add_folder.triggered.connect(self._on_add_folder)
         tb.addAction(self.act_add_folder)
 
@@ -776,14 +774,13 @@ class MainWindow(QMainWindow):
 
         self.act_analyze = QAction(self.tr("Track Analysis"), self)
         self.act_analyze.setShortcut(QKeySequence("Ctrl+T"))
-        self.act_analyze.setToolTip(self.tr(
-            "Analyze track gain without applying (Ctrl+T)"))
+        self._set_shortcut_tip(self.act_analyze, self.tr("Analyze track gain without applying"))
         self.act_analyze.triggered.connect(self._on_analyze)
         tb.addAction(self.act_analyze)
 
         self.act_gain = QAction(self.tr("Track Gain"), self)
         self.act_gain.setShortcut(QKeySequence("Ctrl+G"))
-        self.act_gain.setToolTip(self.tr("Apply track gain to files (Ctrl+G)"))
+        self._set_shortcut_tip(self.act_gain, self.tr("Apply track gain to files"))
         self.act_gain.triggered.connect(self._on_gain)
         tb.addAction(self.act_gain)
 
@@ -796,10 +793,10 @@ class MainWindow(QMainWindow):
         tb.addSeparator()
 
         self.act_clear = QAction(self.tr("Clear All"), self)
-        self.act_clear.setShortcut(QKeySequence("Ctrl+Shift+Delete"))
-        self.act_clear.setToolTip(self.tr(
-            "Clear all files from the list (Ctrl+Shift+Delete)"
-        ))
+        # macOS 의 delete 키는 Backspace 로 들어온다.
+        self.act_clear.setShortcuts([QKeySequence("Ctrl+Shift+Delete"),
+                                     QKeySequence("Ctrl+Shift+Backspace")])
+        self._set_shortcut_tip(self.act_clear, self.tr("Clear all files from the list"))
         self.act_clear.triggered.connect(self._on_clear)
         tb.addAction(self.act_clear)
 

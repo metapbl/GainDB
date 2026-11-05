@@ -155,11 +155,16 @@ class DeleteKeyTest(WindowTestBase):
         self.press(Qt.Key.Key_Delete)
         self.assertEqual(self.win.model.rowCount(), 1)
 
-    def test_backspace_keeps_rows(self):
+    def test_backspace_removes_selected_row(self):
         from PySide6.QtCore import Qt
         self.win.table.selectRow(0)
         self.press(Qt.Key.Key_Backspace)
-        self.assertEqual(self.win.model.rowCount(), 2)
+        self.assertEqual(self.win.model.rowCount(), 1)
+
+    def test_shortcut_tooltip_uses_native_text(self):
+        from PySide6.QtGui import QKeySequence
+        native = QKeySequence("Ctrl+F").toString(QKeySequence.SequenceFormat.NativeText)
+        self.assertTrue(self.win.act_add_files.toolTip().endswith(f"({native})"))
 
 
 class ThemeMenuTest(WindowTestBase):

@@ -1,19 +1,19 @@
 # PROGRESS — Gain dB (GaindB)
 
 ## 상태
-- 단계: 8 구현 · 계획: docs/plans/2026-11-05-v100-theme-ux.md (active, 작업 17개)
-- 버전: 0.6.0 (GitHub Release v0.6.0 게시) · 테스트 153건 (로컬 OK, skip 1 = mp3gain 대조 / CI 3개 OS 초록, run 40189347661), 약 2~3분 (.venv Python 3.15.1)
+- 단계: 8 구현 · 계획: docs/plans/2026-11-05-v100-theme-ux.md (active, 작업 14 마무리 중)
+- 버전: 1.0.0 준비 중 (게시는 0.6.0까지) · 테스트 171건 (로컬 OK, skip 2 = mp3gain 대조 / CI 3개 OS 초록, run 41944181600), 약 2분 (.venv Python 3.15.1)
 - 갱신: 2026-11-05 · 태그 v0.6.0 = 6811d44 · 보안 정책 승인 (docs/SECURITY_POLICY.md, 수준 기본, D051~D056)
 
 ## 다음 할 일
 1. AVD 사본 동기화 (D012, D050): 사용자가 별도로 진행. 대상: `gaindb/decode.py`(find_ffmpeg, stdin=DEVNULL)
-2. v1.0.0 계획 작업 1부터 진행 (테마·UX·macOS 러너 검증, D057~D063)
+2. v1.0.0 작업 15 실기기 확인 → 16 Release → 17 인수 확인. macOS 라이트 화면 캡처 재확인 필요 (작업 14)
 
 ## 미해결
 - 없음
 
 ## 확인 대기 (사람만 확인 가능)
-- 없음 (2026-10-25 exe 실기기 확인 통과 — 계획 작업 9 결과~결과3)
+- 작업 15: Windows 빌드 `build/dist/GainDB/GainDB.exe`로 메뉴·대화상자·트레이·테마 전환·끌어다 놓기 확인
 <!-- head:end — 이 줄 위(40줄 이내)만 자동 주입된다. 갱신은 이 위만 고친다. -->
 
 ## 완료 기록

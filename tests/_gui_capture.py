@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -84,7 +85,10 @@ def main() -> int:
         from gui import theme
         for mode in ("dark", "light"):
             theme.apply_theme(app, mode)
-            app.processEvents()
+            # 화면 전체 캡처는 창이 실제로 다시 그려진 뒤에 찍어야 한다.
+            deadline = time.monotonic() + 1.0
+            while time.monotonic() < deadline:
+                app.processEvents()
             shot(f"theme_{mode}")
             screen(f"screen_{mode}")
 

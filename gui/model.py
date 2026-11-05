@@ -10,6 +10,7 @@ from typing import Any, Optional
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QColor
 
+from gui import theme
 from gui.columns import COLUMNS, COLUMN_COUNT, Col
 
 # Custom role used by the sort proxy to fetch the raw (typed) sort value
@@ -94,12 +95,18 @@ def _fmt_int(value: Optional[int]) -> str:
     return "" if value is None else str(value)
 
 
-# Warning colors only. "none" is intentionally left unset so the OS palette
-# supplies the correct text color (fixes invisible black text in dark mode).
+# Warning colors only (theme token names). "none" is intentionally left unset so
+# the palette supplies the normal text color.
 _CLIP_COLORS = {
-    "possible": QColor(0, 0, 255),   # blue
-    "definite": QColor(255, 0, 0),   # red
+    "possible": "accent",
+    "definite": "danger",
 }
+
+
+def _clip_color(state) -> Optional[QColor]:
+    name = _CLIP_COLORS.get(state)
+    return QColor(theme.color(name)) if name else None
+
 
 _CLIP_TEXT = {
     "none": "",
@@ -149,9 +156,9 @@ class FileTableModel(QAbstractTableModel):
             # Track clip 은 clip_state, Album clip 은 album_clip_state 로 색칠.
             if row.result:
                 if col.index == Col.CLIP:
-                    return _CLIP_COLORS.get(row.result.get("clip_state"))
+                    return _clip_color(row.result.get("clip_state"))
                 if col.index == Col.ALBUM_CLIP:
-                    return _CLIP_COLORS.get(row.result.get("album_clip_state"))
+                    return _clip_color(row.result.get("album_clip_state"))
             return None
 
         if role == Qt.ItemDataRole.TextAlignmentRole:

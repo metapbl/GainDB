@@ -46,19 +46,25 @@ class WindowTestBase(unittest.TestCase):
 
 
 class ClipColorTest(WindowTestBase):
-    def test_clip_colors(self):
+    def test_clip_colors_follow_theme(self):
         from PySide6.QtCore import Qt
         from PySide6.QtGui import QColor
+        from gui import theme
         from gui.columns import Col
         row = self.win.model.get_row(0)
         index = self.win.model.index(0, int(Col.CLIP))
         role = Qt.ItemDataRole.ForegroundRole
-        row.result = {"clip_state": "possible"}
-        self.assertEqual(self.win.model.data(index, role), QColor(0, 0, 255))
-        row.result = {"clip_state": "definite"}
-        self.assertEqual(self.win.model.data(index, role), QColor(255, 0, 0))
-        row.result = {"clip_state": "none"}
-        self.assertIsNone(self.win.model.data(index, role))
+        for mode in ("dark", "light"):
+            with self.subTest(mode=mode):
+                theme.apply_theme(self.app, mode)
+                row.result = {"clip_state": "possible"}
+                self.assertEqual(self.win.model.data(index, role),
+                                 QColor(theme.color("accent")))
+                row.result = {"clip_state": "definite"}
+                self.assertEqual(self.win.model.data(index, role),
+                                 QColor(theme.color("danger")))
+                row.result = {"clip_state": "none"}
+                self.assertIsNone(self.win.model.data(index, role))
 
 
 class DeleteKeyTest(WindowTestBase):

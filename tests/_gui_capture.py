@@ -47,6 +47,9 @@ def main() -> int:
     before = {p: hash_of(p) for p in good}
 
     app = QApplication(sys.argv[:1])
+    if importlib.util.find_spec("gui.theme"):
+        from gui import theme
+        theme.apply_theme(app, "dark")
     print("platform:", app.platformName(), flush=True)
 
     from gui.main_window import MainWindow

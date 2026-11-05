@@ -80,10 +80,9 @@ Path\File 컬럼은 PathElideDelegate 로 그린다: 경로를 먼저 접고(C:\
 가로 스크롤 — 창 크기와 독립)로 두고, "Reset Column Widths" 는 columns.py 의
 default_width 로 되돌린다. 정렬 상태 저장은 확장 기능이다.
 
-선택 하이라이트 이어짐(완전 매끈): 스타일시트로 셀 테두리와 헤더 섹션 구분선을
-없애고, 선택 시 행 전체에 팔레트 Highlight 색을 균일하게 깔아 컬럼 경계에서
-선택색이 갈라지지 않게 한다(FullRowSelect 동작에 부합). 다크테마 팔레트 색을
-그대로 쓰므로 팔레트 위임 원칙을 깨지 않는다.
+선택 하이라이트 이어짐(완전 매끈): 스타일시트로 셀 테두리를 없애고, 선택 시 행
+전체에 테마의 선택색을 균일하게 깔아 컬럼 경계에서 선택색이 갈라지지 않게 한다
+(FullRowSelect 동작에 부합).
 
 GUI 무계산 원칙: 수치는 gaindb.api 가 계산한 것만 표시한다.
 정렬 순서는 프록시(뷰) 좌표, 실제 데이터는 원본 모델 좌표이므로
@@ -111,8 +110,9 @@ from PySide6.QtWidgets import (
     QSystemTrayIcon, QStyle, QApplication, QMessageBox,
 )
 
-from PySide6.QtGui import QAction, QActionGroup, QKeySequence
+from PySide6.QtGui import QAction, QActionGroup, QColor, QKeySequence
 
+from gui import theme
 from gui.model import FileTableModel, SORT_ROLE
 from gui.columns import Col, COLUMNS, COLUMN_COUNT
 from gui.workers import (
@@ -146,28 +146,16 @@ _FFMPEG_HELP_URL = {
     "en": "https://github.com/metapbl/GainDB/blob/main/README.md#installing-ffmpeg",
 }
 
-# 리스트뷰 스타일시트: 셀 테두리·헤더 섹션 구분선을 없애 선택 하이라이트가
-# 컬럼 경계에서 갈라지지 않고 행 전체로 이어지게 한다(완전 매끈). 선택 배경은
-# 팔레트 Highlight 색을 그대로 써 다크테마 팔레트 위임을 깨지 않는다.
+# 리스트뷰 스타일시트: 표 테두리와 셀 테두리를 없애 선택 하이라이트가 컬럼 경계에서
+# 갈라지지 않고 행 전체로 이어지게 한다(완전 매끈). 색은 공통 테마가 정한다.
 _TABLE_QSS = """
 QTableView {
     border: none;
-    gridline-color: transparent;
     outline: none;
 }
 QTableView::item {
     border: 0px;
     padding: 0px 2px;
-}
-QTableView::item:selected {
-    background: palette(highlight);
-    color: palette(highlighted-text);
-}
-QHeaderView::section {
-    border: none;
-    border-right: 1px solid palette(mid);
-    border-bottom: 1px solid palette(mid);
-    padding: 2px 4px;
 }
 """
 
@@ -268,12 +256,8 @@ class PathElideDelegate(QStyledItemDelegate):
         avail = text_rect.width() - 4
         shown = self._elide_path(str(text), max(avail, 0), fm)
 
-        if opt.state & QStyle.StateFlag.State_Selected:
-            color = opt.palette.highlightedText().color()
-        else:
-            color = opt.palette.text().color()
         painter.save()
-        painter.setPen(color)
+        painter.setPen(QColor(theme.color("text")))
         painter.drawText(
             text_rect.adjusted(2, 0, -2, 0),
             int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),

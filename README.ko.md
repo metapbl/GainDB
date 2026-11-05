@@ -24,7 +24,8 @@ MP3 프레임의 `global_gain` 필드를 직접 조정해 음량을 바꾸므로
 - **태그 처리.** APEv2(기본) 또는 ID3v2 태그의 ReplayGain·mp3gain 필드를
   읽기·쓰기·갱신·제거하며 undo 정보도 다룹니다.
 - **CLI 와 GUI.** mp3gain 호환 옵션 체계를 갖춘 명령줄 도구와, 크로스플랫폼
-  PySide6 GUI(Windows·macOS)를 제공합니다.
+  PySide6 GUI(Windows·macOS)를 제공합니다. 다크·라이트 테마를 고를 수 있습니다
+  (옵션 > 테마).
 
 ## 범위: MP3 전용
 

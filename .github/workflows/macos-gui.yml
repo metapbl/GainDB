@@ -7,6 +7,7 @@ on:
 jobs:
   capture:
     runs-on: macos-latest
+    timeout-minutes: 30
     env:
       PYTHONUTF8: "1"
     steps:
@@ -27,6 +28,16 @@ jobs:
 
       - name: Run GUI flow on the real platform
         run: python tests/_gui_capture.py gui-capture
+
+      # 임시 코드는 이 러너 안에서만 넣는다(커밋하지 않음).
+      - name: Build with PyInstaller and capture the built app
+        run: |
+          python -m pip install pyinstaller
+          python tests/_theme_shot_patch.py
+          pyinstaller --noconfirm GainDB.spec
+          mkdir -p gui-capture/built
+          THEME_SHOT="$PWD/gui-capture/built" ./dist/GainDB/GainDB
+          ls gui-capture/built
 
       - name: Upload captures
         if: always()

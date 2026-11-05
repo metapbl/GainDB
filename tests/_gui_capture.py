@@ -67,7 +67,6 @@ def main() -> int:
             print(f"screencapture {name}: exit {r.returncode}", flush=True)
 
     def finish(code: int) -> None:
-        print("app name:", app.applicationName(), flush=True)
         print("add files tooltip:", win.act_add_files.toolTip(), flush=True)
         os._exit(code)
 

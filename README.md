@@ -26,7 +26,8 @@ formats, output, numbers) of mp3gain while remaining compatible with it.
 - **Tag handling.** Reads, writes, updates, and removes ReplayGain and
   mp3gain tag fields in APEv2 (default) or ID3v2 tags, including undo info.
 - **CLI and GUI.** A command-line tool with an mp3gain-compatible option
-  scheme, plus a cross-platform PySide6 GUI (Windows and macOS).
+  scheme, plus a cross-platform PySide6 GUI (Windows and macOS) with dark and
+  light themes (Options > Theme).
 
 ## Scope: MP3 only
 

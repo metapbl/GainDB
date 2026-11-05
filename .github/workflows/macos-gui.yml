@@ -1,0 +1,36 @@
+name: macOS GUI check
+
+# D063: 실제 cocoa 플랫폼에서 GUI 흐름을 돌리고 캡처를 artifact 로 남긴다.
+on:
+  workflow_dispatch:
+
+jobs:
+  capture:
+    runs-on: macos-latest
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install ffmpeg
+        run: brew install ffmpeg
+
+      - name: Install Python packages
+        run: python -m pip install -r requirements.txt
+
+      - name: Generate fixtures
+        run: python tests/_gen_fixtures.py
+
+      - name: Run GUI flow on the real platform
+        run: python tests/_gui_capture.py gui-capture
+
+      - name: Upload captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-gui-capture
+          path: gui-capture

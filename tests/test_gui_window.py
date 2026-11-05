@@ -188,12 +188,20 @@ class MenuStateTest(WindowTestBase):
 
 
 class CloseEventTest(WindowTestBase):
-    def test_close_terminates_stuck_worker(self):
-        for kind in ("scan", "analyze", "apply", "action", "album_apply"):
+    def test_close_terminates_stuck_read_only_worker(self):
+        for kind in ("scan", "analyze", "album_analyze"):
             with self.subTest(kind=kind):
                 worker = self.close_while_running(kind)
                 worker.request_cancel.assert_called_once()
                 worker.terminate.assert_called_once()
+
+    def test_close_never_terminates_file_writing_worker(self):
+        for kind in ("apply", "album_apply", "action"):
+            with self.subTest(kind=kind):
+                worker = self.close_while_running(kind)
+                worker.request_cancel.assert_called_once()
+                worker.wait.assert_called_once_with()
+                worker.terminate.assert_not_called()
 
 
 class RemoveTagsTest(WindowTestBase):

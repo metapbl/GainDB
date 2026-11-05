@@ -136,6 +136,9 @@ from gaindb.decode import DecodeError, find_ffmpeg
 # 위한 배율. 1000 이면 0.1% 단위(소수점 한 자리)까지 표현된다.
 _PROGRESS_SCALE = 1000
 
+# 파일을 바꾸는 워커 종류(창을 닫아도 강제 종료하지 않는다).
+_FILE_WRITING_KINDS = ("apply", "album_apply", "action")
+
 # QSettings 조직/앱 이름(크로스플랫폼: Win=레지스트리, macOS=plist).
 _SETTINGS_ORG = "GaindB"
 _SETTINGS_APP = "GaindB"
@@ -1946,7 +1949,10 @@ class MainWindow(QMainWindow):
         w = self._worker
         if w is not None:
             w.request_cancel()
-            if not w.wait(10000):
+            if self._worker_kind in _FILE_WRITING_KINDS:
+                # 제자리 수정 중 강제 종료하면 파일이 손상되므로 끝까지 기다린다.
+                w.wait()
+            elif not w.wait(10000):
                 w.terminate()
                 w.wait()
         super().closeEvent(event)

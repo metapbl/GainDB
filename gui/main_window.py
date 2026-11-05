@@ -830,6 +830,8 @@ class MainWindow(QMainWindow):
 
         self.table = FileTableView(self)
         self.table.setModel(self.proxy)
+        self.table.selectionModel().selectionChanged.connect(
+            self._update_selection_actions)
         self.table.setSortingEnabled(True)
         self.table.setItemDelegateForColumn(
             int(Col.NAME), PathElideDelegate(self.table))
@@ -1177,8 +1179,7 @@ class MainWindow(QMainWindow):
         self.act_album_analyze.setEnabled(has_rows and not busy)
         self.act_album_gain.setEnabled(has_rows and not busy)
         self.act_clear.setEnabled(has_rows and not busy)
-        self.act_clear_analysis.setEnabled(has_rows and not busy)
-        self.act_undo.setEnabled(has_rows and not busy)
+        self._update_selection_actions()
 
         if busy:
             if self._worker_kind == "scan":
@@ -1197,6 +1198,12 @@ class MainWindow(QMainWindow):
         if not busy:
             self.statusBar().showMessage(
                 self.tr("%n file(s)", "", self.model.rowCount()))
+
+    def _update_selection_actions(self, *args):
+        """선택 행에만 동작하는 메뉴는 선택이 있을 때만 켠다(상태바는 건드리지 않음)."""
+        enable = self.table.selectionModel().hasSelection() and not self._is_busy()
+        self.act_clear_analysis.setEnabled(enable)
+        self.act_undo.setEnabled(enable)
 
     # --- 겸용 버튼 클릭(Pause / Cancel / Rescan 분기) ---
 

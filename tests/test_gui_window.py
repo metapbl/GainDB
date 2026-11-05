@@ -185,11 +185,18 @@ class ThemeMenuTest(WindowTestBase):
 
 
 class MenuStateTest(WindowTestBase):
-    def test_selection_actions_enabled_without_selection(self):
+    def test_selection_actions_follow_selection(self):
         self.win.table.clearSelection()
-        self.win._update_action_states()
+        self.assertFalse(self.win.act_clear_analysis.isEnabled())
+        self.assertFalse(self.win.act_undo.isEnabled())
+        self.win.table.selectRow(0)
         self.assertTrue(self.win.act_clear_analysis.isEnabled())
         self.assertTrue(self.win.act_undo.isEnabled())
+
+    def test_selection_change_keeps_status_message(self):
+        self.win.statusBar().showMessage("done")
+        self.win.table.selectRow(0)
+        self.assertEqual(self.win.statusBar().currentMessage(), "done")
 
 
 class CloseEventTest(WindowTestBase):

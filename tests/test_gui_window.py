@@ -4,8 +4,11 @@
 
 from __future__ import annotations
 
+import ast
 import os
 import unittest
+import xml.etree.ElementTree as ET
+from pathlib import Path
 from unittest import mock
 
 
@@ -43,6 +46,33 @@ class WindowTestBase(unittest.TestCase):
         self.addCleanup(setattr, self.win, "_worker", None)
         self.win.closeEvent(QCloseEvent())
         return worker
+
+
+class TranslationCoverageTest(unittest.TestCase):
+    """화면 문구가 ko 번역에 모두 있는지 본다. lupdate 는 f-string 안의 tr 을 못 찾는다."""
+
+    GUI = Path(__file__).resolve().parent.parent / "gui"
+
+    def _tr_calls(self):
+        for path in self.GUI.rglob("*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            in_fstring = {id(sub) for node in ast.walk(tree)
+                          if isinstance(node, ast.JoinedStr) for sub in ast.walk(node)}
+            for node in ast.walk(tree):
+                if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                        and node.func.attr == "tr" and node.args
+                        and isinstance(node.args[0], ast.Constant)):
+                    yield path.name, node.args[0].value, id(node) in in_fstring
+
+    def test_no_tr_inside_fstring(self):
+        self.assertEqual([c[:2] for c in self._tr_calls() if c[2]], [])
+
+    def test_every_tr_source_is_translated(self):
+        root = ET.parse(self.GUI / "translations" / "gaindb_ko.ts").getroot()
+        done = {m.findtext("source") for m in root.iter("message")
+                if m.find("translation").get("type") is None
+                and (m.findtext("translation") or m.find("translation").find("numerusform") is not None)}
+        self.assertEqual(sorted({c[1] for c in self._tr_calls()} - done), [])
 
 
 class ClipColorTest(WindowTestBase):

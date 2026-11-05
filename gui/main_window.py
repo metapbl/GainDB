@@ -13,10 +13,9 @@ Undo·Remove Tags·Play 를 제공한다.
 즉시 전환한다(Qt 가 LanguageChange 이벤트를 흘리면 changeEvent 가
 _retranslate_ui 를 불러 정적 UI 문자열을 다시 tr() 한다). 화면 문자열만 tr()
 대상이고, 로그 파일·에러 메시지는 영문 고정이다(합의) — 로그는 사람이 나중에
-검색·공유하는 기록이라 CLI 영문 정책과 일관시킨다. 동적 상태바 문구
-(_batch_status 등)는 동사/명사 단위만 tr() 로 감싸고 숫자 조립은 f-string 을
-유지한다(작업 중 언어 변경은 드물고, 다음 갱신 때 새 언어로 나오므로 실용적
-균형 — 정적 UI 는 완전 즉시 전환).
+검색·공유하는 기록이라 CLI 영문 정책과 일관시킨다. 동적 상태바 문구는 문장
+단위로 tr() 하고 값은 _fill 로 채운다(작업 중 언어 변경은 드물고, 다음 갱신 때
+새 언어로 나오므로 실용적 균형 — 정적 UI 는 완전 즉시 전환).
 
 로그: Options → Logs... 로 Error/Analysis/Change 로그 경로·on/off 를 설정한다
 (gui/logging.py + gui/dialogs/logs_dialog.py). 각 워커 완료 슬롯에서 이미
@@ -96,6 +95,7 @@ from __future__ import annotations
 
 import html
 import os
+import re
 import subprocess
 import sys
 
@@ -158,6 +158,11 @@ QTableView::item {
     padding: 0px 2px;
 }
 """
+
+def _fill(template: str, *args) -> str:
+    """번역된 문장의 %1, %2 ... 를 값으로 바꾼다(한 번에 바꿔 값 안의 %를 건드리지 않음)."""
+    return re.sub(r"%(\d)", lambda m: str(args[int(m.group(1)) - 1]), template)
+
 
 def collect_mp3_paths(paths, recurse: bool = True) -> list[str]:
     """파일/폴더 경로 목록에서 .mp3 파일 경로를 모아 돌려준다.
@@ -1026,7 +1031,7 @@ class MainWindow(QMainWindow):
         try:
             func(*args)
         except LogWriteError as exc:
-            self.statusBar().showMessage(f"Log write failed: {exc}")
+            self.statusBar().showMessage(_fill(self.tr("Log write failed: %1"), exc))
 
     def _default_window_size(self):
         """저장된 geometry 가 없을 때, 전 컬럼 default_width 합계에 맞춰 초기
@@ -1129,11 +1134,17 @@ class MainWindow(QMainWindow):
         frac = 0.0 if fraction < 0.0 else (1.0 if fraction > 1.0 else fraction)
         self.progress.setValue(int((done + frac) * _PROGRESS_SCALE))
 
+    def _show_summary(self, parts: list[str], cancelled: bool) -> None:
+        """작업 완료 요약을 상태바에 보인다. 취소됐으면 머리말을 붙인다."""
+        msg = ", ".join(parts)
+        self.statusBar().showMessage(
+            _fill(self.tr("Cancelled - %1"), msg) if cancelled else msg)
+
     def _batch_status(self, verb: str, done: int) -> str:
         """작업 중 상태바 문구: "verb k/N - 파일명 - NN.N%".
 
-        verb 는 이미 tr() 된 동사/명사 문자열(호출자가 self.tr 로 넘김). 숫자
-        조립은 f-string 유지(작업 중 언어 변경은 드물고 다음 갱신 때 새 언어).
+        verb 는 이미 tr() 된 동사/명사 문자열(호출자가 self.tr 로 넘김). tr 을
+        f-string 안에 쓰면 lupdate 가 찾지 못하므로 문장 단위 tr + _fill 을 쓴다.
         """
         msg = f"{verb} {done}/{self._batch_total}"
         if self._current_name:
@@ -1247,7 +1258,7 @@ class MainWindow(QMainWindow):
         self.progress.setValue(self._scan_offset)
         self._update_action_states()
         self.statusBar().showMessage(
-            f"{self.tr('Scanning tags')} {self._scan_offset}/{total}")
+            _fill(self.tr("Scanning tags %1/%2"), self._scan_offset, total))
         self._worker.start()
 
     # --- 파일 추가 공통 ---
@@ -1264,17 +1275,13 @@ class MainWindow(QMainWindow):
         new_rows = self.model.add_paths(mp3s)
         if not new_rows:
             self.statusBar().showMessage(
-                f"{self.tr('No new files')}, "
-                f"{self.model.rowCount()} {self.tr('total')}"
-            )
+                _fill(self.tr("No new files, %1 total"), self.model.rowCount()))
             return
         # 파일 목록이 바뀌었으니 앨범 씨앗을 통째로 무효화.
         self._invalidate_album_seeds()
-        self.statusBar().showMessage(
-            f"{self.tr('Added')} {len(new_rows)} {self.tr('file(s)')}, "
-            f"{self.model.rowCount()} {self.tr('total')} - "
-            f"{self.tr('scanning tags...')}"
-        )
+        self.statusBar().showMessage(_fill(
+            self.tr("Added %1 file(s), %2 total - scanning tags..."),
+            len(new_rows), self.model.rowCount()))
         self._start_tag_scan(self._pending_paths())
 
     # --- 툴바/메뉴 액션 ---
@@ -1347,7 +1354,7 @@ class MainWindow(QMainWindow):
         self.progress.setValue(0)
         self._update_action_states()
         self.statusBar().showMessage(
-            f"{self.tr('Analyzing')} {len(paths)} {self.tr('file(s)...')}")
+            _fill(self.tr("Analyzing %1 file(s)..."), len(paths)))
         self._worker.start()
 
     def _on_gain(self):
@@ -1400,7 +1407,7 @@ class MainWindow(QMainWindow):
         self.progress.setValue(0)
         self._update_action_states()
         self.statusBar().showMessage(
-            f"{self.tr('Applying gain to')} {len(paths)} {self.tr('file(s)...')}")
+            _fill(self.tr("Applying gain to %1 file(s)..."), len(paths)))
         self._worker.start()
 
     # --- Album Analysis / Album Gain 핸들러 ---
@@ -1449,9 +1456,8 @@ class MainWindow(QMainWindow):
         self.progress.setRange(0, len(paths) * _PROGRESS_SCALE)
         self.progress.setValue(0)
         self._update_action_states()
-        self.statusBar().showMessage(
-            f"{self.tr('Analyzing')} {len(paths)} {self.tr('file(s) in')} "
-            f"{len(groups)} {self.tr('album(s)...')}")
+        self.statusBar().showMessage(_fill(
+            self.tr("Analyzing %1 file(s) in %2 album(s)..."), len(paths), len(groups)))
         self._worker.start()
 
     def _on_album_gain(self):
@@ -1504,9 +1510,9 @@ class MainWindow(QMainWindow):
         self.progress.setRange(0, len(paths) * _PROGRESS_SCALE)
         self.progress.setValue(0)
         self._update_action_states()
-        self.statusBar().showMessage(
-            f"{self.tr('Applying album gain to')} {len(paths)} "
-            f"{self.tr('file(s) in')} {len(groups)} {self.tr('album(s)...')}")
+        self.statusBar().showMessage(_fill(
+            self.tr("Applying album gain to %1 file(s) in %2 album(s)..."),
+            len(paths), len(groups)))
         self._worker.start()
 
     def _on_clear(self):
@@ -1538,12 +1544,12 @@ class MainWindow(QMainWindow):
         if fr is None:
             return
         if not os.path.exists(fr.path):
-            self.statusBar().showMessage(f"{self.tr('File not found:')} {fr.path}")
+            self.statusBar().showMessage(_fill(self.tr("File not found: %1"), fr.path))
             return
         try:
             open_with_default_app(fr.path)
         except Exception as exc:
-            self.statusBar().showMessage(f"{self.tr('Could not open file:')} {exc}")
+            self.statusBar().showMessage(_fill(self.tr("Could not open file: %1"), exc))
 
     def _on_target_changed(self, value):
         # 목표가 바뀌면 값이 있는 전 행을 재계산해 다시 표시(재분석 없음).
@@ -1557,7 +1563,7 @@ class MainWindow(QMainWindow):
             fr.result = recompute_target(fr.result, value)
             self.model.row_changed(r)
         self.statusBar().showMessage(
-            f"{self.tr('Target set to')} {value:.1f} dB")
+            _fill(self.tr("Target set to %1 dB"), f"{value:.1f}"))
 
     # --- 우클릭 팝업 표시 + 항목 핸들러 ---
 
@@ -1588,8 +1594,7 @@ class MainWindow(QMainWindow):
         self._update_action_states()
         if rows:
             self.statusBar().showMessage(
-                f"{self.tr('Cleared analysis of')} {len(rows)} "
-                f"{self.tr('file(s)')}")
+                _fill(self.tr("Cleared analysis of %1 file(s)"), len(rows)))
 
     def _on_ctx_undo(self):
         """선택 행의 게인 변경을 undo(파일 변경)."""
@@ -1637,17 +1642,18 @@ class MainWindow(QMainWindow):
         self.progress.setRange(0, len(paths))
         self.progress.setValue(0)
         self._update_action_states()
-        self.statusBar().showMessage(
-            f"{self._action_verb} {len(paths)} {self.tr('file(s)...')}")
+        self.statusBar().showMessage(_fill(
+            self.tr("Undoing %1 file(s)...") if action == "undo"
+            else self.tr("Removing tags from %1 file(s)..."), len(paths)))
         self._worker.start()
 
     # --- 태그 스캔 워커 슬롯 ---
 
     def _on_scan_current(self, path: str):
         done = self._scan_offset + self._scanned_count
-        self.statusBar().showMessage(
-            f"{self.tr('Scanning tags')} {done}/{self._scan_total} - "
-            f"{os.path.basename(path)}")
+        self.statusBar().showMessage(_fill(
+            self.tr("Scanning tags %1/%2 - %3"),
+            done, self._scan_total, os.path.basename(path)))
 
     def _on_scan_progress(self, done: int, total_in_batch: int):
         self._scanned_count = done
@@ -1670,16 +1676,14 @@ class MainWindow(QMainWindow):
         done = self._scanned_count
         total = self.model.row_count()
         if cancelled:
-            self.statusBar().showMessage(
-                f"{self.tr('Paused - scanned')} {self._scan_offset + done}/"
-                f"{total} {self.tr('tag(s). Press Rescan to continue.')}"
-            )
+            self.statusBar().showMessage(_fill(
+                self.tr("Paused - scanned %1/%2 tag(s). Press Rescan to continue."),
+                self._scan_offset + done, total))
         else:
             self.progress.setRange(0, total)
             self.progress.setValue(total)
             self.statusBar().showMessage(
-                f"{self.tr('Tag scan done -')} {total} {self.tr('file(s) total')}"
-            )
+                _fill(self.tr("Tag scan done - %1 file(s) total"), total))
 
     # --- 분석 워커 슬롯(Track Analysis + Album Analysis 공유) ---
 
@@ -1739,12 +1743,10 @@ class MainWindow(QMainWindow):
         self._update_action_states()
         done = self._analyzed_count
         failed = self._failed_count
-        parts = [f"{self.tr('Analyzed')} {done} {self.tr('file(s)')}"]
+        parts = [_fill(self.tr("Analyzed %1 file(s)"), done)]
         if failed:
-            parts.append(f"{failed} {self.tr('failed')}")
-        msg = ", ".join(parts)
-        self.statusBar().showMessage(
-            f"{self.tr('Cancelled -')} {msg}" if cancelled else msg)
+            parts.append(_fill(self.tr("%1 failed"), failed))
+        self._show_summary(parts, cancelled)
 
     # --- 앨범 고유 슬롯 ---
 
@@ -1840,14 +1842,12 @@ class MainWindow(QMainWindow):
         applied = self._applied_count
         analyzed_only = self._analyzed_count
         failed = self._failed_count
-        parts = [f"{self.tr('Applied gain to')} {applied} {self.tr('file(s)')}"]
+        parts = [_fill(self.tr("Applied gain to %1 file(s)"), applied)]
         if analyzed_only:
-            parts.append(f"{analyzed_only} {self.tr('already at target')}")
+            parts.append(_fill(self.tr("%1 already at target"), analyzed_only))
         if failed:
-            parts.append(f"{failed} {self.tr('failed')}")
-        msg = ", ".join(parts)
-        self.statusBar().showMessage(
-            f"{self.tr('Cancelled -')} {msg}" if cancelled else msg)
+            parts.append(_fill(self.tr("%1 failed"), failed))
+        self._show_summary(parts, cancelled)
 
     # --- 파일 액션 워커 슬롯(undo / remove_tags) ---
 
@@ -1896,14 +1896,13 @@ class MainWindow(QMainWindow):
         self._update_action_states()
         done = self._action_done
         failed = self._failed_count
-        verb_done = (self.tr("Undone") if self._action_verb == self.tr("Undoing")
-                     else self.tr("Removed tags from"))
-        parts = [f"{verb_done} {done} {self.tr('file(s)')}"]
+        done_text = (self.tr("Undone %1 file(s)")
+                     if self._action_verb == self.tr("Undoing")
+                     else self.tr("Removed tags from %1 file(s)"))
+        parts = [_fill(done_text, done)]
         if failed:
-            parts.append(f"{failed} {self.tr('failed')}")
-        msg = ", ".join(parts)
-        self.statusBar().showMessage(
-            f"{self.tr('Cancelled -')} {msg}" if cancelled else msg)
+            parts.append(_fill(self.tr("%1 failed"), failed))
+        self._show_summary(parts, cancelled)
 
     # --- 드래그 앤 드롭 ---
 

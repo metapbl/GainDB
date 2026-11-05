@@ -445,6 +445,7 @@
     <message>
         <location filename="../main_window.py" line="754"/>
         <location filename="../main_window.py" line="929"/>
+        <location filename="../main_window.py" line="1646"/>
         <source>Remove Tags from Files</source>
         <translation>파일에서 태그 제거</translation>
     </message>
@@ -636,90 +637,95 @@
         <translation>%1개 파일의 분석 값을 지움</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1664"/>
+        <location filename="../main_window.py" line="1647"/>
+        <source>Remove tags from %1 file(s)? The undo information is removed too, so gain changes can no longer be undone.</source>
+        <translation>%1개 파일의 태그를 제거할까요? 되돌리기 정보도 함께 지워져 게인 변경을 되돌릴 수 없게 됩니다.</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="1672"/>
         <source>No files selected</source>
         <translation>선택된 파일이 없습니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1670"/>
-        <location filename="../main_window.py" line="1939"/>
+        <location filename="../main_window.py" line="1678"/>
+        <location filename="../main_window.py" line="1947"/>
         <source>Undoing</source>
         <translation>되돌리는 중</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1671"/>
+        <location filename="../main_window.py" line="1679"/>
         <source>Removing tags</source>
         <translation>태그 제거 중</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1685"/>
+        <location filename="../main_window.py" line="1693"/>
         <source>Undoing %1 file(s)...</source>
         <translation>%1개 파일 되돌리는 중...</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1686"/>
+        <location filename="../main_window.py" line="1694"/>
         <source>Removing tags from %1 file(s)...</source>
         <translation>%1개 파일의 태그 제거 중...</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1694"/>
+        <location filename="../main_window.py" line="1702"/>
         <source>Scanning tags %1/%2 - %3</source>
         <translation>태그 읽는 중 %1/%2 - %3</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1719"/>
+        <location filename="../main_window.py" line="1727"/>
         <source>Paused - scanned %1/%2 tag(s). Press Rescan to continue.</source>
         <translation>일시 정지 - 태그 %1/%2개 읽음. 계속하려면 다시 스캔을 누르세요.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1725"/>
+        <location filename="../main_window.py" line="1733"/>
         <source>Tag scan done - %1 file(s) total</source>
         <translation>태그 읽기 완료 - 전체 %1개 파일</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1733"/>
-        <location filename="../main_window.py" line="1739"/>
-        <location filename="../main_window.py" line="1816"/>
-        <location filename="../main_window.py" line="1827"/>
+        <location filename="../main_window.py" line="1741"/>
+        <location filename="../main_window.py" line="1747"/>
+        <location filename="../main_window.py" line="1824"/>
+        <location filename="../main_window.py" line="1835"/>
         <source>Analyzing</source>
         <translation>분석 중</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1785"/>
+        <location filename="../main_window.py" line="1793"/>
         <source>Analyzed %1 file(s)</source>
         <translation>%1개 파일 분석 완료</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1787"/>
-        <location filename="../main_window.py" line="1888"/>
-        <location filename="../main_window.py" line="1943"/>
+        <location filename="../main_window.py" line="1795"/>
+        <location filename="../main_window.py" line="1896"/>
+        <location filename="../main_window.py" line="1951"/>
         <source>%1 failed</source>
         <translation>%1개 실패</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1818"/>
-        <location filename="../main_window.py" line="1829"/>
-        <location filename="../main_window.py" line="1844"/>
+        <location filename="../main_window.py" line="1826"/>
+        <location filename="../main_window.py" line="1837"/>
+        <location filename="../main_window.py" line="1852"/>
         <source>Applying</source>
         <translation>적용 중</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1884"/>
+        <location filename="../main_window.py" line="1892"/>
         <source>Applied gain to %1 file(s)</source>
         <translation>%1개 파일에 게인 적용 완료</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1886"/>
+        <location filename="../main_window.py" line="1894"/>
         <source>%1 already at target</source>
         <translation>%1개는 이미 목표값</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1938"/>
+        <location filename="../main_window.py" line="1946"/>
         <source>Undone %1 file(s)</source>
         <translation>%1개 파일 되돌림</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1940"/>
+        <location filename="../main_window.py" line="1948"/>
         <source>Removed tags from %1 file(s)</source>
         <translation>%1개 파일의 태그 제거 완료</translation>
     </message>

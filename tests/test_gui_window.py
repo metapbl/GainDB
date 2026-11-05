@@ -228,13 +228,21 @@ class CloseEventTest(WindowTestBase):
 
 
 class RemoveTagsTest(WindowTestBase):
-    def test_remove_tags_starts_without_asking(self):
+    def _remove_tags(self, answer):
         self.win.table.selectRow(0)
         with mock.patch.object(self.mw, "FileActionWorker") as worker, \
-                mock.patch.object(self.mw.QMessageBox, "question") as ask:
+                mock.patch.object(self.mw.QMessageBox, "question",
+                                  return_value=answer) as ask:
             self.addCleanup(setattr, self.win, "_worker", None)
             self.win._on_ctx_remove_tags()
-        ask.assert_not_called()
+        ask.assert_called_once()
+        return worker
+
+    def test_cancel_starts_nothing(self):
+        self._remove_tags(self.mw.QMessageBox.StandardButton.No).assert_not_called()
+
+    def test_confirm_starts_remove_tags(self):
+        worker = self._remove_tags(self.mw.QMessageBox.StandardButton.Yes)
         self.assertEqual(worker.call_args.args[1], "remove_tags")
 
 

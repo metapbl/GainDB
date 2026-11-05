@@ -1640,8 +1640,16 @@ class MainWindow(QMainWindow):
         self._start_file_action("undo")
 
     def _on_ctx_remove_tags(self):
-        """선택 행의 mp3gain 태그 제거(파일 변경)."""
-        self._start_file_action("remove_tags")
+        """선택 행의 mp3gain 태그 제거(파일 변경). undo 정보도 사라지므로 먼저 묻는다."""
+        count = len(self._selected_source_rows())
+        answer = QMessageBox.question(
+            self, self.tr("Remove Tags from Files"),
+            _fill(self.tr("Remove tags from %1 file(s)? The undo information is "
+                          "removed too, so gain changes can no longer be undone."), count),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if answer == QMessageBox.StandardButton.Yes:
+            self._start_file_action("remove_tags")
 
     def _on_ctx_play(self):
         """선택 행(들)을 기본 앱으로 연다."""

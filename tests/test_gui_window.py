@@ -6,10 +6,14 @@ from __future__ import annotations
 
 import ast
 import os
+import shutil
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest import mock
+
+from tests._support import BaseGainTest
+from tests.test_mp3gain_parity import _table
 
 
 class WindowTestBase(unittest.TestCase):
@@ -95,6 +99,53 @@ class ClipColorTest(WindowTestBase):
                                  QColor(theme.color("danger")))
                 row.result = {"clip_state": "none"}
                 self.assertIsNone(self.win.model.data(index, role))
+
+
+class FailedRowTest(WindowTestBase):
+    def test_failed_row_name_is_danger_with_tooltip(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QColor
+        from gui import theme
+        from gui.columns import Col
+        self.win.model.get_row(0).mark_error("bad file")
+        index = self.win.model.index(0, int(Col.NAME))
+        self.assertEqual(self.win.model.data(index, Qt.ItemDataRole.ForegroundRole),
+                         QColor(theme.color("danger")))
+        self.assertEqual(self.win.model.data(index, Qt.ItemDataRole.ToolTipRole), "bad file")
+        ok = self.win.model.index(1, int(Col.NAME))
+        self.assertIsNone(self.win.model.data(ok, Qt.ItemDataRole.ForegroundRole))
+
+
+class AlbumGainBrokenFileTest(BaseGainTest):
+    def test_broken_file_fails_alone_and_others_apply_like_cli(self):
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtWidgets import QApplication
+        from gaindb.api import DEFAULT_TARGET_DB, group_by_album
+        from gui.workers import AlbumApplyWorker
+        QApplication.instance() or QApplication([])
+
+        files = {}
+        for side in ("gui", "cli"):
+            d = Path(self._tmpdir) / side
+            d.mkdir()
+            good = [shutil.copy2(self.copy_fixture(n), d / n)
+                    for n in ("test_gain_44k.mp3", "test_gain_48k.mp3")]
+            broken = d / "broken.mp3"
+            broken.write_bytes(b"not an mp3" * 50)
+            files[side] = [str(good[0]), str(broken), str(good[1])]
+
+        failed, applied = [], {}
+        worker = AlbumApplyWorker(
+            group_by_album(files["gui"], each_folder_is_album=False), DEFAULT_TARGET_DB, {})
+        worker.failed.connect(lambda p, msg: failed.append(p))
+        worker.row_applied.connect(lambda p, shown, steps: applied.__setitem__(p, steps))
+        worker.run()
+        self.assertEqual(failed, [files["gui"][1]])
+        self.assertEqual(sorted(applied), sorted([files["gui"][0], files["gui"][2]]))
+
+        r = self.run_cli(["-o", "-a", "-c", *files["cli"]])
+        album_steps = int(_table(r.stdout)["Album"][0])
+        self.assertEqual(set(applied.values()), {album_steps})
 
 
 class DeleteKeyTest(WindowTestBase):

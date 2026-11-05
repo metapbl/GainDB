@@ -100,3 +100,22 @@ class Mp3gainParityTest(BaseGainTest):
                 with self.subTest(undo=side, file=f.name):
                     self.assertEqual(self.audio_body_sha256(str(f)),
                                      self.originals[f.name])
+
+    def test_album_with_broken_file_matches(self):
+        """깨진 파일이 낀 앨범: 나머지 파일의 스텝·Album 값이 원본과 같다 (D064)."""
+        tables = {}
+        for side, files in self.sides.items():
+            broken = Path(files[0]).parent / "broken.mp3"
+            broken.write_bytes(b"not an mp3" * 50)
+            args = ["-o", "-a", "-c", str(files[0]), str(broken), *map(str, files[1:])]
+            if side == "mp3gain":
+                r = subprocess.run([MP3GAIN, *args], capture_output=True, text=True,
+                                   errors="replace")
+            else:
+                r = self.run_cli(args)
+            print(f"\n[{side} broken file] exit {r.returncode}\n{r.stdout}\n{r.stderr}")
+            tables[side] = _table(r.stdout)
+        self.assertEqual(sorted(tables["gaindb"]), sorted(tables["mp3gain"]))
+        for key, cols in tables["mp3gain"].items():
+            with self.subTest(row=key):
+                self.assertEqual(tables["gaindb"][key][0], cols[0])

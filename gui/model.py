@@ -153,6 +153,8 @@ class FileTableModel(QAbstractTableModel):
             return self._sort_value(row, col.index)
 
         if role == Qt.ItemDataRole.ForegroundRole:
+            if row.status == "error" and col.index == Col.NAME:
+                return QColor(theme.color("danger"))
             # Track clip 은 clip_state, Album clip 은 album_clip_state 로 색칠.
             if row.result:
                 if col.index == Col.CLIP:

@@ -337,12 +337,18 @@ class AlbumApplyWorker(QThread):
                 raws[path] = seed
                 continue
             self.current.emit(path)
-            raw = analyze_album_file(
-                path,
-                should_cancel=lambda: self._cancel,
-                on_progress=self.file_progress.emit,
-            )
-            raws[path] = raw
+            try:
+                raw = analyze_album_file(
+                    path,
+                    should_cancel=lambda: self._cancel,
+                    on_progress=self.file_progress.emit,
+                )
+                raws[path] = raw
+            except DecodeCancelled:
+                raise
+            except Exception as exc:
+                # 깨진 파일만 실패로 두고 나머지로 앨범을 계속한다(Album Analysis·CLI 와 동일).
+                self.failed.emit(path, str(exc))
             # 분석 구간에서 카운트+progress 를 센다(진행바 base 갱신). 씨앗
             # 재사용 곡(위 continue)은 분석이 없어 여기 안 옴 -> 그 경우 진행바가
             # 잠깐 0 에 머물다 완료되는 게 의도된 동작.

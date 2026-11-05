@@ -262,7 +262,9 @@ class PathElideDelegate(QStyledItemDelegate):
         shown = self._elide_path(str(text), max(avail, 0), fm)
 
         painter.save()
-        painter.setPen(QColor(theme.color("text")))
+        # 실패 행은 모델이 준 경고색을 쓴다(직접 그리므로 뷰가 대신 칠해 주지 않는다).
+        painter.setPen(index.data(Qt.ItemDataRole.ForegroundRole)
+                       or QColor(theme.color("text")))
         painter.drawText(
             text_rect.adjusted(2, 0, -2, 0),
             int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),

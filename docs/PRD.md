@@ -1,6 +1,6 @@
 # PRD — Gain dB (GaindB)
 
-상태: approved (2026-10-29) | 단계: 5 확정 | 갱신: 2026-10-29
+상태: approved (2026-11-05) | 단계: 5 확정 | 갱신: 2026-11-05
 <!-- 상태가 approved (YYYY-MM-DD)가 되기 전에는 코드·뼈대·의존성 설치를 하지 않는다. -->
 <!-- 모든 항목 끝에 출처를 단다: [U] 사용자 · [X] 기존 코드·문서 · [AI] AI 기본값. 근거 결정은 (D###). -->
 
@@ -19,6 +19,10 @@
   2. F6 ffmpeg 찾기 (§3).
   3. CI 추가 (§6) — 완료 기준: main push에서 3개 OS 작업이 모두 초록. [AI]
   4. 정식 GitHub Release — 완료 기준: GitHub Releases에 태그·릴리스 노트·Windows onedir zip이 올라가 있고 zip 안에 LICENSE·NOTICE·THIRD_PARTY_LICENSES·licenses/qt가 있다. 버전 0.6.0, 첨부물은 Windows onedir zip만(D044, D045). 릴리스 노트는 AI 초안 → 사용자 승인 후 게시. 같은 태그가 이미 있거나 빌드·라이선스 검증이 실패하면 멈추고 보고. [AI]
+- 1.0 작업 (순서대로): [U] (D057~D063)
+  1. macOS 러너 검증 경로 추가 (§6).
+  2. F7 테마와 UX (§3).
+  3. 1.0.0 GitHub Release — 완료 기준: 태그 v1.0.0·릴리스 노트·Windows onedir zip이 올라가 있고 zip 안에 LICENSE·NOTICE·THIRD_PARTY_LICENSES·licenses/qt가 있다. 노트는 AI 초안 → 사용자 승인 후 게시. 빌드 전 pip-audit. 같은 태그가 있거나 검증이 실패하면 멈추고 보고. [U][AI] (D062, D054)
 ### 2.2 있으면 좋음
 - 없음. 보류 목록(2.3)이 그 역할. [U] (D034)
 ### 2.3 이번에는 안 함
@@ -106,6 +110,28 @@
   - Given 어디에도 없음 / When CLI로 `-s c` / Then 정상 출력 (ffmpeg 불필요)
 - 링크 대상: GUI 언어가 ko면 GitHub의 README.ko.md "ffmpeg 설치" 절, 아니면 README.md "Installing ffmpeg" 절. [AI]
 - 확인 방법: 자동 테스트(PATH와 후보 폴더를 임시 폴더로 주입해 찾기 함수의 반환값 확인, GUI 확인은 offscreen에서 대화상자 호출 횟수 확인) + CI macOS 러너(Homebrew ffmpeg, PATH를 /usr/bin:/bin으로 줄여 Finder 실행 흉내). macOS 실기기 확인은 없음. [U][AI] (D037, D039)
+### F7 테마와 UX (1.0)
+- 정상 흐름: GUI가 Graphite(다크)/Paper(라이트) 테마로 뜬다. Options > Theme에서 System/Dark/Light를 고르면 즉시 바뀌고 다음 실행에도 유지된다. 기본은 System. 배치·컬럼·수치·파일 결과는 그대로다. [U] (D057, D059)
+- 파일: `gui/theme.py`, `gui/assets/icons/`(생성물, 직접 고치지 않음). 앱 고유 규칙은 창 QSS. MIT 고지는 테마 파일 머리와 THIRD_PARTY_LICENSES. [AI]
+- UX: [U] (D060, D061)
+  - clip 색: possible=accent, definite=danger.
+  - 상태바 문구를 문장 단위로 번역한다. ko에서 영문 조각이 남지 않는다. 로그·오류 원문은 영문 유지(D011).
+  - 실패한 행은 파일 이름이 danger 색이고 툴팁에 오류가 있다.
+  - 파일을 바꾸는 작업(게인 적용·undo·태그 제거) 중 창을 닫으면 취소를 요청하고 끝날 때까지 기다린다. 강제 종료하지 않는다.
+  - Delete와 Backspace 모두 선택 행을 목록에서 지운다(파일 미변경). 툴팁 단축키 표기는 OS에 맞춘다.
+  - 앱 이름은 Gain dB.
+  - Clear Analysis·Undo 메뉴는 선택이 있을 때만 켜진다.
+  - 빈 목록에 끌어다 놓기 안내, 진행률 막대 옆에 퍼센트 라벨.
+  - Remove Tags는 실행 전 확인한다. 취소하면 파일을 바꾸지 않는다.
+- 인수 기준: [AI]
+  - Given 저장값 없음 / When 시작 / Then System 모드로 뜨고 `Could not parse stylesheet` 경고가 없다
+  - Given Dark / When Options > Theme > Light / Then 재시작 없이 바뀌고 재시작 뒤에도 Light다
+  - Given 언어 ko / When 분석·적용·undo 완료 / Then 상태바에 번역 안 된 영문 조각이 없다 (번역 파일 대조 테스트)
+  - Given 깨진 MP3 / When 분석 / Then 그 행 이름이 danger 색이고 툴팁에 오류가 있다
+  - Given 게인 적용 중 / When 창 닫기 / Then terminate를 부르지 않고 워커가 끝난 뒤 닫힌다
+  - Given Remove Tags 확인창 / When 취소 / Then audio_body_sha256과 태그가 그대로다
+  - Given 테마 적용 / When Album 분석·적용 후 undo / Then F5 성공 기준(D029)이 그대로 통과한다
+- 확인 방법: 자동 테스트, 양 테마 캡처(소스·빌드), macOS 러너(D063), 대화상자·메뉴는 Windows 실기기 사용자 확인. [U][AI]
 ## 4. 기술 결정
 | 항목 | 선택 | 버린 안 (이유) | 근거 |
 |---|---|---|---|
@@ -115,6 +141,7 @@
 | GUI | PySide6, 코어 직접 import | exe subprocess | D007 |
 | 배포 | PyInstaller onedir | onefile (LGPLv3) | D020 |
 | 라이선스 | LGPL-2.1-or-later | Apache-2.0 / MIT 혼합 | D006 |
+| 테마 | Graphite/Paper 생성물(`gui/theme.py`), Fusion 기반, PySide6 ≥6.8 | 직접 만든 QSS / 팔레트 위임 유지 | D057, D058 |
 | CI | GitHub Actions (Windows·macOS·Ubuntu), mp3gain CLI 대조 포함 | 수동 대조만 | D038, D039 |
 
 ## 5. 비기능 요구
@@ -129,6 +156,7 @@
 - 전체 테스트 명령과 걸리는 시간: `python -m unittest discover -s tests` (139건). 약 3분 (184초, Python 3.15.1, 2026-10-25 측정, D046). [X]
 - 편집 때 자동 검사 (확장자별 린터·타입 검사 명령): `.py` → `python -m py_compile <파일>`. [U] (D040)
 - 위험한 명령 (실행 전 확인 대상): git push, git tag, gh release, build_release.ps1, `_local/` 삭제. [U] (D041)
+- macOS 검증: GitHub Actions macOS 러너에서 실제 플랫폼 실행, 양 테마 캡처, 조작 자동 실행, PyInstaller 결과 실행. 네이티브 메뉴·파일 대화상자·Finder 드래그는 확인하지 못하며 릴리스 노트에 밝힌다. [U] (D063)
 - 의존성 취약점 검사: 릴리스 빌드 전 `pip-audit -r requirements.txt` 수동 실행. lock 파일 없음. [U][AI] (D054)
 - 버전 관리 (커밋 단위, 메시지 형식): 의미 단위마다 커밋, Conventional Commits, 신원 metapbl / ggoyong2@gmail.com. [X] 브랜치는 main 하나. [U] (D030)
 
@@ -142,3 +170,4 @@
 | 2026-10-25 | 질의응답 반영, PRD 검사 보완 | Q023~Q043, D026~D046 |
 | 2026-10-25 | 구현 반영: peak 허용 오차(§1), F6 GUI 확인 시점에 Gain 버튼 추가 | Q046~Q048, D048~D050, 실기기 확인 |
 | 2026-10-29 | 보안 정책 추가 (§2.6, §6, `docs/SECURITY_POLICY.md`) | Q049, D051~D056 |
+| 2026-11-05 | 1.0 범위: F7 테마와 UX, macOS 러너 검증, 1.0.0 릴리스 (§2.1, §3, §4, §6) | Q050, Q051, D057~D063 |

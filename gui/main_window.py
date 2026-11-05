@@ -110,7 +110,7 @@ from PySide6.QtWidgets import (
     QSystemTrayIcon, QStyle, QApplication, QMessageBox,
 )
 
-from PySide6.QtGui import QAction, QActionGroup, QColor, QKeySequence
+from PySide6.QtGui import QAction, QActionGroup, QColor, QKeySequence, QPainter
 
 from gui import theme
 from gui.model import FileTableModel, SORT_ROLE
@@ -295,6 +295,20 @@ class FileTableView(QTableView):
         self._rubber_origin = QPoint()
         self._rubber_active = False
         self._rubber_additive = False
+        theme.notifier.changed.connect(self._repaint_viewport)
+
+    def _repaint_viewport(self):
+        self.viewport().update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        # 빈 목록에는 끌어다 놓기 안내를 그린다.
+        model = self.model()
+        if model is not None and model.rowCount() == 0:
+            painter = QPainter(self.viewport())
+            painter.setPen(QColor(theme.color("faint")))
+            painter.drawText(self.viewport().rect(), Qt.AlignmentFlag.AlignCenter,
+                             self.tr("Drag MP3 files or folders here"))
 
     def keyPressEvent(self, event):
         # macOS 의 delete 키는 Backspace 로 들어온다.
@@ -746,6 +760,9 @@ class MainWindow(QMainWindow):
             self.tray_act_exit.setText(self.tr("Exit"))
             self._tray.setToolTip("Gain dB")
 
+        # 빈 목록 안내도 다시 그린다.
+        self.table.viewport().update()
+
         # 컬럼 헤더는 model.headerData 가 tr() 하므로 헤더 갱신 신호만.
         self.model.headerDataChanged.emit(
             Qt.Orientation.Horizontal, 0, COLUMN_COUNT - 1)
@@ -871,6 +888,14 @@ class MainWindow(QMainWindow):
         self.progress = QProgressBar(self)
         self.progress.setValue(0)
         prog_row.addWidget(self.progress, 1)
+        # 테마가 막대 안 글자를 숨기므로 퍼센트는 옆 라벨에 쓴다.
+        self.lbl_percent = QLabel("0%", self)
+        self.lbl_percent.setMinimumWidth(
+            self.lbl_percent.fontMetrics().horizontalAdvance("100%"))
+        self.lbl_percent.setAlignment(Qt.AlignmentFlag.AlignRight
+                                      | Qt.AlignmentFlag.AlignVCenter)
+        prog_row.addWidget(self.lbl_percent)
+        self.progress.valueChanged.connect(self._update_percent)
         self.btn_action = QPushButton(self.tr("Cancel"), self)
         self.btn_action.setEnabled(False)
         self.btn_action.clicked.connect(self._on_action_button)
@@ -878,6 +903,11 @@ class MainWindow(QMainWindow):
         layout.addLayout(prog_row)
 
         self.setCentralWidget(central)
+
+    def _update_percent(self, value: int) -> None:
+        span = self.progress.maximum() - self.progress.minimum()
+        percent = (value - self.progress.minimum()) * 100 // span if span > 0 else 0
+        self.lbl_percent.setText(f"{percent}%")
 
     def _build_statusbar(self):
         self.statusBar().showMessage(self.tr("Ready"))

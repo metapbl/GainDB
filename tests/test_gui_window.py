@@ -184,6 +184,17 @@ class ThemeMenuTest(WindowTestBase):
         self.assertTrue(self.win.act_theme_system.isChecked())
 
 
+class ProgressLabelTest(WindowTestBase):
+    def test_percent_label_follows_progress(self):
+        self.win.progress.setRange(0, 4000)
+        self.win.progress.setValue(2000)
+        self.assertEqual(self.win.lbl_percent.text(), "50%")
+        self.win.progress.setValue(4000)
+        self.assertEqual(self.win.lbl_percent.text(), "100%")
+        self.win.progress.setValue(0)
+        self.assertEqual(self.win.lbl_percent.text(), "0%")
+
+
 class MenuStateTest(WindowTestBase):
     def test_selection_actions_follow_selection(self):
         self.win.table.clearSelection()

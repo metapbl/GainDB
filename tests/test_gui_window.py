@@ -81,6 +81,23 @@ class DeleteKeyTest(WindowTestBase):
         self.assertEqual(self.win.model.rowCount(), 2)
 
 
+class ThemeMenuTest(WindowTestBase):
+    def test_select_applies_and_persists(self):
+        from PySide6.QtCore import QSettings
+        from gui import theme
+        self.win.act_theme_dark.trigger()
+        self.assertEqual(theme.current(), "dark")
+        self.win.act_theme_light.trigger()
+        self.assertEqual(theme.current(), "light")
+        self.assertEqual(QSettings("GaindBTest", "GaindBTest").value("ui/theme_mode"), "light")
+        again = self.mw.MainWindow()
+        self.addCleanup(again.deleteLater)
+        self.assertTrue(again.act_theme_light.isChecked())
+
+    def test_system_is_default(self):
+        self.assertTrue(self.win.act_theme_system.isChecked())
+
+
 class MenuStateTest(WindowTestBase):
     def test_selection_actions_enabled_without_selection(self):
         self.win.table.clearSelection()

@@ -526,6 +526,19 @@ class MainWindow(QMainWindow):
             "When minimized, hide the window and show a system tray icon"))
         self.act_minimize_to_tray.toggled.connect(self._on_toggle_tray_option)
 
+        # Theme — 시스템 따라가기/다크/라이트 상호배타 선택(즉시 전환·저장).
+        self.menu_theme = QMenu(self.tr("Theme"), self)
+        self._theme_group = QActionGroup(self)
+        self._theme_group.setExclusive(True)
+        saved_mode = self._settings.value("ui/theme_mode", "system", type=str)
+        self.act_theme_system = self._add_theme_action(
+            self.tr("System"), "system", saved_mode)
+        self.act_theme_dark = self._add_theme_action(
+            self.tr("Dark"), "dark", saved_mode)
+        self.act_theme_light = self._add_theme_action(
+            self.tr("Light"), "light", saved_mode)
+        self._theme_group.triggered.connect(self._on_theme_selected)
+
         # Logs... — 로그 설정 다이얼로그 열기.
         self.act_logs = QAction(self.tr("Logs..."), self)
         self.act_logs.setToolTip(self.tr(
@@ -544,6 +557,21 @@ class MainWindow(QMainWindow):
         self.act_about.setToolTip(self.tr(
             "Show program information and license notices"))
         self.act_about.triggered.connect(self._on_about)
+
+    def _add_theme_action(self, text: str, mode: str, saved_mode: str) -> QAction:
+        action = QAction(text, self)
+        action.setCheckable(True)
+        action.setData(mode)
+        action.setChecked(mode == saved_mode)
+        self._theme_group.addAction(action)
+        self.menu_theme.addAction(action)
+        return action
+
+    def _on_theme_selected(self, action: QAction):
+        """Theme 메뉴 선택: 저장하고 즉시 전환한다."""
+        mode = action.data()
+        self._settings.setValue("ui/theme_mode", mode)
+        theme.apply_theme(QApplication.instance(), mode)
 
     def _wire_menu_actions(self):
         """툴바 Track 액션이 만들어진 뒤 메뉴에 배치한다(액션 공유)."""
@@ -565,6 +593,7 @@ class MainWindow(QMainWindow):
         self.menu_options.addAction(self.act_each_folder_album)
         self.menu_options.addAction(self.act_minimize_to_tray)
         self.menu_options.addSeparator()
+        self.menu_options.addMenu(self.menu_theme)
         self.menu_options.addAction(self.act_logs)
         self.menu_options.addAction(self.act_reset_columns)
 
@@ -673,6 +702,10 @@ class MainWindow(QMainWindow):
         self.act_minimize_to_tray.setText(self.tr("Minimize to tray"))
         self.act_minimize_to_tray.setToolTip(self.tr(
             "When minimized, hide the window and show a system tray icon"))
+        self.menu_theme.setTitle(self.tr("Theme"))
+        self.act_theme_system.setText(self.tr("System"))
+        self.act_theme_dark.setText(self.tr("Dark"))
+        self.act_theme_light.setText(self.tr("Light"))
         self.act_logs.setText(self.tr("Logs..."))
         self.act_logs.setToolTip(self.tr(
             "Configure error / analysis / change log files"))

@@ -1,13 +1,13 @@
 # PROGRESS — Gain dB (GaindB)
 
 ## 상태
-- 단계: 8 구현 · 계획: docs/plans/2026-11-05-v100-theme-ux.md (active, 작업 14 마무리 중)
+- 단계: 8 구현 · 계획: docs/plans/2026-11-05-v100-theme-ux.md (active, 작업 15 대기)
 - 버전: 1.0.0 준비 중 (게시는 0.6.0까지) · 테스트 171건 (로컬 OK, skip 2 = mp3gain 대조 / CI 3개 OS 초록, run 41944181600), 약 2분 (.venv Python 3.15.1)
 - 갱신: 2026-11-05 · 태그 v0.6.0 = 6811d44 · 보안 정책 승인 (docs/SECURITY_POLICY.md, 수준 기본, D051~D056)
 
 ## 다음 할 일
 1. AVD 사본 동기화 (D012, D050): 사용자가 별도로 진행. 대상: `gaindb/decode.py`(find_ffmpeg, stdin=DEVNULL)
-2. v1.0.0 작업 15 실기기 확인 → 16 Release → 17 인수 확인. macOS 라이트 화면 캡처 재확인 필요 (작업 14)
+2. v1.0.0 작업 15 실기기 확인 → 릴리스 노트 승인 → 16 Release → 17 인수 확인
 
 ## 미해결
 - 없음

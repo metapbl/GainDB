@@ -15,18 +15,21 @@ Analysis numbers, tags and CLI output are unchanged from 0.6.0. This release is 
 - Backspace now removes selected rows from the list, like Delete (the files are not touched). This is the delete key on a Mac keyboard.
 - Clear Analysis and Undo Gain Changes in the menus are enabled only when files are selected.
 - Shortcut hints in tooltips use your system's notation (⌘ on macOS).
+- **Logs have default locations.** Options > Logs now shows default files in `Documents\Gain dB\` (`GainDB-error.log`, `GainDB-analysis.log`, `GainDB-change.log`). Logs stay off until you tick them, and a log file and its folder are created only when the first line is written.
+- The Analysis Log also records files that already had values (from tags or an earlier analysis) when you run Track Analysis, as the original mp3gain does. TrackdB is written with two decimals.
+- The first window opens wide enough to show every column without a horizontal scrollbar, with a height in golden ratio to its width. Numeric columns are sized to their headers. Saved window and column sizes from earlier versions are reset once.
 - PySide6 6.8 or newer is now required.
 
 ### Fixed
 - **Album Gain and broken files.** One unreadable MP3 in an album made Album Gain skip every file and report nothing. The broken file is now marked as failed and the rest of the album is processed, as Album Analysis and the CLI already did.
 - **Closing the window during a file change.** The window could force-stop a worker that was still writing a file after 10 seconds. It now waits for the write to finish.
 - **Korean status bar.** Many status bar messages stayed in English in the Korean UI. They are now translated as whole sentences.
-- **Log options: Browse did nothing.** The Browse buttons in Options > Logs did not open a file dialog. They now open the file dialog, stay available while a log is off, and choosing a file turns that log on.
+- **Log options: Browse did nothing.** The Browse buttons in Options > Logs did not open a file dialog. They now open the file dialog.
 - The application name was still "MP3 Gain" in places. It is now "Gain dB".
 
 ### Verification
 - CI on Windows, macOS and Ubuntu (Python 3.13). On macOS and Ubuntu the results are compared with the original mp3gain 1.6.2 CLI, including an album with a broken file.
-- **macOS was checked on GitHub Actions macOS runners, not on a Mac in hand:** the GUI ran on the real platform through add, analyze, apply and undo, with screenshots of both themes, from source and from a PyInstaller build. File dialogs and dragging from Finder were not exercised. Please report anything that looks wrong.
+- **macOS was checked on GitHub Actions macOS runners, not on a Mac in hand:** the GUI ran on the real platform through add, analyze, apply and undo, with screenshots of both themes, from source and from a PyInstaller build. Open menus, file and confirmation dialogs, and dragging from Finder were not exercised. Please report anything that looks wrong.
 - Windows was also checked by hand on a real machine.
 
 ### Download

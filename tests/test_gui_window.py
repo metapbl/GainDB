@@ -172,21 +172,31 @@ class LogsDialogTest(unittest.TestCase):
             QTest.mouseClick(self.dialog._error.browse, Qt.MouseButton.LeftButton)
         ask.assert_called_once()
 
-    def test_rows_are_usable_while_log_is_off(self):
+    def test_rows_are_locked_while_log_is_off(self):
         row = self.dialog._error
         self.assertFalse(row.check.isChecked())
+        self.assertFalse(row.browse.isEnabled())
+        self.assertFalse(row.edit.isEnabled())
+        row.check.setChecked(True)
         self.assertTrue(row.browse.isEnabled())
         self.assertTrue(row.edit.isEnabled())
 
-    def test_choosing_a_file_turns_the_log_on(self):
+    def test_choosing_a_file_sets_the_path(self):
+        self.dialog._error.check.setChecked(True)
         self.browse(self.path)
         self.assertEqual(self.dialog._error.path, self.path)
         self.assertTrue(self.dialog._error.enabled)
 
     def test_cancelling_the_file_dialog_changes_nothing(self):
+        self.dialog._error.check.setChecked(True)
         self.browse("")
         self.assertEqual(self.dialog._error.path, "")
-        self.assertFalse(self.dialog._error.enabled)
+
+    def test_ok_does_not_create_the_file(self):
+        self.dialog._error.check.setChecked(True)
+        self.dialog._error.edit.setText(self.path)
+        self.dialog._on_ok()
+        self.assertFalse(os.path.exists(self.path))
 
     def test_ok_saves_a_typed_path(self):
         self.dialog._error.check.setChecked(True)
@@ -201,6 +211,71 @@ class LogsDialogTest(unittest.TestCase):
         self.dialog._on_ok()
         self.assertFalse(self.config.error_enabled)
         self.assertEqual(self.config.error_path, self.path)
+
+
+class LogDefaultsTest(WindowTestBase):
+    def test_default_paths_are_shown_but_off(self):
+        c = self.win._log_config
+        for kind, path, enabled in (("error", c.error_path, c.error_enabled),
+                                    ("analysis", c.analysis_path, c.analysis_enabled),
+                                    ("change", c.change_path, c.change_enabled)):
+            with self.subTest(kind=kind):
+                self.assertFalse(enabled)
+                self.assertEqual(os.path.basename(path), f"GainDB-{kind}.log")
+                self.assertEqual(os.path.basename(os.path.dirname(path)), "Gain dB")
+
+    def test_analysis_logs_rows_that_already_have_values(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        log = os.path.join(tmp.name, "analysis.log")
+        self.win._log_config.analysis_enabled = True
+        self.win._log_config.analysis_path = log
+        row = self.win.model.get_row(0)
+        row.set_tag_result({"status": "ok", "track_db": -0.14, "curr_max_amp": 15530.2})
+        self.win.table.selectRow(0)
+        with mock.patch.object(self.mw, "AnalyzeWorker") as worker:
+            self.win._on_analyze()
+        worker.assert_not_called()
+        with open(log, encoding="utf-8") as fh:
+            line = fh.read().splitlines()[0]
+        self.assertEqual(line.split("\t")[1:], ["a.mp3", "TrackdB: -0.14", "MaxAmp: 15530"])
+
+
+class DefaultWindowTest(WindowTestBase):
+    def test_numeric_columns_fit_their_headers(self):
+        from PySide6.QtCore import Qt
+        from gui.columns import COLUMNS, Col
+        fm = self.win.table.horizontalHeader().fontMetrics()
+        for cdef in COLUMNS:
+            if cdef.index == Col.NAME:
+                continue
+            header = self.win.model.headerData(int(cdef.index), Qt.Orientation.Horizontal)
+            with self.subTest(column=cdef.header):
+                self.assertGreaterEqual(self.win.table.columnWidth(int(cdef.index)),
+                                        fm.horizontalAdvance(header) + 30)
+
+    def test_default_size_has_no_horizontal_scroll_and_golden_height(self):
+        width, height = self.win._default_window_extent()
+        self.assertEqual(height, round(width / 1.618))
+        self.win.resize(width, height)
+        self.win.show()
+        self.addCleanup(self.win.hide)
+        self.app.processEvents()
+        self.assertEqual(self.win.table.horizontalScrollBar().maximum(), 0)
+
+    def test_settings_from_before_1_0_are_ignored_once(self):
+        from PySide6.QtCore import QSettings
+        s = QSettings("GaindBTest", "GaindBTest")
+        s.setValue("columns/count", 8)
+        s.setValue("columns/width_1", 333)
+        old = self.mw.MainWindow()
+        self.addCleanup(old.deleteLater)
+        self.assertNotEqual(old.table.columnWidth(1), 333)
+        old._save_settings()
+        s.setValue("columns/width_1", 333)
+        again = self.mw.MainWindow()
+        self.addCleanup(again.deleteLater)
+        self.assertEqual(again.table.columnWidth(1), 333)
 
 
 class DialogSmokeTest(WindowTestBase):

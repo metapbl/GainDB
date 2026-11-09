@@ -101,7 +101,7 @@ import sys
 
 from PySide6.QtCore import (
     Qt, QSortFilterProxyModel, QCollator, QModelIndex, Signal, QRect, QPoint,
-    QSettings, QByteArray, QEvent,
+    QSettings, QByteArray, QEvent, QStandardPaths,
 )
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox,
@@ -139,6 +139,9 @@ _PROGRESS_SCALE = 1000
 # 파일을 바꾸는 워커 종류(창을 닫아도 강제 종료하지 않는다).
 _FILE_WRITING_KINDS = ("apply", "album_apply", "action")
 
+# 이 값이 저장값과 다르면 이전 창 크기·컬럼 폭을 한 번 무시한다(1.0 기본 배치, D069).
+_LAYOUT_VERSION = 1
+
 # QSettings 조직/앱 이름(크로스플랫폼: Win=레지스트리, macOS=plist).
 _SETTINGS_ORG = "GaindB"
 _SETTINGS_APP = "GaindB"
@@ -165,6 +168,12 @@ QTableView::item {
 def _fill(template: str, *args) -> str:
     """번역된 문장의 %1, %2 ... 를 값으로 바꾼다(한 번에 바꿔 값 안의 %를 건드리지 않음)."""
     return re.sub(r"%(\d)", lambda m: str(args[int(m.group(1)) - 1]), template)
+
+
+def _default_log_path(kind: str) -> str:
+    """로그 기본 경로: 문서\\Gain dB\\GainDB-<kind>.log (파일은 첫 기록 때 만든다)."""
+    docs = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
+    return os.path.join(docs, "Gain dB", f"GainDB-{kind}.log")
 
 
 def collect_mp3_paths(paths, recurse: bool = True) -> list[str]:
@@ -876,7 +885,7 @@ class MainWindow(QMainWindow):
         for cdef in COLUMNS:
             header.setSectionResizeMode(
                 int(cdef.index), QHeaderView.ResizeMode.Interactive)
-            self.table.setColumnWidth(int(cdef.index), cdef.default_width)
+            self.table.setColumnWidth(int(cdef.index), self._default_column_width(cdef))
         self.model.rowsInserted.connect(self._update_action_states)
         self.model.rowsRemoved.connect(self._update_action_states)
         self.model.modelReset.connect(self._update_action_states)
@@ -1034,11 +1043,12 @@ class MainWindow(QMainWindow):
         s = self._settings
         c = self._log_config
         c.error_enabled = s.value("logs/error_enabled", False, type=bool)
-        c.error_path = s.value("logs/error_path", "", type=str)
+        c.error_path = s.value("logs/error_path", "", type=str) or _default_log_path("error")
         c.analysis_enabled = s.value("logs/analysis_enabled", False, type=bool)
-        c.analysis_path = s.value("logs/analysis_path", "", type=str)
+        c.analysis_path = (s.value("logs/analysis_path", "", type=str)
+                           or _default_log_path("analysis"))
         c.change_enabled = s.value("logs/change_enabled", False, type=bool)
-        c.change_path = s.value("logs/change_path", "", type=str)
+        c.change_path = s.value("logs/change_path", "", type=str) or _default_log_path("change")
 
     def _load_tray_config(self):
         """QSettings 에서 트레이 옵션(minimize_to_tray)을 복원한다(기본 꺼짐)."""
@@ -1067,21 +1077,31 @@ class MainWindow(QMainWindow):
         except LogWriteError as exc:
             self.statusBar().showMessage(_fill(self.tr("Log write failed: %1"), exc))
 
-    def _default_window_size(self):
-        """저장된 geometry 가 없을 때, 전 컬럼 default_width 합계에 맞춰 초기
-        창 가로폭을 정한다(모든 컬럼이 잘리지 않고 딱 보이는 폭). 고정 폼이
-        아니라 이 자동 맞춤은 우리 확장이다."""
-        total = sum(cdef.default_width for cdef in COLUMNS)
+    def _default_column_width(self, cdef) -> int:
+        """숫자 컬럼은 헤더 글자(영문·현재 언어 중 넓은 쪽)+여백·정렬 화살표 30px 에 맞춘다."""
+        if cdef.index == Col.NAME:
+            return cdef.default_width
+        fm = self.table.horizontalHeader().fontMetrics()
+        header = self.model.headerData(int(cdef.index), Qt.Orientation.Horizontal)
+        text = max(fm.horizontalAdvance(cdef.header), fm.horizontalAdvance(header))
+        return max(cdef.default_width, text + 30)
 
-        frame = self.table.frameWidth() * 2
-        vbar = self.table.verticalScrollBar().sizeHint().width()
+    def _default_window_extent(self) -> tuple[int, int]:
+        """가로 스크롤이 생기지 않는 창 폭과 황금비(폭/1.618) 높이."""
+        total = sum(self.table.columnWidth(int(cdef.index)) for cdef in COLUMNS)
+        layout = self.centralWidget().layout().contentsMargins()
         margins = self.contentsMargins()
-        extra = frame + vbar + 4 + margins.left() + margins.right()
+        extra = (self.table.frameWidth() * 2
+                 + self.table.verticalScrollBar().sizeHint().width()
+                 + layout.left() + layout.right() + margins.left() + margins.right() + 4)
+        width = total + extra
+        return width, round(width / 1.618)
 
+    def _default_window_size(self):
+        """저장된 geometry 가 없을 때의 처음 창 크기. 화면보다 크면 줄인다."""
+        width, height = self._default_window_extent()
         avail = self.screen().availableGeometry()
-        width = min(total + extra, avail.width())
-        height = max(600, int(avail.height() * 0.6))
-        self.resize(width, height)
+        self.resize(min(width, avail.width()), min(height, avail.height()))
 
     def _restore_settings(self):
         """QSettings 에서 창 기하·컬럼폭·정렬 상태를 복원한다(시작 시).
@@ -1091,14 +1111,15 @@ class MainWindow(QMainWindow):
         COLUMN_COUNT 와 다르면 통째로 건너뛰어(스키마 불일치 방어)
         default_width 초기값을 유지한다.
         """
+        current = self._settings.value("layout/version", 0, type=int) == _LAYOUT_VERSION
         geo = self._settings.value("window/geometry")
-        if isinstance(geo, QByteArray) and not geo.isEmpty():
+        if current and isinstance(geo, QByteArray) and not geo.isEmpty():
             self.restoreGeometry(geo)
         else:
             self._default_window_size()
 
         saved_count = self._settings.value("columns/count", type=int)
-        if saved_count == COLUMN_COUNT:
+        if current and saved_count == COLUMN_COUNT:
             for cdef in COLUMNS:
                 key = f"columns/width_{int(cdef.index)}"
                 w = self._settings.value(key, type=int)
@@ -1120,6 +1141,7 @@ class MainWindow(QMainWindow):
         저장 매체·키는 우리 독립 결정이다. 언어(i18n/language)는 선택 순간
         save_language 가 저장하므로 여기선 안 한다.
         """
+        self._settings.setValue("layout/version", _LAYOUT_VERSION)
         self._settings.setValue("window/geometry", self.saveGeometry())
 
         self._settings.setValue("columns/count", COLUMN_COUNT)
@@ -1145,9 +1167,9 @@ class MainWindow(QMainWindow):
             "tray/minimize_to_tray", self._minimize_to_tray)
 
     def _reset_column_widths(self):
-        """모든 컬럼폭을 columns.py 의 default_width 로 되돌린다."""
+        """모든 컬럼폭을 기본 폭으로 되돌린다."""
         for cdef in COLUMNS:
-            self.table.setColumnWidth(int(cdef.index), cdef.default_width)
+            self.table.setColumnWidth(int(cdef.index), self._default_column_width(cdef))
         self.statusBar().showMessage(self.tr("Column widths reset to defaults"))
 
     # --- Album 씨앗 관리 ---
@@ -1360,8 +1382,13 @@ class MainWindow(QMainWindow):
         paths = []
         for r in self._target_source_rows():
             fr = self.model.get_row(r)
-            if fr is not None and fr.needs_analysis():
+            if fr is None:
+                continue
+            if fr.needs_analysis():
                 paths.append(fr.path)
+            else:
+                # 원본처럼 이미 값이 있는 파일도 분석 로그에 남긴다(디코딩 없음, D067).
+                self._log_track_result(fr.path, fr.result)
 
         if not paths:
             self.statusBar().showMessage(self.tr(
@@ -1763,8 +1790,11 @@ class MainWindow(QMainWindow):
         fr = self.model.get_row(r)
         fr.set_result(result)
         self.model.row_changed(r)
-        # Analysis Log: 분석된 Track dB·MaxAmp 기록.
-        if result.get("status") == "ok" and result.get("track_db") is not None:
+        self._log_track_result(path, result)
+
+    def _log_track_result(self, path: str, result: dict | None):
+        """Analysis Log 에 Track dB·MaxAmp 한 줄(값이 있을 때만)."""
+        if result and result.get("status") == "ok" and result.get("track_db") is not None:
             self._safe_log(
                 log_analysis_track, self._log_config, path,
                 result.get("track_db"), result.get("curr_max_amp") or 0.0)

@@ -23,6 +23,7 @@ Qt 없이 검증 가능). 파일 쓰기 실패는 삼키지 않고 LogWriteError
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -72,6 +73,8 @@ def _append_line(path: str, line: str) -> None:
     먼저 확인하므로 여기서는 path 가 비어있지 않다고 가정한다.
     """
     try:
+        # 기본 경로의 폴더는 첫 기록 때 만든다.
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         with open(path, "a", encoding="utf-8") as fh:
             fh.write(line + "\n")
     except OSError as exc:
@@ -79,19 +82,21 @@ def _append_line(path: str, line: str) -> None:
 
 
 def check_writable(path: str) -> bool:
-    """path 를 append 모드로 열 수 있는지 검사한다.
+    """path 에 로그를 쓸 수 있어 보이는지 파일을 만들지 않고 검사한다(다이얼로그 OK).
 
-    파일이 없으면 만들어질 수 있는지까지 포함해 확인한다(append 는 없으면 생성).
-    성공하면 True, 실패하면 False. 다이얼로그 OK 검증에서 쓴다.
+    파일이 있으면 그 파일, 없으면 가장 가까운 기존 상위 폴더의 쓰기 권한을 본다.
+    shortcut: Windows 의 os.access 는 폴더 ACL 을 보지 않는다. 실제 실패는 첫 기록 때
+    LogWriteError 로 상태바에 나온다.
     """
     if not path:
         return False
-    try:
-        with open(path, "a", encoding="utf-8"):
-            pass
-        return True
-    except OSError:
-        return False
+    path = os.path.abspath(path)
+    if os.path.exists(path):
+        return os.path.isfile(path) and os.access(path, os.W_OK)
+    parent = os.path.dirname(path)
+    while not os.path.exists(parent):
+        parent = os.path.dirname(parent)
+    return os.path.isdir(parent) and os.access(parent, os.W_OK)
 
 
 def _fmt_db(steps: int) -> str:
@@ -119,7 +124,7 @@ def log_analysis_track(cfg: LogConfig, path: str,
     if not cfg.analysis_active():
         return
     line = (f"{_timestamp()}\t{path}\t"
-            f"TrackdB: {track_db}\tMaxAmp: {int(round(max_amp))}")
+            f"TrackdB: {track_db:.2f}\tMaxAmp: {int(round(max_amp))}")
     _append_line(cfg.analysis_path, line)
 
 

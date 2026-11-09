@@ -18,7 +18,7 @@ ColumnDef 시그니처 유지를 위해 채워 둔다.
 default_width: 컬럼 초기폭(px). 최초 실행(저장된 폭 없음)과 "Reset Column
 Widths"에서 이 값으로 되돌린다. 전 컬럼이 Interactive(사용자 드래그로 개별
 조절, 넘치면 가로 스크롤)라 NAME 도 이 폭이 실제 초기값이 된다(Path\File 은
-넉넉히 480).
+넉넉히 420).
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ class ColumnDef:
     index         : Col 값(위치).
     header        : 헤더 표기(영문, tr 은 후속).
     align         : 셀 정렬 플래그(Qt.AlignmentFlag).
-    default_width : 초기폭(px). 최초 실행·Reset 시 적용.
+    default_width : 초기폭(px). 숫자 컬럼은 헤더 글자 폭+30 과 이 값 중 큰 값(최소값).
     sort_key      : FileRow 를 받아 정렬용 값을 돌려주는 함수(현재 미사용, 준비만).
     """
     index: Col
@@ -73,21 +73,21 @@ _CENTER = Qt.AlignmentFlag.AlignCenter
 
 
 COLUMNS: tuple[ColumnDef, ...] = (
-    ColumnDef(Col.NAME, QT_TRANSLATE_NOOP("FileTableModel", "Path\\File"), _LEFT, 480,
+    ColumnDef(Col.NAME, QT_TRANSLATE_NOOP("FileTableModel", "Path\\File"), _LEFT, 420,
               lambda row: str(getattr(row, "path", "")).lower()),
-    ColumnDef(Col.VOLUME, QT_TRANSLATE_NOOP("FileTableModel", "Volume"), _RIGHT, 80,
+    ColumnDef(Col.VOLUME, QT_TRANSLATE_NOOP("FileTableModel", "Volume"), _RIGHT, 72,
               lambda row: _num_or_min(None)),
-    ColumnDef(Col.TRACK_GAIN, QT_TRANSLATE_NOOP("FileTableModel", "Track Gain"), _RIGHT, 90,
+    ColumnDef(Col.TRACK_GAIN, QT_TRANSLATE_NOOP("FileTableModel", "Track Gain"), _RIGHT, 80,
               lambda row: _num_or_min(None)),
-    ColumnDef(Col.CLIP, QT_TRANSLATE_NOOP("FileTableModel", "clipping"), _CENTER, 70,
+    ColumnDef(Col.CLIP, QT_TRANSLATE_NOOP("FileTableModel", "clipping"), _CENTER, 72,
               lambda row: ""),
     ColumnDef(Col.ALBUM_VOLUME, QT_TRANSLATE_NOOP("FileTableModel", "Album Volume"), _RIGHT, 100,
               lambda row: _num_or_min(None)),
-    ColumnDef(Col.ALBUM_GAIN, QT_TRANSLATE_NOOP("FileTableModel", "Album Gain"), _RIGHT, 90,
+    ColumnDef(Col.ALBUM_GAIN, QT_TRANSLATE_NOOP("FileTableModel", "Album Gain"), _RIGHT, 88,
               lambda row: _num_or_min(None)),
-    ColumnDef(Col.ALBUM_CLIP, QT_TRANSLATE_NOOP("FileTableModel", "clip(Album)"), _CENTER, 80,
+    ColumnDef(Col.ALBUM_CLIP, QT_TRANSLATE_NOOP("FileTableModel", "clip(Album)"), _CENTER, 88,
               lambda row: ""),
-    ColumnDef(Col.MAX_AMP, QT_TRANSLATE_NOOP("FileTableModel", "Curr Max Amp"), _RIGHT, 110,
+    ColumnDef(Col.MAX_AMP, QT_TRANSLATE_NOOP("FileTableModel", "Curr Max Amp"), _RIGHT, 104,
               lambda row: _num_or_min(None)),
 )
 

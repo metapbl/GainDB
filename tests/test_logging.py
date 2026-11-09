@@ -10,6 +10,7 @@ enabled/path 분리 A안)이 유지되는지 회귀 고정한다.
 
 import os
 import re
+import shutil
 import tempfile
 import unittest
 
@@ -36,9 +37,7 @@ class LoggingTest(unittest.TestCase):
         self.chg = os.path.join(self.tmp, "chg.log")
 
     def tearDown(self):
-        for name in os.listdir(self.tmp):
-            os.remove(os.path.join(self.tmp, name))
-        os.rmdir(self.tmp)
+        shutil.rmtree(self.tmp)
 
     # --- 활성 판정(enabled + path, A안) ---
 
@@ -78,13 +77,13 @@ class LoggingTest(unittest.TestCase):
 
     def test_analysis_track_format(self):
         cfg = LogConfig(analysis_enabled=True, analysis_path=self.ana)
-        log_analysis_track(cfg, "C:\\music\\a.mp3", -6.5, 17196.4)
+        log_analysis_track(cfg, "C:\\music\\a.mp3", -6.50000000000001, 17196.4)
         line = _read(self.ana).splitlines()[0]
         self.assertRegex(line, _TS)
         # ts<TAB>path<TAB>TrackdB: <db><TAB>MaxAmp: <int>
         parts = line.split("\t")
         self.assertEqual(parts[1], "C:\\music\\a.mp3")
-        self.assertEqual(parts[2], "TrackdB: -6.5")
+        self.assertEqual(parts[2], "TrackdB: -6.50")  # 부동소수점 꼬리 없이 둘째 자리
         self.assertEqual(parts[3], "MaxAmp: 17196")  # 반올림 정수
 
     def test_analysis_album_format(self):
@@ -122,15 +121,22 @@ class LoggingTest(unittest.TestCase):
 
     # --- check_writable ---
 
-    def test_check_writable_ok(self):
-        target = os.path.join(self.tmp, "new.log")
-        self.assertTrue(check_writable(target))  # 없으면 생성 가능해야 True
+    def test_check_writable_ok_without_creating(self):
+        target = os.path.join(self.tmp, "sub", "new.log")
+        self.assertTrue(check_writable(target))
+        self.assertFalse(os.path.exists(os.path.dirname(target)))  # 파일은 첫 기록 때 만든다
+
+    def test_first_write_creates_folder(self):
+        target = os.path.join(self.tmp, "sub", "err.log")
+        log_error(LogConfig(error_enabled=True, error_path=target), "boom")
+        self.assertTrue(os.path.isfile(target))
 
     def test_check_writable_empty_false(self):
         self.assertFalse(check_writable(""))
 
-    def test_check_writable_bad_dir_false(self):
-        bad = os.path.join(self.tmp, "no_such_dir", "x.log")
+    def test_check_writable_under_a_file_false(self):
+        bad = os.path.join(self.err, "x.log")
+        open(self.err, "w").close()
         self.assertFalse(check_writable(bad))
 
 

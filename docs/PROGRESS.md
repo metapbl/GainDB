@@ -1,19 +1,19 @@
 # PROGRESS — Gain dB (GaindB)
 
 ## 상태
-- 단계: 8 구현 · 계획: docs/plans/2026-11-05-v100-theme-ux.md (active, 작업 15 대기)
-- 버전: 1.0.0 준비 중 (게시는 0.6.0까지) · 테스트 171건 (로컬 OK, skip 2 = mp3gain 대조 / CI 3개 OS 초록, run 41944181600), 약 2분 (.venv Python 3.15.1)
-- 갱신: 2026-11-05 · 태그 v0.6.0 = 6811d44 · 보안 정책 승인 (docs/SECURITY_POLICY.md, 수준 기본, D051~D056)
+- 단계: 8 구현 · 활성 계획 없음 (2026-11-05-v100-theme-ux done)
+- 버전: 1.0.0 게시 (태그 v1.0.0 = a386935) · 테스트 184건 (로컬 OK, skip 2 = mp3gain 대조 / CI 3개 OS·macOS GUI 러너 초록, run 42620067002·42620078216), 약 2분 (.venv Python 3.15.1)
+- 갱신: 2026-11-10 · 보안 정책 승인 (docs/SECURITY_POLICY.md, 수준 기본, D051~D056)
 
 ## 다음 할 일
-1. AVD 사본 동기화 (D012, D050): 사용자가 별도로 진행. 대상: `gaindb/decode.py`(find_ffmpeg, stdin=DEVNULL)
-2. v1.0.0 작업 15 실기기 확인 → 릴리스 노트 승인 → 16 Release → 17 인수 확인
+1. AVD 사본 동기화 (D012, D050): 사용자가 별도로 진행. 대상: `gaindb/decode.py`(find_ffmpeg, stdin=DEVNULL), `gaindb/__init__.py`(버전 1.0.0)
+2. 1.0 이후 원본 옵션 계획 (D070): 날짜 보존, Track Gain no-clip, 태그 재계산
 
 ## 미해결
 - 없음
 
 ## 확인 대기 (사람만 확인 가능)
-- 작업 15: Windows 빌드 `dist/GainDB/GainDB.exe`로 메뉴·대화상자·트레이·테마 전환·끌어다 놓기 확인
+- 선택: 원본 mp3gain에서 같은 파일을 두 번 Track Analysis하면 분석 로그가 두 줄 남는지 (D067)
 <!-- head:end — 이 줄 위(40줄 이내)만 자동 주입된다. 갱신은 이 위만 고친다. -->
 
 ## 완료 기록
@@ -28,4 +28,5 @@
 - 2026-10-25 F6 ffmpeg 찾기 (bda35e8~4ca74e6) · GUI Gain 버튼 확인 (7a62dae) · stdin 가로채기 수정 (dd4c421)
 - 2026-10-25 mp3gain·GUI 대조 테스트 (2c9ea54, 403ceb0, 01234bf) · CI 3개 OS (b65e07c)
 - 2026-10-25 v0.6.0 Release (97f4c31, 태그 6811d44) — 계획 2026-10-25-v060-release done
+- 2026-11-10 v1.0.0 Release: Graphite/Paper 테마·UX 개선·로그 기본 경로 (태그 a386935) — 계획 2026-11-05-v100-theme-ux done
 - 2026-10-25 metarche 이관: PRD 승인, 결정 46개 기록 (커밋 전)

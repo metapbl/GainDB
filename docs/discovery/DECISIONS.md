@@ -90,3 +90,4 @@
 | D072 | 2026-11-10 | UX | GUI "Don't clip when doing Track Gain"은 원본 GUI 식(min(제안, 최대 무클립 스텝), 제안 0이어도 낮춤)을 따르고 Track Gain에만 쓴다. CLI `-k`는 그대로 | [U] | Q057 | CLI `-k` 식 재사용 | 확정 |
 | D073 | 2026-11-10 | UX | GUI "Re-calculate (do not read tags)"는 파일 추가 때 태그를 읽지 않는 것으로 구현한다. GaindB Track Analysis는 원래 늘 디코딩하므로 결과는 원본과 같다 | [U] | Q057 | 분석·적용마다 태그 무시 분기 | 확정 |
 | D074 | 2026-11-10 | 구현 | 1.1의 날짜 보존·Track no-clip을 코어(gaindb/)에 넣고 AVD 재동기화를 감수한다 | [U] | Q057 | GUI에만 구현 (CLI 버그 남음) | 확정 |
+| D075 | 2026-11-11 | UX | GUI Re-calculate를 Tags 하위 메뉴 대신 Options 바로 아래(Track no-clip 다음)에 둔다. 원본은 Tags 하위 메뉴지만 Ignore를 빼서 항목이 하나뿐이다. 문구·설정 키·동작은 그대로 | [U] | - | 원본처럼 Tags 하위 메뉴 유지 | 확정 |

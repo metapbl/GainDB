@@ -1,6 +1,6 @@
 # PRD — Gain dB (GaindB)
 
-상태: approved (2026-11-10) | 단계: 5 확정 | 갱신: 2026-11-10
+상태: approved (2026-11-10) | 단계: 5 확정 | 갱신: 2026-11-11
 <!-- 상태가 approved (YYYY-MM-DD)가 되기 전에는 코드·뼈대·의존성 설치를 하지 않는다. -->
 <!-- 모든 항목 끝에 출처를 단다: [U] 사용자 · [X] 기존 코드·문서 · [AI] AI 기본값. 근거 결정은 (D###). -->
 
@@ -143,7 +143,7 @@
 - 정상 흐름: Options 메뉴에 원본 mp3gain GUI 1.3.4의 체크 항목 3개를 넣는다. 설정에 저장되고 기본은 모두 꺼짐. [U] (D070, D072, D073)
   - Preserve file date/time: Track/Album Gain·Undo·Remove Tags가 파일 날짜를 지킨다.
   - Don't clip when doing Track Gain: Track Gain 적용 스텝 = min(제안 스텝, 클리핑 없는 최대 스텝). 제안이 0이어도 최대 스텝이 음수면 낮춘다. 최대 스텝 = floor(4·log2(32767/현재 최대 진폭)), 진폭을 모르면 낮추지 않는다. Album Gain에는 쓰지 않는다(원본 GUI와 같음, CLI `-k`와 다름).
-  - Tags > Re-calculate (do not read tags): 파일 추가 때 태그를 읽지 않는다. 그래서 적용 때 태그 값을 쓰지 않고 새로 분석한다.
+  - Re-calculate (do not read tags): Options 바로 아래(원본은 Tags 하위 메뉴, 항목이 하나뿐이라 올림, D075). 파일 추가 때 태그를 읽지 않는다. 그래서 적용 때 태그 값을 쓰지 않고 새로 분석한다.
 - 범위 밖: 원본 "Ignore (do not read or write tags)", Max No-clip GUI(§2.3). [U]
 - 코어 변경: 날짜 보존과 Track no-clip이 코어 api에 들어가 AVD 동기화 대상이다. [U] (D074)
 - 인수 기준: [AI]
@@ -194,3 +194,4 @@
 | 2026-11-05 | F7에 로그 창 수정 추가 | Q055, D066 |
 | 2026-11-09 | F7에 로그 기본 경로·분석 로그·기본 창 크기 추가 | Q056, D067~D070 |
 | 2026-11-10 | 1.1 범위: CLI `-p` 수정, F8 원본 GUI 옵션, 1.1.0 릴리스 (§2.1, §3). discover 결과가 저장되지 않아 사용자 승인으로 직접 수정 | Q057, D071~D074 |
+| 2026-11-11 | F8 Re-calculate를 Tags 하위 메뉴에서 Options 바로 아래로 (§3). 사용자 승인으로 직접 수정 | D075 |

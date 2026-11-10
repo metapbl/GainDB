@@ -1,6 +1,6 @@
 # PRD — Gain dB (GaindB)
 
-상태: approved (2026-11-05) | 단계: 5 확정 | 갱신: 2026-11-05
+상태: approved (2026-11-10) | 단계: 5 확정 | 갱신: 2026-11-10
 <!-- 상태가 approved (YYYY-MM-DD)가 되기 전에는 코드·뼈대·의존성 설치를 하지 않는다. -->
 <!-- 모든 항목 끝에 출처를 단다: [U] 사용자 · [X] 기존 코드·문서 · [AI] AI 기본값. 근거 결정은 (D###). -->
 
@@ -23,6 +23,10 @@
   1. macOS 러너 검증 경로 추가 (§6).
   2. F7 테마와 UX (§3).
   3. 1.0.0 GitHub Release — 완료 기준: 태그 v1.0.0·릴리스 노트·Windows onedir zip이 올라가 있고 zip 안에 LICENSE·NOTICE·THIRD_PARTY_LICENSES·licenses/qt가 있다. 노트는 AI 초안 → 사용자 승인 후 게시. 빌드 전 pip-audit. 같은 태그가 있거나 검증이 실패하면 멈추고 보고. [U][AI] (D062, D054)
+- 1.1 작업 (순서대로): [U] (D071~D074)
+  1. CLI `-p` 수정 — 완료 기준: 날짜를 바꿔 둔 사본에 `-r -c -p`·`-a -c -p`·`-u -p`를 실행하면 날짜가 그대로다(원본 exe와 같음). 수치·태그는 그대로. [U][AI] (D071)
+  2. F8 원본 GUI 옵션 (§3).
+  3. 1.1.0 GitHub Release — 완료 기준은 1.0.0과 같고, 빌드 결과 다크·라이트 캡처로 테마 1.4.1을 확인한다. [U][AI]
 ### 2.2 있으면 좋음
 - 없음. 보류 목록(2.3)이 그 역할. [U] (D034)
 ### 2.3 이번에는 안 함
@@ -135,6 +139,19 @@
   - Given Remove Tags 확인창 / When 취소 / Then audio_body_sha256과 태그가 그대로다
   - Given 테마 적용 / When Album 분석·적용 후 undo / Then F5 성공 기준(D029)이 그대로 통과한다
 - 확인 방법: 자동 테스트, 양 테마 캡처(소스·빌드), macOS 러너(D063), 대화상자·메뉴는 Windows 실기기 사용자 확인. [U][AI]
+### F8 원본 GUI 옵션 (1.1)
+- 정상 흐름: Options 메뉴에 원본 mp3gain GUI 1.3.4의 체크 항목 3개를 넣는다. 설정에 저장되고 기본은 모두 꺼짐. [U] (D070, D072, D073)
+  - Preserve file date/time: Track/Album Gain·Undo·Remove Tags가 파일 날짜를 지킨다.
+  - Don't clip when doing Track Gain: Track Gain 적용 스텝 = min(제안 스텝, 클리핑 없는 최대 스텝). 제안이 0이어도 최대 스텝이 음수면 낮춘다. 최대 스텝 = floor(4·log2(32767/현재 최대 진폭)), 진폭을 모르면 낮추지 않는다. Album Gain에는 쓰지 않는다(원본 GUI와 같음, CLI `-k`와 다름).
+  - Tags > Re-calculate (do not read tags): 파일 추가 때 태그를 읽지 않는다. 그래서 적용 때 태그 값을 쓰지 않고 새로 분석한다.
+- 범위 밖: 원본 "Ignore (do not read or write tags)", Max No-clip GUI(§2.3). [U]
+- 코어 변경: 날짜 보존과 Track no-clip이 코어 api에 들어가 AVD 동기화 대상이다. [U] (D074)
+- 인수 기준: [AI]
+  - Given 옵션 켬, 날짜를 바꿔 둔 사본 / When Track Gain·Album Gain·Undo·Remove Tags / Then 날짜가 그대로다
+  - Given 클리핑이 나는 사본, 옵션 켬 / When Track Gain / Then 적용 스텝이 클리핑 없는 최대 스텝이다. 옵션을 끄면 지금과 같다
+  - Given 태그가 있는 사본, 재계산 켬 / When 추가 / Then 값 칸이 비고, Track Gain이 디코딩해 계산한다
+  - Given 옵션 3개 / When 재시작 / Then 체크 상태가 유지된다
+- 확인 방법: 자동 테스트(tempfile 사본), 날짜 유지는 원본 exe와 사본 대조. [AI]
 ## 4. 기술 결정
 | 항목 | 선택 | 버린 안 (이유) | 근거 |
 |---|---|---|---|
@@ -176,3 +193,4 @@
 | 2026-11-05 | 1.0 범위: F7 테마와 UX, macOS 러너 검증, 1.0.0 릴리스 (§2.1, §3, §4, §6) | Q050, Q051, D057~D063 |
 | 2026-11-05 | F7에 로그 창 수정 추가 | Q055, D066 |
 | 2026-11-09 | F7에 로그 기본 경로·분석 로그·기본 창 크기 추가 | Q056, D067~D070 |
+| 2026-11-10 | 1.1 범위: CLI `-p` 수정, F8 원본 GUI 옵션, 1.1.0 릴리스 (§2.1, §3). discover 결과가 저장되지 않아 사용자 승인으로 직접 수정 | Q057, D071~D074 |

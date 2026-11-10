@@ -95,7 +95,7 @@
 <context>
     <name>FileTableView</name>
     <message>
-        <location filename="../main_window.py" line="311"/>
+        <location filename="../main_window.py" line="320"/>
         <source>Drag MP3 files or folders here</source>
         <translation>MP3 파일이나 폴더를 여기에 끌어다 놓으세요</translation>
     </message>
@@ -108,78 +108,78 @@
         <translation>찾아보기...</translation>
     </message>
     <message>
-        <location filename="../dialogs/logs_dialog.py" line="55"/>
+        <location filename="../dialogs/logs_dialog.py" line="54"/>
         <source>Choose %1 file</source>
         <translation>%1 파일 선택</translation>
     </message>
     <message>
-        <location filename="../dialogs/logs_dialog.py" line="83"/>
-        <location filename="../dialogs/logs_dialog.py" line="138"/>
+        <location filename="../dialogs/logs_dialog.py" line="79"/>
+        <location filename="../dialogs/logs_dialog.py" line="134"/>
         <source>Log options</source>
         <translation>로그 옵션</translation>
     </message>
     <message>
-        <location filename="../dialogs/logs_dialog.py" line="90"/>
+        <location filename="../dialogs/logs_dialog.py" line="86"/>
         <source>Error Log</source>
         <translation>오류 로그</translation>
     </message>
     <message>
-        <location filename="../dialogs/logs_dialog.py" line="91"/>
+        <location filename="../dialogs/logs_dialog.py" line="87"/>
         <source>Errors during processing are logged to this file</source>
         <translation>처리 중 발생한 오류를 이 파일에 기록합니다</translation>
     </message>
     <message>
-        <location filename="../dialogs/logs_dialog.py" line="94"/>
+        <location filename="../dialogs/logs_dialog.py" line="90"/>
         <source>Analysis Log</source>
         <translation>분석 로그</translation>
     </message>
     <message>
-        <location filename="../dialogs/logs_dialog.py" line="95"/>
+        <location filename="../dialogs/logs_dialog.py" line="91"/>
         <source>Analysis results are logged to this file</source>
         <translation>분석 결과를 이 파일에 기록합니다</translation>
     </message>
     <message>
-        <location filename="../dialogs/logs_dialog.py" line="97"/>
+        <location filename="../dialogs/logs_dialog.py" line="93"/>
         <source>Change Log</source>
         <translation>변경 로그</translation>
     </message>
     <message>
-        <location filename="../dialogs/logs_dialog.py" line="98"/>
+        <location filename="../dialogs/logs_dialog.py" line="94"/>
         <source>Gain changes are logged to this file</source>
         <translation>게인 변경 내역을 이 파일에 기록합니다</translation>
     </message>
     <message>
-        <location filename="../dialogs/logs_dialog.py" line="120"/>
+        <location filename="../dialogs/logs_dialog.py" line="116"/>
         <source>Log files (*.log);;Text files (*.txt);;All files (*.*)</source>
         <translation>로그 파일 (*.log);;텍스트 파일 (*.txt);;모든 파일 (*.*)</translation>
     </message>
     <message>
-        <location filename="../dialogs/logs_dialog.py" line="131"/>
+        <location filename="../dialogs/logs_dialog.py" line="127"/>
         <source>Error Log is enabled but no file path is set.</source>
         <translation>오류 로그가 켜져 있지만 파일 경로가 설정되지 않았습니다.</translation>
     </message>
     <message>
-        <location filename="../dialogs/logs_dialog.py" line="132"/>
+        <location filename="../dialogs/logs_dialog.py" line="128"/>
         <source>Can&apos;t open or write to the Error log file:</source>
         <translation>오류 로그 파일을 열거나 쓸 수 없습니다:</translation>
     </message>
     <message>
-        <location filename="../dialogs/logs_dialog.py" line="133"/>
+        <location filename="../dialogs/logs_dialog.py" line="129"/>
         <source>Analysis Log is enabled but no file path is set.</source>
         <translation>분석 로그가 켜져 있지만 파일 경로가 설정되지 않았습니다.</translation>
     </message>
     <message>
-        <location filename="../dialogs/logs_dialog.py" line="134"/>
+        <location filename="../dialogs/logs_dialog.py" line="130"/>
         <source>Can&apos;t open or write to the Analysis log file:</source>
         <translation>분석 로그 파일을 열거나 쓸 수 없습니다:</translation>
     </message>
     <message>
-        <location filename="../dialogs/logs_dialog.py" line="135"/>
+        <location filename="../dialogs/logs_dialog.py" line="131"/>
         <source>Change Log is enabled but no file path is set.</source>
         <translation>변경 로그가 켜져 있지만 파일 경로가 설정되지 않았습니다.</translation>
     </message>
     <message>
-        <location filename="../dialogs/logs_dialog.py" line="136"/>
+        <location filename="../dialogs/logs_dialog.py" line="132"/>
         <source>Can&apos;t open or write to the Change log file:</source>
         <translation>변경 로그 파일을 열거나 쓸 수 없습니다:</translation>
     </message>
@@ -187,545 +187,557 @@
 <context>
     <name>MainWindow</name>
     <message>
-        <location filename="../main_window.py" line="509"/>
-        <location filename="../main_window.py" line="691"/>
+        <location filename="../main_window.py" line="518"/>
+        <location filename="../main_window.py" line="715"/>
         <source>File</source>
         <translation>파일</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="510"/>
-        <location filename="../main_window.py" line="692"/>
+        <location filename="../main_window.py" line="519"/>
+        <location filename="../main_window.py" line="716"/>
         <source>Analysis</source>
         <translation>분석</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="511"/>
-        <location filename="../main_window.py" line="693"/>
+        <location filename="../main_window.py" line="520"/>
+        <location filename="../main_window.py" line="717"/>
         <source>Modify</source>
         <translation>수정</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="512"/>
-        <location filename="../main_window.py" line="694"/>
+        <location filename="../main_window.py" line="521"/>
+        <location filename="../main_window.py" line="718"/>
         <source>Options</source>
         <translation>옵션</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="516"/>
-        <location filename="../main_window.py" line="711"/>
+        <location filename="../main_window.py" line="525"/>
+        <location filename="../main_window.py" line="735"/>
         <source>Album Analysis</source>
         <translation>앨범 분석</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="521"/>
-        <location filename="../main_window.py" line="713"/>
+        <location filename="../main_window.py" line="530"/>
+        <location filename="../main_window.py" line="737"/>
         <source>Album Gain</source>
         <translation>앨범 게인</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="527"/>
-        <location filename="../main_window.py" line="717"/>
-        <location filename="../main_window.py" line="752"/>
-        <location filename="../main_window.py" line="919"/>
+        <location filename="../main_window.py" line="536"/>
+        <location filename="../main_window.py" line="741"/>
+        <location filename="../main_window.py" line="779"/>
+        <location filename="../main_window.py" line="946"/>
         <source>Clear Analysis</source>
         <translation>분석 지우기</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="529"/>
-        <location filename="../main_window.py" line="719"/>
+        <location filename="../main_window.py" line="538"/>
+        <location filename="../main_window.py" line="743"/>
         <source>Clear analysis values of selected files (does not change files)</source>
         <translation>선택한 파일의 분석 값을 지웁니다 (파일은 변경되지 않음)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="534"/>
-        <location filename="../main_window.py" line="721"/>
+        <location filename="../main_window.py" line="543"/>
+        <location filename="../main_window.py" line="745"/>
         <source>Undo gain changes of selected files</source>
         <translation>선택한 파일의 게인 변경을 되돌립니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="538"/>
-        <location filename="../main_window.py" line="722"/>
+        <location filename="../main_window.py" line="547"/>
+        <location filename="../main_window.py" line="746"/>
         <source>Each folder is album</source>
         <translation>각 폴더를 앨범으로 취급</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="542"/>
-        <location filename="../main_window.py" line="724"/>
+        <location filename="../main_window.py" line="551"/>
+        <location filename="../main_window.py" line="748"/>
         <source>Treat each folder as a separate album (else all files = one album)</source>
         <translation>각 폴더를 개별 앨범으로 취급합니다 (해제 시 전체 파일 = 하나의 앨범)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="545"/>
-        <location filename="../main_window.py" line="725"/>
+        <location filename="../main_window.py" line="554"/>
+        <location filename="../main_window.py" line="749"/>
         <source>Minimize to tray</source>
         <translation>트레이로 최소화</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="549"/>
-        <location filename="../main_window.py" line="727"/>
+        <location filename="../main_window.py" line="558"/>
+        <location filename="../main_window.py" line="751"/>
         <source>When minimized, hide the window and show a system tray icon</source>
         <translation>최소화 시 창을 숨기고 시스템 트레이 아이콘을 표시합니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="566"/>
-        <location filename="../main_window.py" line="732"/>
+        <location filename="../main_window.py" line="580"/>
+        <location filename="../main_window.py" line="759"/>
         <source>Logs...</source>
         <translation>로그...</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="568"/>
-        <location filename="../main_window.py" line="734"/>
+        <location filename="../main_window.py" line="582"/>
+        <location filename="../main_window.py" line="761"/>
         <source>Configure error / analysis / change log files</source>
         <translation>오류 / 분석 / 변경 로그 파일을 설정합니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="572"/>
-        <location filename="../main_window.py" line="735"/>
+        <location filename="../main_window.py" line="586"/>
+        <location filename="../main_window.py" line="762"/>
         <source>Reset Column Widths</source>
         <translation>열 너비 초기화</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="574"/>
-        <location filename="../main_window.py" line="737"/>
+        <location filename="../main_window.py" line="588"/>
+        <location filename="../main_window.py" line="764"/>
         <source>Reset all column widths to their defaults</source>
         <translation>모든 열 너비를 기본값으로 되돌립니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="638"/>
-        <location filename="../main_window.py" line="696"/>
+        <location filename="../main_window.py" line="662"/>
+        <location filename="../main_window.py" line="720"/>
         <source>Language</source>
         <translation>언어</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="699"/>
-        <location filename="../main_window.py" line="778"/>
+        <location filename="../main_window.py" line="723"/>
+        <location filename="../main_window.py" line="805"/>
         <source>Add Files</source>
         <translation>파일 추가</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="701"/>
-        <location filename="../main_window.py" line="784"/>
+        <location filename="../main_window.py" line="725"/>
+        <location filename="../main_window.py" line="811"/>
         <source>Add Folder</source>
         <translation>폴더 추가</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="703"/>
-        <location filename="../main_window.py" line="792"/>
+        <location filename="../main_window.py" line="727"/>
+        <location filename="../main_window.py" line="819"/>
         <source>Track Analysis</source>
         <translation>트랙 분석</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="705"/>
-        <location filename="../main_window.py" line="798"/>
+        <location filename="../main_window.py" line="729"/>
+        <location filename="../main_window.py" line="825"/>
         <source>Track Gain</source>
         <translation>트랙 게인</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="743"/>
-        <location filename="../main_window.py" line="828"/>
+        <location filename="../main_window.py" line="770"/>
+        <location filename="../main_window.py" line="855"/>
         <source>Target Volume:</source>
         <translation>목표 볼륨:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="749"/>
-        <location filename="../main_window.py" line="886"/>
+        <location filename="../main_window.py" line="776"/>
+        <location filename="../main_window.py" line="913"/>
         <source>Progress:</source>
         <translation>진행률:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="533"/>
-        <location filename="../main_window.py" line="720"/>
-        <location filename="../main_window.py" line="753"/>
-        <location filename="../main_window.py" line="925"/>
+        <location filename="../main_window.py" line="542"/>
+        <location filename="../main_window.py" line="744"/>
+        <location filename="../main_window.py" line="780"/>
+        <location filename="../main_window.py" line="952"/>
         <source>Undo Gain Changes</source>
         <translation>게인 변경 되돌리기</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="518"/>
-        <location filename="../main_window.py" line="712"/>
+        <location filename="../main_window.py" line="527"/>
+        <location filename="../main_window.py" line="736"/>
         <source>Analyze album gain per folder/group without applying</source>
         <translation>적용 없이 폴더/그룹별 앨범 게인을 분석합니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="523"/>
-        <location filename="../main_window.py" line="714"/>
+        <location filename="../main_window.py" line="532"/>
+        <location filename="../main_window.py" line="738"/>
         <source>Apply album gain to files per folder/group</source>
         <translation>폴더/그룹별 앨범 게인을 파일에 적용합니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="553"/>
-        <location filename="../main_window.py" line="728"/>
+        <location filename="../main_window.py" line="567"/>
+        <location filename="../main_window.py" line="755"/>
         <source>Theme</source>
         <translation>테마</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="558"/>
-        <location filename="../main_window.py" line="729"/>
+        <location filename="../main_window.py" line="572"/>
+        <location filename="../main_window.py" line="756"/>
         <source>System</source>
         <translation>시스템</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="560"/>
-        <location filename="../main_window.py" line="730"/>
+        <location filename="../main_window.py" line="574"/>
+        <location filename="../main_window.py" line="757"/>
         <source>Dark</source>
         <translation>다크</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="562"/>
-        <location filename="../main_window.py" line="731"/>
+        <location filename="../main_window.py" line="576"/>
+        <location filename="../main_window.py" line="758"/>
         <source>Light</source>
         <translation>라이트</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="579"/>
-        <location filename="../main_window.py" line="738"/>
+        <location filename="../main_window.py" line="593"/>
+        <location filename="../main_window.py" line="765"/>
         <source>About %1</source>
         <translation>%1 정보</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="581"/>
-        <location filename="../main_window.py" line="740"/>
+        <location filename="../main_window.py" line="595"/>
+        <location filename="../main_window.py" line="767"/>
         <source>Show program information and license notices</source>
         <translation>프로그램 정보와 라이선스 고지를 표시합니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="664"/>
-        <location filename="../main_window.py" line="695"/>
+        <location filename="../main_window.py" line="688"/>
+        <location filename="../main_window.py" line="719"/>
         <source>Help</source>
         <translation>도움말</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="700"/>
-        <location filename="../main_window.py" line="780"/>
+        <location filename="../main_window.py" line="724"/>
+        <location filename="../main_window.py" line="807"/>
         <source>Add MP3 files to the list</source>
         <translation>목록에 MP3 파일을 추가합니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="702"/>
-        <location filename="../main_window.py" line="786"/>
+        <location filename="../main_window.py" line="726"/>
+        <location filename="../main_window.py" line="813"/>
         <source>Add all MP3 files in a folder</source>
         <translation>폴더 안의 모든 MP3 파일을 추가합니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="704"/>
-        <location filename="../main_window.py" line="794"/>
+        <location filename="../main_window.py" line="728"/>
+        <location filename="../main_window.py" line="821"/>
         <source>Analyze track gain without applying</source>
         <translation>적용 없이 트랙 게인을 분석합니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="706"/>
-        <location filename="../main_window.py" line="800"/>
+        <location filename="../main_window.py" line="730"/>
+        <location filename="../main_window.py" line="827"/>
         <source>Apply track gain to files</source>
         <translation>트랙 게인을 파일에 적용합니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="707"/>
-        <location filename="../main_window.py" line="812"/>
+        <location filename="../main_window.py" line="731"/>
+        <location filename="../main_window.py" line="839"/>
         <source>Clear All</source>
         <translation>모두 지우기</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="708"/>
-        <location filename="../main_window.py" line="816"/>
+        <location filename="../main_window.py" line="732"/>
+        <location filename="../main_window.py" line="843"/>
         <source>Clear all files from the list</source>
         <translation>목록에서 모든 파일을 제거합니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="745"/>
-        <location filename="../main_window.py" line="839"/>
+        <location filename="../main_window.py" line="563"/>
+        <location filename="../main_window.py" line="752"/>
+        <source>Preserve file date/time</source>
+        <translation>파일 날짜/시간 유지</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="564"/>
+        <location filename="../main_window.py" line="754"/>
+        <source>Keep each file&apos;s modified time when changing gain or tags</source>
+        <translation>게인이나 태그를 바꿀 때 파일의 수정 시간을 그대로 둡니다</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="772"/>
+        <location filename="../main_window.py" line="866"/>
         <source>(ReplayGain 89 dB reference)</source>
         <translation>(ReplayGain 89 dB 기준)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="747"/>
-        <location filename="../main_window.py" line="841"/>
+        <location filename="../main_window.py" line="774"/>
+        <location filename="../main_window.py" line="868"/>
         <source>This target is relative to the ReplayGain specification&apos;s 89 dB reference level. It is not an absolute SPL or LUFS level.</source>
         <translation>이 목표값은 ReplayGain 표준의 89 dB 기준에 맞춘 상대값입니다. 스피커로 나오는 실제 소리 크기(SPL)나 방송용 음량 규격(LUFS) 같은 절대 수치가 아닙니다.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="754"/>
-        <location filename="../main_window.py" line="929"/>
-        <location filename="../main_window.py" line="1646"/>
+        <location filename="../main_window.py" line="781"/>
+        <location filename="../main_window.py" line="956"/>
+        <location filename="../main_window.py" line="1693"/>
         <source>Remove Tags from Files</source>
         <translation>파일에서 태그 제거</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="755"/>
-        <location filename="../main_window.py" line="935"/>
+        <location filename="../main_window.py" line="782"/>
+        <location filename="../main_window.py" line="962"/>
         <source>Play MP3 file</source>
         <translation>MP3 파일 재생</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="759"/>
-        <location filename="../main_window.py" line="963"/>
+        <location filename="../main_window.py" line="786"/>
+        <location filename="../main_window.py" line="990"/>
         <source>Restore</source>
         <translation>복원</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="760"/>
-        <location filename="../main_window.py" line="967"/>
+        <location filename="../main_window.py" line="787"/>
+        <location filename="../main_window.py" line="994"/>
         <source>Exit</source>
         <translation>종료</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="899"/>
-        <location filename="../main_window.py" line="1218"/>
-        <location filename="../main_window.py" line="1225"/>
+        <location filename="../main_window.py" line="926"/>
+        <location filename="../main_window.py" line="1258"/>
+        <location filename="../main_window.py" line="1265"/>
         <source>Cancel</source>
         <translation>취소</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="913"/>
+        <location filename="../main_window.py" line="940"/>
         <source>Ready</source>
         <translation>준비됨</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1068"/>
+        <location filename="../main_window.py" line="1096"/>
         <source>Log write failed: %1</source>
         <translation>로그 기록 실패: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1151"/>
+        <location filename="../main_window.py" line="1191"/>
         <source>Column widths reset to defaults</source>
         <translation>열 너비를 기본값으로 초기화했습니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1175"/>
+        <location filename="../main_window.py" line="1215"/>
         <source>Cancelled - %1</source>
         <translation>취소됨 - %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1216"/>
+        <location filename="../main_window.py" line="1256"/>
         <source>Pause</source>
         <translation>일시정지</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1222"/>
+        <location filename="../main_window.py" line="1262"/>
         <source>Rescan</source>
         <translation>다시 스캔</translation>
     </message>
     <message numerus="yes">
-        <location filename="../main_window.py" line="1230"/>
+        <location filename="../main_window.py" line="1270"/>
         <source>%n file(s)</source>
         <translation>
             <numerusform>파일 %n개</numerusform>
         </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1248"/>
+        <location filename="../main_window.py" line="1288"/>
         <source>Pausing after current file...</source>
         <translation>현재 파일 완료 후 일시정지합니다...</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1250"/>
+        <location filename="../main_window.py" line="1290"/>
         <source>Cancelling...</source>
         <translation>취소하는 중...</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1300"/>
+        <location filename="../main_window.py" line="1340"/>
         <source>Scanning tags %1/%2</source>
         <translation>태그 읽는 중 %1/%2</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1308"/>
+        <location filename="../main_window.py" line="1348"/>
         <source>Busy - wait for the current task</source>
         <translation>작업 중 - 현재 작업이 끝날 때까지 기다려 주세요</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1312"/>
+        <location filename="../main_window.py" line="1352"/>
         <source>No .mp3 files found</source>
         <translation>.mp3 파일을 찾을 수 없습니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1317"/>
+        <location filename="../main_window.py" line="1357"/>
         <source>No new files, %1 total</source>
         <translation>새 파일 없음, 전체 %1개</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1322"/>
+        <location filename="../main_window.py" line="1362"/>
         <source>Added %1 file(s), %2 total - scanning tags...</source>
         <translation>%1개 파일 추가, 전체 %2개 - 태그 읽는 중...</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1330"/>
+        <location filename="../main_window.py" line="1370"/>
         <source>Add MP3 files</source>
         <translation>MP3 파일 추가</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1331"/>
+        <location filename="../main_window.py" line="1371"/>
         <source>MP3 files (*.mp3);;All files (*.*)</source>
         <translation>MP3 파일 (*.mp3);;모든 파일 (*.*)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1337"/>
+        <location filename="../main_window.py" line="1377"/>
         <source>Add folder</source>
         <translation>폴더 추가</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1348"/>
+        <location filename="../main_window.py" line="1388"/>
         <source>ffmpeg not found</source>
         <translation>ffmpeg를 찾을 수 없음</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1349"/>
+        <location filename="../main_window.py" line="1389"/>
         <source>Analysis needs ffmpeg and ffprobe, but they were not found.</source>
         <translation>분석에는 ffmpeg와 ffprobe가 필요하지만 찾지 못했습니다.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1351"/>
+        <location filename="../main_window.py" line="1391"/>
         <source>How to install ffmpeg</source>
         <translation>ffmpeg 설치 방법</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1368"/>
+        <location filename="../main_window.py" line="1413"/>
         <source>Nothing to analyze (all selected files already have values)</source>
         <translation>분석할 대상이 없습니다 (선택한 파일에 이미 값이 있음)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1396"/>
+        <location filename="../main_window.py" line="1441"/>
         <source>Analyzing %1 file(s)...</source>
         <translation>%1개 파일 분석 중...</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1416"/>
+        <location filename="../main_window.py" line="1461"/>
         <source>Nothing to apply (all target files already at target)</source>
         <translation>적용할 대상이 없습니다 (모든 대상 파일이 이미 목표값임)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1449"/>
+        <location filename="../main_window.py" line="1495"/>
         <source>Applying gain to %1 file(s)...</source>
         <translation>%1개 파일에 게인 적용 중...</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1467"/>
+        <location filename="../main_window.py" line="1513"/>
         <source>No files to analyze</source>
         <translation>분석할 파일이 없습니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1499"/>
+        <location filename="../main_window.py" line="1545"/>
         <source>Analyzing %1 file(s) in %2 album(s)...</source>
         <translation>앨범 %2개의 파일 %1개 분석 중...</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1515"/>
+        <location filename="../main_window.py" line="1561"/>
         <source>No files to apply</source>
         <translation>적용할 파일이 없습니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1553"/>
+        <location filename="../main_window.py" line="1600"/>
         <source>Applying album gain to %1 file(s) in %2 album(s)...</source>
         <translation>앨범 %2개의 파일 %1개에 앨범 게인 적용 중...</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1586"/>
+        <location filename="../main_window.py" line="1633"/>
         <source>File not found: %1</source>
         <translation>파일을 찾을 수 없음: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1591"/>
+        <location filename="../main_window.py" line="1638"/>
         <source>Could not open file: %1</source>
         <translation>파일을 열 수 없음: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1605"/>
+        <location filename="../main_window.py" line="1652"/>
         <source>Target set to %1 dB</source>
         <translation>목표를 %1 dB로 설정</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1636"/>
+        <location filename="../main_window.py" line="1683"/>
         <source>Cleared analysis of %1 file(s)</source>
         <translation>%1개 파일의 분석 값을 지움</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1647"/>
+        <location filename="../main_window.py" line="1694"/>
         <source>Remove tags from %1 file(s)? The undo information is removed too, so gain changes can no longer be undone.</source>
         <translation>%1개 파일의 태그를 제거할까요? 되돌리기 정보도 함께 지워져 게인 변경을 되돌릴 수 없게 됩니다.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1672"/>
+        <location filename="../main_window.py" line="1719"/>
         <source>No files selected</source>
         <translation>선택된 파일이 없습니다</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1678"/>
-        <location filename="../main_window.py" line="1947"/>
+        <location filename="../main_window.py" line="1725"/>
+        <location filename="../main_window.py" line="1998"/>
         <source>Undoing</source>
         <translation>되돌리는 중</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1679"/>
+        <location filename="../main_window.py" line="1726"/>
         <source>Removing tags</source>
         <translation>태그 제거 중</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1693"/>
+        <location filename="../main_window.py" line="1741"/>
         <source>Undoing %1 file(s)...</source>
         <translation>%1개 파일 되돌리는 중...</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1694"/>
+        <location filename="../main_window.py" line="1742"/>
         <source>Removing tags from %1 file(s)...</source>
         <translation>%1개 파일의 태그 제거 중...</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1702"/>
+        <location filename="../main_window.py" line="1750"/>
         <source>Scanning tags %1/%2 - %3</source>
         <translation>태그 읽는 중 %1/%2 - %3</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1727"/>
+        <location filename="../main_window.py" line="1775"/>
         <source>Paused - scanned %1/%2 tag(s). Press Rescan to continue.</source>
         <translation>일시 정지 - 태그 %1/%2개 읽음. 계속하려면 다시 스캔을 누르세요.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1733"/>
+        <location filename="../main_window.py" line="1781"/>
         <source>Tag scan done - %1 file(s) total</source>
         <translation>태그 읽기 완료 - 전체 %1개 파일</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1741"/>
-        <location filename="../main_window.py" line="1747"/>
-        <location filename="../main_window.py" line="1824"/>
-        <location filename="../main_window.py" line="1835"/>
+        <location filename="../main_window.py" line="1789"/>
+        <location filename="../main_window.py" line="1795"/>
+        <location filename="../main_window.py" line="1875"/>
+        <location filename="../main_window.py" line="1886"/>
         <source>Analyzing</source>
         <translation>분석 중</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1793"/>
+        <location filename="../main_window.py" line="1844"/>
         <source>Analyzed %1 file(s)</source>
         <translation>%1개 파일 분석 완료</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1795"/>
-        <location filename="../main_window.py" line="1896"/>
-        <location filename="../main_window.py" line="1951"/>
+        <location filename="../main_window.py" line="1846"/>
+        <location filename="../main_window.py" line="1947"/>
+        <location filename="../main_window.py" line="2002"/>
         <source>%1 failed</source>
         <translation>%1개 실패</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1826"/>
-        <location filename="../main_window.py" line="1837"/>
-        <location filename="../main_window.py" line="1852"/>
+        <location filename="../main_window.py" line="1877"/>
+        <location filename="../main_window.py" line="1888"/>
+        <location filename="../main_window.py" line="1903"/>
         <source>Applying</source>
         <translation>적용 중</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1892"/>
+        <location filename="../main_window.py" line="1943"/>
         <source>Applied gain to %1 file(s)</source>
         <translation>%1개 파일에 게인 적용 완료</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1894"/>
+        <location filename="../main_window.py" line="1945"/>
         <source>%1 already at target</source>
         <translation>%1개는 이미 목표값</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1946"/>
+        <location filename="../main_window.py" line="1997"/>
         <source>Undone %1 file(s)</source>
         <translation>%1개 파일 되돌림</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1948"/>
+        <location filename="../main_window.py" line="1999"/>
         <source>Removed tags from %1 file(s)</source>
         <translation>%1개 파일의 태그 제거 완료</translation>
     </message>

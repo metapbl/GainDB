@@ -119,6 +119,7 @@ def apply_track_gain(
     seed_peak: float = None,
     seed_min_gain: int = None,
     seed_max_gain: int = None,
+    save_timestamp: bool = False,
     should_cancel=None,
     on_progress=None,
 ) -> dict:
@@ -194,7 +195,8 @@ def apply_track_gain(
         # 게인 변화 없음. 태그가 dirty 면 태그만 기록(mp3gain 과 동일한 동작).
         tag_written = False
         if (not skip_tag) and info.dirty:
-            _write_mp3gain_tag(path, info, file_tags, use_id3=use_id3)
+            _write_mp3gain_tag(path, info, file_tags, save_timestamp=save_timestamp,
+                               use_id3=use_id3)
             tag_written = True
         return {
             "status": "no_change",
@@ -206,7 +208,8 @@ def apply_track_gain(
 
     if skip_tag:
         changed = apply_gain(path, steps, wrap=wrap,
-                             should_cancel=should_cancel, on_progress=on_progress)
+                             should_cancel=should_cancel, on_progress=on_progress,
+                             save_timestamp=save_timestamp)
         return {
             "status": "ok",
             "db_gain": db_gain,
@@ -217,7 +220,7 @@ def apply_track_gain(
 
     # change_gain_and_tag 가 게인 적용 + undo 누적 + 적용분 재차감 + 태그 기록.
     change_gain_and_tag(path, steps, steps, info, file_tags, wrap=wrap,
-                        use_id3=use_id3,
+                        use_id3=use_id3, save_timestamp=save_timestamp,
                         should_cancel=should_cancel, on_progress=on_progress)
     return {
         "status": "ok",
@@ -243,6 +246,7 @@ def _apply_one_album_file(
     wrap: bool = False,
     skip_tag: bool = False,
     use_id3: bool = False,
+    save_timestamp: bool = False,
     should_cancel=None,
     on_progress=None,
 ) -> dict:
@@ -273,17 +277,19 @@ def _apply_one_album_file(
     if steps == 0:
         tag_written = False
         if (not skip_tag) and info.dirty:
-            _write_mp3gain_tag(path, info, file_tags, use_id3=use_id3)
+            _write_mp3gain_tag(path, info, file_tags, save_timestamp=save_timestamp,
+                               use_id3=use_id3)
             tag_written = True
         return {"path": path, "frames_changed": 0, "tag_written": tag_written}
 
     if skip_tag:
         changed = apply_gain(path, steps, wrap=wrap,
-                             should_cancel=should_cancel, on_progress=on_progress)
+                             should_cancel=should_cancel, on_progress=on_progress,
+                             save_timestamp=save_timestamp)
         return {"path": path, "frames_changed": changed, "tag_written": False}
 
     change_gain_and_tag(path, steps, steps, info, file_tags, wrap=wrap,
-                        use_id3=use_id3,
+                        use_id3=use_id3, save_timestamp=save_timestamp,
                         should_cancel=should_cancel, on_progress=on_progress)
     return {"path": path, "frames_changed": None, "tag_written": True}
 

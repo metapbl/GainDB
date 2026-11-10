@@ -29,7 +29,7 @@
 - [x] 1. CLI `-p` 수정 (CI mp3gain 대조는 push 뒤 확인) — 코어 쓰기 경로, `gaindb_cli.py`
   - 먼저 실패 테스트: 날짜를 2020-01-01로 맞춘 사본에 `-r -c -p`, `-r -c -p -s s`, `-a -c -p`, `-u -p` → 날짜 그대로. `-p` 없으면 바뀜
   - 확인: 테스트 통과, CI mp3gain 대조 테스트(test_preserve_time_matches) 초록, audio_body_sha256·태그 값 기존과 같음
-- [ ] 2. 날짜 유지 옵션 — Options > Preserve file date/time
+- [x] 2. 날짜 유지 옵션 — Options > Preserve file date/time
   - Track/Album Gain·Undo·Remove Tags에 전달. 설정 저장, 기본 꺼짐
   - 먼저 실패 테스트: 옵션 켜고 GUI 적용·undo·태그 제거 → 날짜 그대로
   - 확인: 테스트 통과

@@ -115,11 +115,13 @@ class ApplyWorker(QThread):
     failed = Signal(str, str)
     done = Signal()
 
-    def __init__(self, paths, target_db, seed_results, parent=None):
+    def __init__(self, paths, target_db, seed_results, parent=None,
+                 save_timestamp=False):
         super().__init__(parent)
         self._paths = list(paths)
         self._target_db = target_db
         self._seed = dict(seed_results)
+        self._save_timestamp = save_timestamp
         self._cancel = False
 
     def request_cancel(self):
@@ -162,6 +164,7 @@ class ApplyWorker(QThread):
                 apply_res = apply_file_track_gain(
                     path, self._target_db, seed=result,
                     should_cancel=lambda: self._cancel,
+                    save_timestamp=self._save_timestamp,
                 )
                 status = apply_res.get("status")
                 if status == "ok":
@@ -189,11 +192,13 @@ class FileActionWorker(QThread):
     failed = Signal(str, str)
     done = Signal()
 
-    def __init__(self, paths, action, use_id3=False, parent=None):
+    def __init__(self, paths, action, use_id3=False, parent=None,
+                 save_timestamp=False):
         super().__init__(parent)
         self._paths = list(paths)
         self._action = action
         self._use_id3 = use_id3
+        self._save_timestamp = save_timestamp
         self._cancel = False
 
     def request_cancel(self):
@@ -212,7 +217,8 @@ class FileActionWorker(QThread):
             self.current.emit(path)
             try:
                 if self._action == "undo":
-                    res = undo_file_gain(path, use_id3=self._use_id3)
+                    res = undo_file_gain(path, use_id3=self._use_id3,
+                                         save_timestamp=self._save_timestamp)
                     if res.get("status") == "ok":
                         self.row_undone.emit(path, res.get("undo_steps", 0))
                     elif res.get("status") == "nothing_to_undo":
@@ -220,7 +226,8 @@ class FileActionWorker(QThread):
                     else:
                         self.failed.emit(path, "No undo information in file.")
                 else:
-                    remove_file_tags(path, use_id3=self._use_id3)
+                    remove_file_tags(path, use_id3=self._use_id3,
+                                     save_timestamp=self._save_timestamp)
                     self.row_tags_removed.emit(path)
             except Exception as exc:
                 self.failed.emit(path, str(exc))
@@ -313,11 +320,13 @@ class AlbumApplyWorker(QThread):
     failed = Signal(str, str)
     done = Signal()
 
-    def __init__(self, groups, target_db, seed_raws, parent=None):
+    def __init__(self, groups, target_db, seed_raws, parent=None,
+                 save_timestamp=False):
         super().__init__(parent)
         self._groups = {k: list(v) for k, v in groups.items()}
         self._target_db = target_db
         self._seed = dict(seed_raws)
+        self._save_timestamp = save_timestamp
         self._cancel = False
 
     def request_cancel(self):
@@ -392,6 +401,7 @@ class AlbumApplyWorker(QThread):
                             path, album_db, album_peak, album_min, album_max,
                             track_seed=raw, target_db=self._target_db,
                             should_cancel=lambda: self._cancel,
+                            save_timestamp=self._save_timestamp,
                         )
                         track_res = result_from_album_raw(raw, self._target_db)
                         steps = apply_res.get("steps") or 0

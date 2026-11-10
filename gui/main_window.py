@@ -558,6 +558,11 @@ class MainWindow(QMainWindow):
             "When minimized, hide the window and show a system tray icon"))
         self.act_minimize_to_tray.toggled.connect(self._on_toggle_tray_option)
 
+        # 원본 mp3gain GUI 의 옵션(F8). 체크 상태는 설정에 저장, 기본 꺼짐.
+        self.act_preserve_time = self._add_option_action(
+            "options/preserve_time", self.tr("Preserve file date/time"),
+            self.tr("Keep each file's modified time when changing gain or tags"))
+
         # Theme — 시스템 따라가기/다크/라이트 상호배타 선택(즉시 전환·저장).
         self.menu_theme = QMenu(self.tr("Theme"), self)
         self._theme_group = QActionGroup(self)
@@ -595,6 +600,15 @@ class MainWindow(QMainWindow):
         shortcut = action.shortcut().toString(QKeySequence.SequenceFormat.NativeText)
         action.setToolTip(f"{text} ({shortcut})")
 
+    def _add_option_action(self, key: str, text: str, tip: str) -> QAction:
+        """설정 key 에 체크 상태를 저장하는 옵션 액션(기본 꺼짐)."""
+        action = QAction(text, self)
+        action.setToolTip(tip)
+        action.setCheckable(True)
+        action.setChecked(self._settings.value(key, False, type=bool))
+        action.toggled.connect(lambda on: self._settings.setValue(key, on))
+        return action
+
     def _add_theme_action(self, text: str, mode: str, saved_mode: str) -> QAction:
         action = QAction(text, self)
         action.setCheckable(True)
@@ -629,6 +643,7 @@ class MainWindow(QMainWindow):
 
         self.menu_options.addAction(self.act_each_folder_album)
         self.menu_options.addAction(self.act_minimize_to_tray)
+        self.menu_options.addAction(self.act_preserve_time)
         self.menu_options.addSeparator()
         self.menu_options.addMenu(self.menu_theme)
         self.menu_options.addAction(self.act_logs)
@@ -734,6 +749,9 @@ class MainWindow(QMainWindow):
         self.act_minimize_to_tray.setText(self.tr("Minimize to tray"))
         self.act_minimize_to_tray.setToolTip(self.tr(
             "When minimized, hide the window and show a system tray icon"))
+        self.act_preserve_time.setText(self.tr("Preserve file date/time"))
+        self.act_preserve_time.setToolTip(self.tr(
+            "Keep each file's modified time when changing gain or tags"))
         self.menu_theme.setTitle(self.tr("Theme"))
         self.act_theme_system.setText(self.tr("System"))
         self.act_theme_dark.setText(self.tr("Dark"))
@@ -1459,7 +1477,8 @@ class MainWindow(QMainWindow):
         self._current_fraction = 0.0
         self._progress_base = 0
         self._album_applying = False
-        self._worker = ApplyWorker(paths, target_db, seed_results, self)
+        self._worker = ApplyWorker(paths, target_db, seed_results, self,
+                                   save_timestamp=self.act_preserve_time.isChecked())
         self._worker_kind = "apply"
         self._worker.current.connect(self._on_apply_current)
         self._worker.file_progress.connect(self._on_apply_file_progress)
@@ -1561,7 +1580,8 @@ class MainWindow(QMainWindow):
         self._current_fraction = 0.0
         self._progress_base = 0
         self._album_applying = False
-        self._worker = AlbumApplyWorker(groups, target_db, seed_raws, self)
+        self._worker = AlbumApplyWorker(groups, target_db, seed_raws, self,
+                                        save_timestamp=self.act_preserve_time.isChecked())
         self._worker_kind = "album_apply"
         # Track Gain 과 의미가 같은 시그널은 기존 슬롯 재사용.
         self._worker.current.connect(self._on_apply_current)
@@ -1704,7 +1724,8 @@ class MainWindow(QMainWindow):
         self._batch_total = len(paths)
         self._action_verb = (self.tr("Undoing") if action == "undo"
                              else self.tr("Removing tags"))
-        self._worker = FileActionWorker(paths, action, use_id3=False, parent=self)
+        self._worker = FileActionWorker(paths, action, use_id3=False, parent=self,
+                                        save_timestamp=self.act_preserve_time.isChecked())
         self._worker_kind = "action"
         self._worker.current.connect(self._on_action_current)
         self._worker.progress.connect(self._on_action_progress)

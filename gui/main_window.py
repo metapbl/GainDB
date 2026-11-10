@@ -562,6 +562,9 @@ class MainWindow(QMainWindow):
         self.act_preserve_time = self._add_option_action(
             "options/preserve_time", self.tr("Preserve file date/time"),
             self.tr("Keep each file's modified time when changing gain or tags"))
+        self.act_track_no_clip = self._add_option_action(
+            "options/track_no_clip", self.tr("Don't clip when doing Track Gain"),
+            self.tr("Lower Track Gain so that no clipping occurs"))
 
         # Theme — 시스템 따라가기/다크/라이트 상호배타 선택(즉시 전환·저장).
         self.menu_theme = QMenu(self.tr("Theme"), self)
@@ -644,6 +647,7 @@ class MainWindow(QMainWindow):
         self.menu_options.addAction(self.act_each_folder_album)
         self.menu_options.addAction(self.act_minimize_to_tray)
         self.menu_options.addAction(self.act_preserve_time)
+        self.menu_options.addAction(self.act_track_no_clip)
         self.menu_options.addSeparator()
         self.menu_options.addMenu(self.menu_theme)
         self.menu_options.addAction(self.act_logs)
@@ -752,6 +756,9 @@ class MainWindow(QMainWindow):
         self.act_preserve_time.setText(self.tr("Preserve file date/time"))
         self.act_preserve_time.setToolTip(self.tr(
             "Keep each file's modified time when changing gain or tags"))
+        self.act_track_no_clip.setText(self.tr("Don't clip when doing Track Gain"))
+        self.act_track_no_clip.setToolTip(self.tr(
+            "Lower Track Gain so that no clipping occurs"))
         self.menu_theme.setTitle(self.tr("Theme"))
         self.act_theme_system.setText(self.tr("System"))
         self.act_theme_dark.setText(self.tr("Dark"))
@@ -1478,7 +1485,8 @@ class MainWindow(QMainWindow):
         self._progress_base = 0
         self._album_applying = False
         self._worker = ApplyWorker(paths, target_db, seed_results, self,
-                                   save_timestamp=self.act_preserve_time.isChecked())
+                                   save_timestamp=self.act_preserve_time.isChecked(),
+                                   track_no_clip=self.act_track_no_clip.isChecked())
         self._worker_kind = "apply"
         self._worker.current.connect(self._on_apply_current)
         self._worker.file_progress.connect(self._on_apply_file_progress)

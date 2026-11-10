@@ -33,7 +33,7 @@
   - Track/Album Gain·Undo·Remove Tags에 전달. 설정 저장, 기본 꺼짐
   - 먼저 실패 테스트: 옵션 켜고 GUI 적용·undo·태그 제거 → 날짜 그대로
   - 확인: 테스트 통과
-- [ ] 3. Track Gain 클리핑 방지 — Options > Don't clip when doing Track Gain
+- [x] 3. Track Gain 클리핑 방지 — Options > Don't clip when doing Track Gain
   - 원본 GUI 식. Album Gain에는 적용하지 않는다
   - 먼저 실패 테스트: 클리핑 나는 사본에서 적용 스텝 = MaxNoclip, 제안 0·MaxNoclip<0인 경우도 낮춤, 옵션 끄면 기존과 같음
   - 확인: 테스트 통과

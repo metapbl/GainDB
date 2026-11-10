@@ -240,8 +240,12 @@ def apply_file_track_gain(path: str, target_db: float = DEFAULT_TARGET_DB,
                           should_cancel: Callable[[], bool] | None = None,
                           on_progress: Callable[[float], None] | None = None,
                           save_timestamp: bool = False,
+                          track_no_clip: bool = False,
                           ) -> dict:
-    """목표 dB 를 반영해 Track ReplayGain 을 실제 적용한다(파괴적)."""
+    """목표 dB 를 반영해 Track ReplayGain 을 실제 적용한다(파괴적).
+
+    track_no_clip: 원본 GUI "Don't clip when doing Track Gain"(apply_gain.track_no_clip_steps).
+    """
     db_gain_mod = target_db - DEFAULT_TARGET_DB
 
     seed_db_gain = seed_peak = seed_min_gain = seed_max_gain = None
@@ -257,6 +261,7 @@ def apply_file_track_gain(path: str, target_db: float = DEFAULT_TARGET_DB,
                             seed_min_gain=seed_min_gain,
                             seed_max_gain=seed_max_gain,
                             save_timestamp=save_timestamp,
+                            track_no_clip=track_no_clip,
                             should_cancel=should_cancel,
                             on_progress=on_progress)
 

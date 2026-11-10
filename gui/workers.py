@@ -116,12 +116,13 @@ class ApplyWorker(QThread):
     done = Signal()
 
     def __init__(self, paths, target_db, seed_results, parent=None,
-                 save_timestamp=False):
+                 save_timestamp=False, track_no_clip=False):
         super().__init__(parent)
         self._paths = list(paths)
         self._target_db = target_db
         self._seed = dict(seed_results)
         self._save_timestamp = save_timestamp
+        self._track_no_clip = track_no_clip
         self._cancel = False
 
     def request_cancel(self):
@@ -165,6 +166,7 @@ class ApplyWorker(QThread):
                     path, self._target_db, seed=result,
                     should_cancel=lambda: self._cancel,
                     save_timestamp=self._save_timestamp,
+                    track_no_clip=self._track_no_clip,
                 )
                 status = apply_res.get("status")
                 if status == "ok":

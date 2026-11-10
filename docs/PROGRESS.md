@@ -1,14 +1,13 @@
 # PROGRESS — Gain dB (GaindB)
 
 ## 상태
-- 단계: 8 구현 · 활성 계획 docs/plans/2026-11-10-v110-original-options.md
-- 버전: 1.0.0 게시 (태그 v1.0.0 = a386935) · 테스트 202건 (로컬 OK, skip 3 = mp3gain 대조), 약 2분 (.venv Python 3.15.1)
-- 갱신: 2026-11-10 · 1.1 작업 1~4 완료(CLI -p, GUI 옵션 3개), push 전 · 테마 1.4.3 (소스 캡처 확인)
+- 단계: 8 구현 · 활성 계획 없음 (2026-11-10-v110-original-options done)
+- 버전: 1.1.0 게시 (태그 v1.1.0 = 4afa542) · 테스트 202건 (로컬 OK, skip 3 = mp3gain 대조 / CI 3개 OS 초록, run 42911783165), 약 2분 (.venv Python 3.15.1)
+- 갱신: 2026-11-11 · v1.1.0 Release (CLI -p 수정, GUI 옵션 3개, 테마 1.4.3, 빌드 캡처 확인)
 
 ## 다음 할 일
-1. push 후 CI의 mp3gain 대조(test_preserve_time_matches) 초록 확인 — 로컬 mp3gain.exe는 실행 불가(T18)
-2. 1.1 작업 5~7: 버전 1.1.0·README·노트 → 빌드·빌드 캡처(테마 1.4.3) → 태그·Release
-3. 코어 변경(writer·tag·apply_gain·api)으로 1.1 이후 AVD 재동기화 (D012, D074)
+1. AVD 사본 동기화 (D012, D074): 사용자가 별도로 진행. 대상: `gaindb/writer.py`·`tag.py`·`apply_gain.py`·`api.py`(날짜 보존·Track no-clip), `gaindb/__init__.py`(1.1.0)
+2. (사용자) 1.1.0 exe에서 옵션 메뉴 3개 실기기 확인
 
 ## 미해결
 - 없음
@@ -31,4 +30,5 @@
 - 2026-10-25 v0.6.0 Release (97f4c31, 태그 6811d44) — 계획 2026-10-25-v060-release done
 - 2026-11-05 metarche upgrade U1~U4 (42186ef) · 보안 정책 D051~D056 (153b096) · pip-audit 도입 (9d604d9)
 - 2026-11-10 v1.0.0 Release: Graphite/Paper 테마·UX 개선·로그 기본 경로 (태그 a386935) — 계획 2026-11-05-v100-theme-ux done
+- 2026-11-11 v1.1.0 Release: CLI -p 수정 (2e1e609), GUI 옵션 3개 (34bceaf, 506037d, 8effe42), 테마 1.4.0~1.4.3 (태그 4afa542) — 계획 2026-11-10-v110-original-options done
 - 2026-10-25 metarche 이관: PRD 승인, 결정 46개 기록 (커밋 전)

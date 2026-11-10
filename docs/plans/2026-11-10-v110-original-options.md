@@ -1,5 +1,5 @@
 # v1.1.0 — 원본 GUI 옵션 3개 · CLI -p 수정 · Release
-상태: active | 시작: 2026-11-10 | 근거: PRD §2.1 1.1 작업, F8 (D070~D074)
+상태: done | 시작: 2026-11-10 | 근거: PRD §2.1 1.1 작업, F8 (D070~D074)
 
 목표: GUI 옵션 메뉴에 원본 mp3gain GUI의 날짜 유지·Track Gain 클리핑 방지·태그 재계산을 넣고, CLI `-p`가 게인 적용 때도 원래 날짜를 지키게 고친 뒤 v1.1.0을 게시한다.
 
@@ -43,7 +43,7 @@
   - 확인: 테스트 통과
 - [x] 5. 버전·문서 — 1.1.0, README 옵션 설명, 노트 초안(사용자 승인)
   - 확인: `gaindb_cli.py -v` 출력 1.1.0, 노트 승인
-- [ ] 6. 빌드·캡처 — pip-audit, `build_release.ps1`, 빌드 결과 다크·라이트 캡처(테마 1.4.0 확인)
+- [x] 6. 빌드·캡처 — pip-audit, `build_release.ps1`, 빌드 결과 다크·라이트 캡처(테마 1.4.3 확인)
   - 확인: pip_audit 결과, PNG 확인, 앱 코드에 THEME_SHOT 없음
-- [ ] 7. Release — 태그 v1.1.0, GitHub Release (실행 전 사용자 확인)
+- [x] 7. Release — 태그 v1.1.0, GitHub Release (실행 전 사용자 확인)
   - 확인: Release에 태그·노트·zip, zip에 LICENSE·NOTICE·THIRD_PARTY_LICENSES·licenses/qt. AVD 동기화 대상 고지

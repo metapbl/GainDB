@@ -70,6 +70,7 @@
 | T15 | 편집한 Windows 경로에 `\f`·`\b` 제어 문자가 들어감 | Bash heredoc으로 넘긴 Python 문자열에서 `\\`가 `\`로 바뀜 | 백슬래시가 든 편집은 Edit 도구로. 편집 뒤 제어 문자 검사 | 작업 3 (2026-10-25) |
 | T16 | exe 용량(≈215MB)을 `.spec` excludes로 줄이면 앱이 깨지거나 효과 없음 | scipy.signal이 fft·spatial 등에 의존, Qt 모듈은 훅이 DLL을 그대로 가져옴 | 근본 절감은 scipy `lfilter`를 numpy로 대체(≈145MB)뿐. 보류 항목(PRD §2.3), 하면 mp3gain 수치 재검증 | legacy 10.1 |
 | T17 | `build_release.ps1`이 실패했는데 출력 끝부분만 보고 놓칠 뻔함 | 실행 중인 GainDB.exe가 `dist`를 잠금 / .venv 밖에서 실행해 PyInstaller 없음 | 빌드 전 `Get-Process GainDB` 없음 확인, `.venv\Scripts\Activate.ps1` 먼저, 성공은 출력 전체에서 `BUILD OK`로 판정 | v1.0.0 (2026-11-09~10) |
+| T18 | 원본 mp3gain.exe를 돌렸는데 파일이 그대로라 "원본도 같다"고 잘못 판단 | 이 PC에 C 런타임 DLL이 없어 exe가 시작조차 못 함(0xC0000135, Git Bash는 dll 오류). 출력·종료 코드를 버려서 못 봄 | 원본 대조는 CI의 mp3gain(test_mp3gain_parity)으로. 로컬에서 exe를 쓰면 종료 코드와 파일 해시 변화를 먼저 확인 | v1.1 작업 1 (2026-11-10) |
 
 ## R§5 환경·도구
 - 개발 PC: Windows 11, PowerShell 7, Python 3.15 (`py` launcher; `python`은 스토어 별칭). `.venv`는 재생성 필요(D046).

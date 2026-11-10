@@ -7,7 +7,7 @@
 - Preserve file date/time(`mnuKeepTime`, 설정 PreserveFileDate): 적용·undo·태그 제거에 `/p`
 - Don't clip when doing Track Gain(`mnuDontAddClipping`, 설정 TrackNoClip): 적용 스텝 = min(제안 스텝, MaxNoclipMp3Gain). 제안이 0이어도 MaxNoclip < 0이면 낮춘다. MaxNoclip = floor(4·log2(32767/CurrMaxAmp)), CurrMaxAmp 없으면 0. CLI `-k`와 다름
 - Tags > Re-calculate(`mnuReCalcTags`, 설정 ReCalculateTags): 추가할 때 태그를 읽지 않음, 분석에 `/s r`
-- 원본 exe `-r -c -p`는 날짜를 지키지만 GaindB CLI는 바뀐다(2026-11-10 사본 대조). 원인: 날짜 저장이 태그 쓰기 시작에만 있고 게인 쓰기(writer.apply_gain) 앞에는 없음
+- 원본 `changeGain`(mp3gain.c)은 게인 쓰기 전 날짜를 저장해 끝나면 복원한다. GaindB CLI는 `-p`를 줘도 게인 적용 뒤 날짜가 바뀐다(사본 확인). 원인: 날짜 저장이 태그 쓰기 시작에만 있고 게인 쓰기(writer.apply_gain) 앞에는 없음
 
 구조:
 - `gaindb/writer.py`, `gaindb/apply_gain.py`, `gaindb/tag.py` — 게인 쓰기 전 날짜 저장·끝난 뒤 복원
@@ -26,9 +26,9 @@
 - 커밋은 작업마다 1개, Conventional Commits, 작업마다 전체 테스트
 
 ## 작업
-- [ ] 1. CLI `-p` 수정 — 코어 쓰기 경로, `gaindb_cli.py`
+- [x] 1. CLI `-p` 수정 (CI mp3gain 대조는 push 뒤 확인) — 코어 쓰기 경로, `gaindb_cli.py`
   - 먼저 실패 테스트: 날짜를 2020-01-01로 맞춘 사본에 `-r -c -p`, `-r -c -p -s s`, `-a -c -p`, `-u -p` → 날짜 그대로. `-p` 없으면 바뀜
-  - 확인: 테스트 통과, 원본 exe와 같은 결과(사본 대조), audio_body_sha256·태그 값 기존과 같음
+  - 확인: 테스트 통과, CI mp3gain 대조 테스트(test_preserve_time_matches) 초록, audio_body_sha256·태그 값 기존과 같음
 - [ ] 2. 날짜 유지 옵션 — Options > Preserve file date/time
   - Track/Album Gain·Undo·Remove Tags에 전달. 설정 저장, 기본 꺼짐
   - 먼저 실패 테스트: 옵션 켜고 GUI 적용·undo·태그 제거 → 날짜 그대로

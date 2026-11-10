@@ -604,7 +604,7 @@ def _run_undo(opt, path, info, file_tags):
             print(f"{path}\t{info.undo_left}\t{info.undo_right}")
         change_gain_and_tag(path, info.undo_left, info.undo_right,
                             info, file_tags, wrap=opt.wrap_gain,
-                            use_id3=opt.use_id3)
+                            save_timestamp=opt.save_time, use_id3=opt.use_id3)
         return 0
     else:
         if opt.database_format:
@@ -634,10 +634,12 @@ def _run_direct_single(opt, path, info, file_tags):
         left, right = val, 0
 
     if opt.skip_tag:
-        apply_gain(path, left, right, wrap=opt.wrap_gain)
+        apply_gain(path, left, right, wrap=opt.wrap_gain,
+                   save_timestamp=opt.save_time)
     else:
         change_gain_and_tag(path, left, right, info, file_tags,
-                            wrap=opt.wrap_gain, use_id3=opt.use_id3)
+                            wrap=opt.wrap_gain, save_timestamp=opt.save_time,
+                            use_id3=opt.use_id3)
 
     if not opt.quiet_mode:
         print("\ndone", file=sys.stderr)
@@ -651,10 +653,12 @@ def _run_direct(opt, path, info, file_tags):
         print(f"Applying gain change of {val} to {path}...", file=sys.stderr)
 
     if opt.skip_tag:
-        apply_gain(path, val, val, wrap=opt.wrap_gain)
+        apply_gain(path, val, val, wrap=opt.wrap_gain,
+                   save_timestamp=opt.save_time)
     else:
         change_gain_and_tag(path, val, val, info, file_tags,
-                            wrap=opt.wrap_gain, use_id3=opt.use_id3)
+                            wrap=opt.wrap_gain, save_timestamp=opt.save_time,
+                            use_id3=opt.use_id3)
 
     if not opt.quiet_mode:
         print("\ndone", file=sys.stderr)
@@ -849,7 +853,7 @@ def _do_apply(opt, path, steps, info, file_tags):
     """Common gain apply ('Applying mp3 gain change of N to ...' + apply)."""
     print(f"Applying mp3 gain change of {steps} to {path}...")
     if opt.skip_tag:
-        apply_gain(path, steps, wrap=opt.wrap_gain)
+        apply_gain(path, steps, wrap=opt.wrap_gain, save_timestamp=opt.save_time)
     else:
         change_gain_and_tag(path, steps, steps, info, file_tags,
                             wrap=opt.wrap_gain, save_timestamp=opt.save_time,

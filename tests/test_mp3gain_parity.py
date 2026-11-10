@@ -101,6 +101,20 @@ class Mp3gainParityTest(BaseGainTest):
                     self.assertEqual(self.audio_body_sha256(str(f)),
                                      self.originals[f.name])
 
+    def test_preserve_time_matches(self):
+        """-p: 게인을 바꾸는 각 단계 뒤 날짜가 남는지가 원본과 같다 (D071)."""
+        old = 1577836800  # 2020-01-01 00:00:00 UTC
+        for args in (("-r", "-c", "-p"), ("-u", "-p"), ("-a", "-c", "-p"),
+                     ("-g", "2", "-p"), ("-r", "-c")):
+            kept = {}
+            for side, files in self.sides.items():
+                for f in files:
+                    os.utime(f, (old, old))
+                self._run(side, *args)
+                kept[side] = [int(os.stat(f).st_mtime) == old for f in files]
+            with self.subTest(args=args):
+                self.assertEqual(kept["gaindb"], kept["mp3gain"])
+
     def test_album_with_broken_file_matches(self):
         """깨진 파일이 낀 앨범: 나머지 파일의 스텝·Album 값이 원본과 같다 (D064)."""
         tables = {}

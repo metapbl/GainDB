@@ -112,6 +112,41 @@ class OptionMenuTest(WindowTestBase):
             self.win._on_gain()
         self.assertTrue(worker.call_args.kwargs["save_timestamp"])
 
+    def _add_file(self):
+        import tempfile
+        d = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, d, True)
+        path = os.path.join(d, "x.mp3")
+        open(path, "wb").close()
+        self.addCleanup(setattr, self.win, "_worker", None)
+        with mock.patch.object(self.mw, "TagScanWorker") as scan:
+            self.win._add_from([path])
+        return path, scan
+
+    def test_recalc_skips_tag_scan_and_track_gain_analyzes(self):
+        self.win.act_recalc_tags.setChecked(True)
+        path, scan = self._add_file()
+        scan.assert_not_called()
+        row = self.win.model.get_row(self.win.model.find_row_by_path(path))
+        self.assertIsNone(row.result)
+        self.assertFalse(row.needs_tag_scan())  # Rescan 대상으로 남지 않는다
+
+        self.win.table.selectAll()
+        with mock.patch.object(self.mw, "ApplyWorker") as worker, \
+                mock.patch.object(self.win, "_ffmpeg_missing", return_value=False):
+            self.win._on_gain()
+        self.assertIsNone(worker.call_args.args[2][path])  # 씨앗 없음 → 워커가 분석
+
+    def test_recalc_off_scans_tags(self):
+        _path, scan = self._add_file()
+        scan.assert_called_once()
+
+    def test_recalc_persists(self):
+        self.win.act_recalc_tags.setChecked(True)
+        again = self.mw.MainWindow()
+        self.addCleanup(again.deleteLater)
+        self.assertTrue(again.act_recalc_tags.isChecked())
+
     def test_track_no_clip_persists_and_reaches_worker(self):
         self.assertFalse(self.win.act_track_no_clip.isChecked())
         self.win.act_track_no_clip.setChecked(True)

@@ -37,7 +37,7 @@
   - 원본 GUI 식. Album Gain에는 적용하지 않는다
   - 먼저 실패 테스트: 클리핑 나는 사본에서 적용 스텝 = MaxNoclip, 제안 0·MaxNoclip<0인 경우도 낮춤, 옵션 끄면 기존과 같음
   - 확인: 테스트 통과
-- [ ] 4. 태그 재계산 — Options > Tags > Re-calculate (do not read tags)
+- [x] 4. 태그 재계산 — Options > Tags > Re-calculate (do not read tags)
   - 켜면 파일 추가 때 태그 스캔을 하지 않아 적용 때 태그 값을 씨앗으로 쓰지 않는다
   - 먼저 실패 테스트: 태그 있는 사본 추가 → 값 칸 빈칸, Track Gain이 디코딩해 계산
   - 확인: 테스트 통과

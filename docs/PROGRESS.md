@@ -2,12 +2,13 @@
 
 ## 상태
 - 단계: 8 구현 · 활성 계획 docs/plans/2026-11-10-v110-original-options.md
-- 버전: 1.0.0 게시 (태그 v1.0.0 = a386935) · 테스트 184건 (로컬 OK, skip 2 = mp3gain 대조 / CI 3개 OS·macOS GUI 러너 초록, run 42620067002·42620078216), 약 2분 (.venv Python 3.15.1)
-- 갱신: 2026-11-10 · AVD 사본 1.0 동기화 확인 · Graphite/Paper 테마 1.2.0 → 1.4.3 (gui/theme.py만, 아이콘 동일, 소스 캡처 확인)
+- 버전: 1.0.0 게시 (태그 v1.0.0 = a386935) · 테스트 202건 (로컬 OK, skip 3 = mp3gain 대조), 약 2분 (.venv Python 3.15.1)
+- 갱신: 2026-11-10 · 1.1 작업 1~4 완료(CLI -p, GUI 옵션 3개), push 전 · 테마 1.4.3 (소스 캡처 확인)
 
 ## 다음 할 일
-1. 테마 1.4.3 반영 빌드 확인 (빌드 결과 캡처는 아직 안 함, 다음 릴리스 빌드 때)
-2. 1.1 계획 작업 1부터 (CLI -p 수정 → GUI 옵션 3개 → 1.1.0 릴리스)
+1. push 후 CI의 mp3gain 대조(test_preserve_time_matches) 초록 확인 — 로컬 mp3gain.exe는 실행 불가(T18)
+2. 1.1 작업 5~7: 버전 1.1.0·README·노트 → 빌드·빌드 캡처(테마 1.4.3) → 태그·Release
+3. 코어 변경(writer·tag·apply_gain·api)으로 1.1 이후 AVD 재동기화 (D012, D074)
 
 ## 미해결
 - 없음

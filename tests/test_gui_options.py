@@ -147,6 +147,13 @@ class OptionMenuTest(WindowTestBase):
         self.addCleanup(again.deleteLater)
         self.assertTrue(again.act_recalc_tags.isChecked())
 
+    def test_recalc_sits_directly_under_options(self):
+        # D075: 항목이 하나뿐인 Tags 하위 메뉴 대신 Options 바로 아래, Track no-clip 다음.
+        acts = self.win.menu_options.actions()
+        i = acts.index(self.win.act_track_no_clip)
+        self.assertIs(acts[i + 1], self.win.act_recalc_tags)
+        self.assertNotIn("Tags", [a.text() for a in acts if a.menu()])
+
     def test_track_no_clip_persists_and_reaches_worker(self):
         self.assertFalse(self.win.act_track_no_clip.isChecked())
         self.win.act_track_no_clip.setChecked(True)

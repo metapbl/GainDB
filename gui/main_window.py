@@ -565,11 +565,9 @@ class MainWindow(QMainWindow):
         self.act_track_no_clip = self._add_option_action(
             "options/track_no_clip", self.tr("Don't clip when doing Track Gain"),
             self.tr("Lower Track Gain so that no clipping occurs"))
-        self.menu_tags = QMenu(self.tr("Tags"), self)
         self.act_recalc_tags = self._add_option_action(
             "options/recalc_tags", self.tr("Re-calculate (do not read tags)"),
             self.tr("Do not read stored values when adding files; Track Gain analyzes them"))
-        self.menu_tags.addAction(self.act_recalc_tags)
 
         # Theme — 시스템 따라가기/다크/라이트 상호배타 선택(즉시 전환·저장).
         self.menu_theme = QMenu(self.tr("Theme"), self)
@@ -653,7 +651,7 @@ class MainWindow(QMainWindow):
         self.menu_options.addAction(self.act_minimize_to_tray)
         self.menu_options.addAction(self.act_preserve_time)
         self.menu_options.addAction(self.act_track_no_clip)
-        self.menu_options.addMenu(self.menu_tags)
+        self.menu_options.addAction(self.act_recalc_tags)
         self.menu_options.addSeparator()
         self.menu_options.addMenu(self.menu_theme)
         self.menu_options.addAction(self.act_logs)
@@ -765,7 +763,6 @@ class MainWindow(QMainWindow):
         self.act_track_no_clip.setText(self.tr("Don't clip when doing Track Gain"))
         self.act_track_no_clip.setToolTip(self.tr(
             "Lower Track Gain so that no clipping occurs"))
-        self.menu_tags.setTitle(self.tr("Tags"))
         self.act_recalc_tags.setText(self.tr("Re-calculate (do not read tags)"))
         self.act_recalc_tags.setToolTip(self.tr(
             "Do not read stored values when adding files; Track Gain analyzes them"))

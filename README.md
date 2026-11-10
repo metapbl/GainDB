@@ -27,7 +27,9 @@ formats, output, numbers) of mp3gain while remaining compatible with it.
   mp3gain tag fields in APEv2 (default) or ID3v2 tags, including undo info.
 - **CLI and GUI.** A command-line tool with an mp3gain-compatible option
   scheme, plus a cross-platform PySide6 GUI (Windows and macOS) with dark and
-  light themes (Options > Theme).
+  light themes (Options > Theme). Like the original mp3gain GUI, Options can
+  preserve file date/time, avoid clipping in Track Gain, and re-calculate
+  instead of reading stored tags.
 
 ## Scope: MP3 only
 

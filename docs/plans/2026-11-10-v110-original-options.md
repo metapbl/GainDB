@@ -26,7 +26,7 @@
 - 커밋은 작업마다 1개, Conventional Commits, 작업마다 전체 테스트
 
 ## 작업
-- [x] 1. CLI `-p` 수정 (CI mp3gain 대조는 push 뒤 확인) — 코어 쓰기 경로, `gaindb_cli.py`
+- [x] 1. CLI `-p` 수정 (CI mp3gain 1.6.2 대조 초록, run 42911783165) — 코어 쓰기 경로, `gaindb_cli.py`
   - 먼저 실패 테스트: 날짜를 2020-01-01로 맞춘 사본에 `-r -c -p`, `-r -c -p -s s`, `-a -c -p`, `-u -p` → 날짜 그대로. `-p` 없으면 바뀜
   - 확인: 테스트 통과, CI mp3gain 대조 테스트(test_preserve_time_matches) 초록, audio_body_sha256·태그 값 기존과 같음
 - [x] 2. 날짜 유지 옵션 — Options > Preserve file date/time
@@ -41,7 +41,7 @@
   - 켜면 파일 추가 때 태그 스캔을 하지 않아 적용 때 태그 값을 씨앗으로 쓰지 않는다
   - 먼저 실패 테스트: 태그 있는 사본 추가 → 값 칸 빈칸, Track Gain이 디코딩해 계산
   - 확인: 테스트 통과
-- [ ] 5. 버전·문서 — 1.1.0, README 옵션 설명, 노트 초안(사용자 승인)
+- [x] 5. 버전·문서 — 1.1.0, README 옵션 설명, 노트 초안(사용자 승인)
   - 확인: `gaindb_cli.py -v` 출력 1.1.0, 노트 승인
 - [ ] 6. 빌드·캡처 — pip-audit, `build_release.ps1`, 빌드 결과 다크·라이트 캡처(테마 1.4.0 확인)
   - 확인: pip_audit 결과, PNG 확인, 앱 코드에 THEME_SHOT 없음

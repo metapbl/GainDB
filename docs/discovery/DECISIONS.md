@@ -91,3 +91,4 @@
 | D073 | 2026-11-10 | UX | GUI "Re-calculate (do not read tags)"는 파일 추가 때 태그를 읽지 않는 것으로 구현한다. GaindB Track Analysis는 원래 늘 디코딩하므로 결과는 원본과 같다 | [U] | Q057 | 분석·적용마다 태그 무시 분기 | 확정 |
 | D074 | 2026-11-10 | 구현 | 1.1의 날짜 보존·Track no-clip을 코어(gaindb/)에 넣고 AVD 재동기화를 감수한다 | [U] | Q057 | GUI에만 구현 (CLI 버그 남음) | 확정 |
 | D075 | 2026-11-11 | UX | GUI Re-calculate를 Tags 하위 메뉴 대신 Options 바로 아래(Track no-clip 다음)에 둔다. 원본은 Tags 하위 메뉴지만 Ignore를 빼서 항목이 하나뿐이다. 문구·설정 키·동작은 그대로 | [U] | - | 원본처럼 Tags 하위 메뉴 유지 | 확정 |
+| D076 | 2026-11-11 | UX | 분석 로그는 행당 한 번만 남긴다. 같은 파일을 다시 Track Analysis해도 줄을 더하지 않는다(원본 exe 사용자 확인). Clear Analysis·Remove Tags·태그 재스캔 뒤에는 다시 기록한다. D067 보완 | [U] | - | 분석할 때마다 기록 | 확정 |

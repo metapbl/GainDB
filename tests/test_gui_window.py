@@ -240,6 +240,22 @@ class LogDefaultsTest(WindowTestBase):
             line = fh.read().splitlines()[0]
         self.assertEqual(line.split("\t")[1:], ["a.mp3", "TrackdB: -0.14", "MaxAmp: 15530"])
 
+    def test_analysis_log_writes_a_row_once(self):
+        # 원본은 같은 파일을 다시 Track Analysis 해도 로그를 더 남기지 않는다(D076).
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        log = os.path.join(tmp.name, "analysis.log")
+        self.win._log_config.analysis_enabled = True
+        self.win._log_config.analysis_path = log
+        row = self.win.model.get_row(0)
+        row.set_tag_result({"status": "ok", "track_db": -0.14, "curr_max_amp": 15530.2})
+        self.win.table.selectRow(0)
+        with mock.patch.object(self.mw, "AnalyzeWorker"):
+            self.win._on_analyze()
+            self.win._on_analyze()
+        with open(log, encoding="utf-8") as fh:
+            self.assertEqual(len(fh.read().splitlines()), 1)
+
 
 class DefaultWindowTest(WindowTestBase):
     def test_numeric_columns_fit_their_headers(self):

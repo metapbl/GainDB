@@ -32,6 +32,7 @@ class FileRow:
     status: str = "pending"  # pending | analyzed | applied | error
     error_msg: str = ""
     tag_scanned: bool = False
+    analysis_logged: bool = False  # 분석 로그는 행당 한 번(원본 동작, D076)
 
     def set_result(self, result: dict) -> None:
         self.result = result
@@ -57,11 +58,13 @@ class FileRow:
         self.result = None
         self.status = "pending"
         self.error_msg = ""
+        self.analysis_logged = False
 
     def set_tag_result(self, result: dict) -> None:
         """파일 추가 시 태그 스캔 결과를 반영한다."""
         self.result = result
         self.error_msg = ""
+        self.analysis_logged = False
         self.status = "analyzed" if result.get("status") == "ok" else "pending"
         self.tag_scanned = True
 

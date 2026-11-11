@@ -1427,9 +1427,10 @@ class MainWindow(QMainWindow):
                 continue
             if fr.needs_analysis():
                 paths.append(fr.path)
-            else:
-                # 원본처럼 이미 값이 있는 파일도 분석 로그에 남긴다(디코딩 없음, D067).
+            elif not fr.analysis_logged:
+                # 원본처럼 이미 값이 있는 파일도 분석 로그에 남긴다(디코딩 없음, D067). 행당 한 번(D076).
                 self._log_track_result(fr.path, fr.result)
+                fr.analysis_logged = True
 
         if not paths:
             self.statusBar().showMessage(self.tr(
@@ -1836,6 +1837,7 @@ class MainWindow(QMainWindow):
         fr.set_result(result)
         self.model.row_changed(r)
         self._log_track_result(path, result)
+        fr.analysis_logged = True
 
     def _log_track_result(self, path: str, result: dict | None):
         """Analysis Log 에 Track dB·MaxAmp 한 줄(값이 있을 때만)."""

@@ -1,12 +1,13 @@
 # PROGRESS — Gain dB (GaindB)
 
 ## 상태
-- 단계: 8 구현 · 활성 계획 없음 (2026-11-10-v110-original-options done)
-- 버전: 1.1.0 게시 (태그 v1.1.0 = 4afa542) · 테스트 202건 (로컬 OK, skip 3 = mp3gain 대조 / CI 3개 OS 초록, run 42911783165), 약 2분 (.venv Python 3.15.1)
-- 갱신: 2026-11-11 · v1.1.0 Release (CLI -p 수정, GUI 옵션 3개, 테마 1.4.3, 빌드 캡처 확인) · AVD 사본 1.1.0 동기화 확인 (AVD d6bc06c, 코어 9파일·라이선스 3파일 일치) · 1.1.0 exe 옵션 3개 동작 사용자 확인
+- 단계: 8 구현 · 활성 계획 없음
+- 버전: 1.1.1 게시 (태그 v1.1.1 = 71e4901) · 테스트 203건 (로컬 OK, skip 3 = mp3gain 대조 / CI 3개 OS 초록, run 42920919290), 약 2분 (.venv Python 3.15.1)
+- 갱신: 2026-11-11 · v1.1.1 Release (Re-calculate를 Options 바로 아래로, D075) · 1.1.0 exe 옵션 3개 동작 사용자 확인
 
 ## 다음 할 일
-1. 미릴리스 변경: Re-calculate 메뉴를 Options 바로 아래로 (D075). 다음 릴리스에 포함
+1. AVD 사본 동기화 (D012): `gaindb/__init__.py` 버전 문자열만 1.1.1로 (나머지 코어는 1.1.0과 같음)
+2. (사용자) 1.1.1 exe에서 Options 메뉴에 Re-calculate가 바로 보이는지 확인
 
 ## 미해결
 - 없음
@@ -30,4 +31,5 @@
 - 2026-11-05 metarche upgrade U1~U4 (42186ef) · 보안 정책 D051~D056 (153b096) · pip-audit 도입 (9d604d9)
 - 2026-11-10 v1.0.0 Release: Graphite/Paper 테마·UX 개선·로그 기본 경로 (태그 a386935) — 계획 2026-11-05-v100-theme-ux done
 - 2026-11-11 v1.1.0 Release: CLI -p 수정 (2e1e609), GUI 옵션 3개 (34bceaf, 506037d, 8effe42), 테마 1.4.0~1.4.3 (태그 4afa542) — 계획 2026-11-10-v110-original-options done
+- 2026-11-11 AVD 사본 1.1.0 동기화 확인 (AVD d6bc06c) · v1.1.1 Release: Re-calculate 메뉴 이동 (64cea24, 태그 71e4901)
 - 2026-10-25 metarche 이관: PRD 승인, 결정 46개 기록 (커밋 전)

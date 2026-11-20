@@ -126,7 +126,7 @@ from gui.logging import (
 from gui.dialogs.logs_dialog import LogsDialog
 from gui.dialogs.about_dialog import AboutDialog
 from gui.resources import app_icon
-from gui.i18n import resolve_language, save_language, install_translator
+from gui.i18n import LANGUAGES, resolve_language, save_language, install_translator
 from gaindb.api import (
     DEFAULT_TARGET_DB, recompute_target, shift_after_apply, group_by_album,
 )
@@ -672,23 +672,13 @@ class MainWindow(QMainWindow):
         self._lang_group = QActionGroup(self)
         self._lang_group.setExclusive(True)
 
-        self.act_lang_en = QAction("English", self)
-        self.act_lang_en.setCheckable(True)
-        self.act_lang_en.setData("en")
-        self._lang_group.addAction(self.act_lang_en)
-        self.menu_language.addAction(self.act_lang_en)
-
-        self.act_lang_ko = QAction("한국어", self)
-        self.act_lang_ko.setCheckable(True)
-        self.act_lang_ko.setData("ko")
-        self._lang_group.addAction(self.act_lang_ko)
-        self.menu_language.addAction(self.act_lang_ko)
-
-        # 현재 언어에 체크 표시.
-        if self._current_language == "ko":
-            self.act_lang_ko.setChecked(True)
-        else:
-            self.act_lang_en.setChecked(True)
+        for code, name in LANGUAGES.items():
+            act = QAction(name, self)
+            act.setCheckable(True)
+            act.setData(code)
+            act.setChecked(code == self._current_language)  # 현재 언어에 체크 표시
+            self._lang_group.addAction(act)
+            self.menu_language.addAction(act)
 
         self._lang_group.triggered.connect(self._on_language_selected)
 

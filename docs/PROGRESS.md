@@ -1,13 +1,15 @@
 # PROGRESS — Gain dB (GaindB)
 
 ## 상태
-- 단계: 8 구현 · 활성 계획 `docs/plans/2026-11-20-v120-i18n-readme.md` (GUI 6개 언어·README·1.2.0)
-- 버전: 1.1.2 게시 (태그 v1.1.2 = 9a6adaf) · 테스트 204건 (로컬 OK, skip 3 = mp3gain 대조 / CI 3개 OS 초록, run 42955891636), 약 2분 (.venv Python 3.15.1)
-- 갱신: 2026-11-20 · metarche upgrade U8·U1·U6·U7 (824e874) · PRD 1.2 변경 승인 (F9, D077~D090) · 계획 승인
+- 단계: 8 구현 · 활성 계획 `docs/plans/2026-11-20-v120-i18n-readme.md` (GUI 6개 언어·README·1.2.0) · 작업 7/12 완료
+- 버전: 1.1.2 게시 (태그 v1.1.2 = 9a6adaf), main은 1.2 작업 중 · 테스트 210건 (로컬 OK, 2026-11-21) / 1.1.2 때 204건 (로컬 OK, skip 3 = mp3gain 대조 / CI 3개 OS 초록, run 42955891636), 약 2분 (.venv Python 3.15.1)
+- 갱신: 2026-11-21 · GUI 6개 언어 완료 (작업 1~7, f2bb9d9~ca5719a): 언어 표, 로케일 규칙(D083·D090), zh_CN·ja·es·ru 번역 137건씩, 6개 언어 첫 창 가로 스크롤 없음
+- 2026-11-20 · metarche upgrade U8·U1·U6·U7 (824e874) · PRD 1.2 변경 승인 (F9, D077~D091) · 계획 승인
 - 이전: 2026-11-11 · v1.1.2 Release (분석 로그 행당 한 번, D076) · 1.1.2 exe 분석 로그 한 줄 사용자 확인 · AVD 사본 1.1.2 동기화 확인 (AVD 3278b23, 코어 9파일·라이선스 3파일 일치)
 
 ## 다음 할 일
-- 계획 작업 8: README 6개 언어·ffmpeg 링크 (ko README는 사용자 검수, GitHub About 변경은 확인 후)
+- 계획 작업 8: README 6개 언어 — `README.md`·`README.{ko,zh-CN,ja,es,ru}.md` readme 표준 구성, `gui/main_window.py > _FFMPEG_HELP_URL` 6개 언어(D088), 먼저 실패 테스트(언어별 링크 대상 파일·앵커 존재). ko README는 사용자 검수, GitHub About 변경은 확인 후
+- 참고: 이 PC(한국어 Windows)에서 중·일 화면은 한국어 글꼴로 대체 표시되고 `\`가 `₩`로 보임 (ko와 같음, D089)
 
 ## 미해결
 - 없음
@@ -33,4 +35,6 @@
 - 2026-11-11 v1.1.0 Release: CLI -p 수정 (2e1e609), GUI 옵션 3개 (34bceaf, 506037d, 8effe42), 테마 1.4.0~1.4.3 (태그 4afa542) — 계획 2026-11-10-v110-original-options done
 - 2026-11-11 AVD 사본 1.1.0 동기화 확인 (AVD d6bc06c) · v1.1.1 Release: Re-calculate 메뉴 이동 (64cea24, 태그 71e4901) · AVD 사본 1.1.1 동기화 확인 (AVD 94418c2)
 - 2026-11-11 원본 D067 확인(두 번 분석해도 로그 한 줄) → 분석 로그 행당 한 번 (c86784e, D076) · v1.1.2 Release (태그 9a6adaf) · 1.1.2 exe 사용자 확인 · AVD 사본 1.1.2 동기화 확인 (AVD 3278b23)
+- 2026-11-20 metarche upgrade U8·U1·U6·U7 (824e874) · PRD 1.2 변경 승인 (fd91a87) · 계획 (6eef201)
+- 2026-11-21 1.2 작업 1~7: 언어 표·번역 검사 (f2bb9d9) · 로케일 규칙·메뉴 (b049a58) · zh_CN (d578764) · ja (26a213a) · es (e5b97f7) · ru (47e2948) · 6개 언어 가로 스크롤 테스트 (ca5719a)
 - 2026-10-25 metarche 이관: PRD 승인, 결정 46개 기록 (커밋 전)

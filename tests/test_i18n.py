@@ -71,5 +71,32 @@ class LanguageMenuTest(unittest.TestCase):
                 win.deleteLater()
 
 
+class LayoutPerLanguageTest(unittest.TestCase):
+    def test_default_size_has_no_horizontal_scroll_in_every_language(self):
+        """D086: 번역된 머리글로 폭을 잡아도 첫 창에 가로 스크롤이 없다(D069)."""
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtCore import QSettings
+        from PySide6.QtWidgets import QApplication
+        import gui.main_window as mw
+        from gui.i18n import LANGUAGES, install_translator
+        app = QApplication.instance() or QApplication([])
+        self.addCleanup(install_translator, app, "en")
+        self.addCleanup(lambda: QSettings("GaindBTest", "GaindBTest").clear())
+        for lang in LANGUAGES:
+            with self.subTest(lang=lang), \
+                    mock.patch.object(mw, "_SETTINGS_ORG", "GaindBTest"), \
+                    mock.patch.object(mw, "_SETTINGS_APP", "GaindBTest"), \
+                    mock.patch.object(mw, "resolve_language", return_value=lang):
+                self.assertEqual(install_translator(app, lang), lang)
+                win = mw.MainWindow()
+                win.model.add_paths(["a.mp3", "b.mp3"])
+                win.resize(*win._default_window_extent())
+                win.show()
+                app.processEvents()
+                self.assertEqual(win.table.horizontalScrollBar().maximum(), 0)
+                win.hide()
+                win.deleteLater()
+
+
 if __name__ == "__main__":
     unittest.main()

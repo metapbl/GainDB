@@ -19,7 +19,7 @@
   <a href="#インストール"><img alt="OS: Windows, macOS, Linux" src="https://img.shields.io/badge/os-Windows_%7C_macOS_%7C_Linux-lightgrey?style=flat-square"></a>
 </p>
 
-CLI と GUI で MP3 の音量を無劣化で解析・調整し、結果は mp3gain と一致します。
+MP3 の音量を再エンコードせずに解析してそろえる、CLI・GUI ツールです。
 
 ## 機能
 

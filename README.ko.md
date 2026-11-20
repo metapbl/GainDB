@@ -19,7 +19,7 @@
   <a href="#설치"><img alt="OS: Windows, macOS, Linux" src="https://img.shields.io/badge/os-Windows_%7C_macOS_%7C_Linux-lightgrey?style=flat-square"></a>
 </p>
 
-CLI와 GUI로 MP3 음량을 무손실 분석·조정하며, 결과가 mp3gain과 같습니다.
+MP3 음량을 재인코딩 없이 분석하고 고르게 맞추는 CLI·GUI 도구입니다.
 
 ## 기능
 

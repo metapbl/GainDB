@@ -19,7 +19,7 @@
   <a href="#instalación"><img alt="OS: Windows, macOS, Linux" src="https://img.shields.io/badge/os-Windows_%7C_macOS_%7C_Linux-lightgrey?style=flat-square"></a>
 </p>
 
-Análisis y ajuste del volumen de MP3 sin pérdidas, con CLI y GUI, con resultados iguales a mp3gain.
+Analiza e iguala el volumen de archivos MP3 sin volver a codificarlos, desde la línea de comandos o una GUI.
 
 ## Qué hace
 

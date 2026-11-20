@@ -17,7 +17,7 @@
   <a href="#installation"><img alt="OS: Windows, macOS, Linux" src="https://img.shields.io/badge/os-Windows_%7C_macOS_%7C_Linux-lightgrey?style=flat-square"></a>
 </p>
 
-Lossless MP3 volume analysis and adjustment with a CLI and GUI, result-compatible with mp3gain.
+Analyze and even out MP3 loudness without re-encoding, from the command line or a GUI.
 
 ## What it does
 

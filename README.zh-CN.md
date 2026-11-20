@@ -19,7 +19,7 @@
   <a href="#安装"><img alt="OS: Windows, macOS, Linux" src="https://img.shields.io/badge/os-Windows_%7C_macOS_%7C_Linux-lightgrey?style=flat-square"></a>
 </p>
 
-无损分析和调整 MP3 音量，提供 CLI 与 GUI，结果与 mp3gain 一致。
+无需重新编码即可分析并统一 MP3 音量的命令行与图形界面工具。
 
 ## 功能
 

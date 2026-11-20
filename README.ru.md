@@ -19,7 +19,7 @@
   <a href="#установка"><img alt="OS: Windows, macOS, Linux" src="https://img.shields.io/badge/os-Windows_%7C_macOS_%7C_Linux-lightgrey?style=flat-square"></a>
 </p>
 
-Анализ и регулировка громкости MP3 без потерь, с CLI и GUI; результаты совпадают с mp3gain.
+Анализ и выравнивание громкости MP3 без перекодирования — из командной строки или в GUI.
 
 ## Возможности
 

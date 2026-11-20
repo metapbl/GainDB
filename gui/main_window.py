@@ -150,6 +150,10 @@ _SETTINGS_APP = "GaindB"
 _FFMPEG_HELP_URL = {
     "ko": "https://github.com/metapbl/GainDB/blob/main/README.ko.md#ffmpeg-설치",
     "en": "https://github.com/metapbl/GainDB/blob/main/README.md#installing-ffmpeg",
+    "zh_CN": "https://github.com/metapbl/GainDB/blob/main/README.zh-CN.md#安装-ffmpeg",
+    "ja": "https://github.com/metapbl/GainDB/blob/main/README.ja.md#ffmpeg-のインストール",
+    "es": "https://github.com/metapbl/GainDB/blob/main/README.es.md#instalar-ffmpeg",
+    "ru": "https://github.com/metapbl/GainDB/blob/main/README.ru.md#установка-ffmpeg",
 }
 
 # 리스트뷰 스타일시트: 표 테두리와 셀 테두리를 없애 선택 하이라이트가 컬럼 경계에서

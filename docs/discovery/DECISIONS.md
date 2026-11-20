@@ -107,3 +107,7 @@
 | D089 | 2026-11-20 | 3 | 한중일 글꼴은 동봉하지 않고 OS 기본 글꼴을 쓴다 | [AI] | Q060 | 글꼴 동봉 (용량·라이선스) | 확정 |
 | D090 | 2026-11-20 | 7 | 시작 언어는 Language 메뉴에서 고른 저장값이 우선이고, 고른 적 없거나 지원 밖 값이면 OS 언어(D083), 그것도 지원 밖이면 en. 언어 전환은 즉시(재시작 없음) | [U][X] | Q061, Q062 | Language 메뉴에 System 항목 (항목·문구 추가, PRD 변경) | 확정 |
 | D091 | 2026-11-20 | 8 | 번역하지 않는 용어는 dB·ReplayGain·mp3gain·APEv2·ID3v2·ffmpeg·ffprobe. 컬럼 머리글은 ko처럼 언어마다 번역한다 (D085 수정, 실제 약어 없음) | [U] | Q063 | 새 언어만 머리글 영문 (ko와 규칙 다름) | 확정 |
+| D092 | 2026-11-21 | 8 | README·GitHub About 한 줄 설명: "Lossless MP3 volume analysis and adjustment with a CLI and GUI, result-compatible with mp3gain." (95자, 기존 About 168자 대체) | [U] | - | 재인코딩 없음 강조 문장 | 확정 |
+| D093 | 2026-11-21 | 8 | 취약점 신고는 GitHub private vulnerability reporting (저장소 설정 켜기, 실행 전 확인) | [U] | - | 이슈로 비공개 연락 요청 | 확정 |
+| D094 | 2026-11-21 | 8 | PR 방침: 버그·질문은 Issues, PR은 받되 큰 변경은 이슈에서 먼저 논의, 전체 테스트 통과, 기여분은 LGPL-2.1-or-later | [U] | - | PR 받지 않음 | 확정 |
+| D095 | 2026-11-21 | 8 | README ffmpeg 앵커는 기존 두 개(README.md#installing-ffmpeg, README.ko.md#ffmpeg-설치)를 유지한다. 배포된 1.1.x exe가 이 링크를 쓴다 | [AI] | - | 새 제목으로 통일 (구 exe 링크 깨짐) | 확정 |

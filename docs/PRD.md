@@ -1,6 +1,6 @@
 # PRD — Gain dB (GaindB)
 
-상태: approved (2026-11-10) | 단계: 5 확정 | 갱신: 2026-11-11
+Status: approved (2026-11-10) | 단계: 5 확정 | 갱신: 2026-11-11
 <!-- 상태가 approved (YYYY-MM-DD)가 되기 전에는 코드·뼈대·의존성 설치를 하지 않는다. -->
 <!-- 모든 항목 끝에 출처를 단다: [U] 사용자 · [X] 기존 코드·문서 · [AI] AI 기본값. 근거 결정은 (D###). -->
 
@@ -175,6 +175,7 @@
 - CI: GitHub Actions, main push와 수동 실행. Windows·macOS·Ubuntu × Python 3.13(최소 지원). 각 러너는 ffmpeg 설치 → `tests/_gen_fixtures.py`로 합성 fixture 생성 → 전체 unittest. Ubuntu(apt)·macOS(brew)는 mp3gain을 설치해 성공 기준 대조 스크립트도 실행. mp3gain 설치 실패나 대조 불일치는 실패로 처리. GUI Album offscreen 대조 테스트는 새로 작성. [AI] (D038, D039)
 - 전체 테스트 명령과 걸리는 시간: `python -m unittest discover -s tests` (139건). 약 3분 (184초, Python 3.15.1, 2026-10-25 측정, D046). [X]
 - 편집 때 자동 검사 (확장자별 린터·타입 검사 명령): `.py` → `python -m py_compile <파일>`. [U] (D040)
+- 응답 끝 검사 (프로젝트 전체 검사 명령): 없음. 전체 테스트가 약 2분이라 응답마다 돌리지 않고 작업마다 직접 실행. [U]
 - 위험한 명령 (실행 전 확인 대상): git push, git tag, gh release, build_release.ps1, `_local/` 삭제. [U] (D041)
 - macOS 검증: GitHub Actions macOS 러너에서 실제 플랫폼 실행, 양 테마 캡처, 조작 자동 실행, PyInstaller 결과 실행. 네이티브 메뉴·파일 대화상자·Finder 드래그는 확인하지 못하며 릴리스 노트에 밝힌다. [U] (D063)
 - 의존성 취약점 검사: 릴리스 빌드 전 `pip-audit -r requirements.txt` 수동 실행. lock 파일 없음. [U][AI] (D054)
@@ -196,3 +197,4 @@
 | 2026-11-10 | 1.1 범위: CLI `-p` 수정, F8 원본 GUI 옵션, 1.1.0 릴리스 (§2.1, §3). discover 결과가 저장되지 않아 사용자 승인으로 직접 수정 | Q057, D071~D074 |
 | 2026-11-11 | F8 Re-calculate를 Tags 하위 메뉴에서 Options 바로 아래로 (§3). 사용자 승인으로 직접 수정 | D075 |
 | 2026-11-11 | F7 분석 로그를 행당 한 번으로 (§3). 사용자 승인으로 직접 수정 | D076 |
+| 2026-11-20 | metarche upgrade U6: 응답 끝 검사 항목 추가 (§6, 명령 없음). 사용자 승인으로 직접 수정 | upgrade U6 |

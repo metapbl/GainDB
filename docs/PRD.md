@@ -1,6 +1,6 @@
 # PRD — Gain dB (GaindB)
 
-Status: approved (2026-11-10) | 단계: 5 확정 | 갱신: 2026-11-11
+Status: approved (2026-11-20) | 단계: 5 확정 | 갱신: 2026-11-20
 <!-- 상태가 approved (YYYY-MM-DD)가 되기 전에는 코드·뼈대·의존성 설치를 하지 않는다. -->
 <!-- 모든 항목 끝에 출처를 단다: [U] 사용자 · [X] 기존 코드·문서 · [AI] AI 기본값. 근거 결정은 (D###). -->
 
@@ -27,6 +27,10 @@ Status: approved (2026-11-10) | 단계: 5 확정 | 갱신: 2026-11-11
   1. CLI `-p` 수정 — 완료 기준: 날짜를 바꿔 둔 사본에 `-r -c -p`·`-a -c -p`·`-u -p`를 실행하면 날짜가 그대로다(원본 소스 changeGain 근거, CI mp3gain 대조로 확인). 수치·태그는 그대로. [U][AI] (D071)
   2. F8 원본 GUI 옵션 (§3).
   3. 1.1.0 GitHub Release — 완료 기준은 1.0.0과 같고, 빌드 결과 다크·라이트 캡처로 테마 1.4.3을 확인한다. [U][AI]
+- 1.2 작업 (순서대로): [U] (D077~D082)
+  1. F9 GUI 6개 언어 (§3).
+  2. README 갱신 — 6개 언어(README.md 영문 기본, README.ko·zh-CN·ja·es·ru.md), readme 표준 구성: 가운데 언어 줄, 번역본 머리에 AI 번역 안내, 링크 달린 flat-square 배지(버전·라이선스·Python·OS), 120자 이하 한 줄 설명(GitHub About과 같음), 절 순서 정리·라이선스 절 끝. 완료 기준: 언어 줄의 파일이 모두 있고 번역본의 `##` 수·배지 수가 영문과 같다, 설치·사용 명령을 실제로 실행했다, 상대 링크 대상과 언어별 `#ffmpeg` 절 앵커가 모두 있다, 배지 이미지가 뜬다, 비밀·내부 경로가 없다. [U][AI] (D080, D081)
+  3. 1.2.0 GitHub Release — 완료 기준은 1.0.0과 같고, 빌드 결과 zip에 6개 언어 .qm이 있고 exe를 ja로 띄운 캡처로 확인한다. [U][AI] (D082)
 ### 2.2 있으면 좋음
 - 없음. 보류 목록(2.3)이 그 역할. [U] (D034)
 ### 2.3 이번에는 안 함
@@ -85,7 +89,7 @@ Status: approved (2026-11-10) | 단계: 5 확정 | 갱신: 2026-11-11
   - Given `-v` 또는 `-h` / When 실행 / Then 버전·사용법을 출력한다 (test_roundtrip_options)
 - 확인 방법: 자동 테스트 [X]
 ### F5 GUI (`python -m gui`)
-- 정상 흐름: 파일/폴더 목록, Track/Album 분석·게인, 우클릭(Clear Analysis/Undo/Remove Tags/Play), 취소, 컬럼 저장, 로그, 트레이, en/ko, About. [X] (D007, D013~D017, D024)
+- 정상 흐름: 파일/폴더 목록, Track/Album 분석·게인, 우클릭(Clear Analysis/Undo/Remove Tags/Play), 취소, 컬럼 저장, 로그, 트레이, 다국어(F9), About. [X] (D007, D013~D017, D024)
 - 인수 기준:
   - Given 하위 폴더가 있는 폴더 / When 재귀 추가 / Then 확장자 대소문자와 무관하게 MP3만 모인다 [X] (test_gui_pure)
   - Given 분석된 행 / When 목표 dB만 바꿈 / Then 파일은 바뀌지 않고 Volume(=89−raw)은 그대로, 스텝만 바뀐다 [X] (test_gui_pure)
@@ -112,7 +116,7 @@ Status: approved (2026-11-10) | 단계: 5 확정 | 갱신: 2026-11-11
   - Given 어디에도 없음 / When CLI로 파일 2개 분석 / Then 파일마다 영문 오류(찾아본 위치 포함), 종료 코드 1, 두 파일 모두 바뀌지 않는다
   - Given 어디에도 없음 / When GUI에서 Album 분석 시작 / Then 대화상자가 한 번 뜨고 README 설치 안내 링크가 있으며, 분석 워커는 시작되지 않는다
   - Given 어디에도 없음 / When CLI로 `-s c` / Then 정상 출력 (ffmpeg 불필요)
-- 링크 대상: GUI 언어가 ko면 GitHub의 README.ko.md "ffmpeg 설치" 절, 아니면 README.md "Installing ffmpeg" 절. [AI]
+- 링크 대상: GUI 언어의 README "ffmpeg 설치" 절 (F9, D088로 대체. 이전: ko면 README.ko.md, 아니면 README.md). [AI][U]
 - 확인 방법: 자동 테스트(PATH와 후보 폴더를 임시 폴더로 주입해 찾기 함수의 반환값 확인, GUI 확인은 offscreen에서 대화상자 호출 횟수 확인) + CI macOS 러너(Homebrew ffmpeg, PATH를 /usr/bin:/bin으로 줄여 Finder 실행 흉내). macOS 실기기 확인은 없음. [U][AI] (D037, D039)
 ### F7 테마와 UX (1.0)
 - 정상 흐름: GUI가 Graphite(다크)/Paper(라이트) 테마로 뜬다. Options > Theme에서 System/Dark/Light를 고르면 즉시 바뀌고 다음 실행에도 유지된다. 기본은 System. 배치·컬럼·수치·파일 결과는 그대로다. [U] (D057, D059)
@@ -152,6 +156,23 @@ Status: approved (2026-11-10) | 단계: 5 확정 | 갱신: 2026-11-11
   - Given 태그가 있는 사본, 재계산 켬 / When 추가 / Then 값 칸이 비고, Track Gain이 디코딩해 계산한다
   - Given 옵션 3개 / When 재시작 / Then 체크 상태가 유지된다
 - 확인 방법: 자동 테스트(tempfile 사본), 날짜 유지는 CI의 mp3gain 대조 테스트. [AI]
+### F9 GUI 6개 언어 (1.2)
+- 정상 흐름: Language 메뉴에서 English·한국어·简体中文·日本語·Español·Русский 중 하나를 고르면 재시작 없이 바뀌고 다음 실행에도 유지된다. 메뉴 항목은 각 언어 자기 이름이고 번역하지 않는다. Qt 표준 버튼(OK·Cancel 등)도 같은 언어(PySide6 내장 qtbase_*.qm). [U][X] (D077, D084)
+- 시작 언어 (저장값 없을 때 시스템 로케일): ko→ko, zh_CN·zh_SG→zh-CN, ja→ja, es_*→es, ru→ru, 번체(zh_TW·zh_HK 등)와 그 밖은 en. [U] (D083)
+- 번역 범위: GUI 문자열 전부(상태바 문장 단위 포함, F7). CLI 출력·로그·오류 원문은 영문 유지. dB·ReplayGain·mp3gain·APEv2·ID3v2·ffmpeg와 컬럼 약어는 번역하지 않는다. AI 번역, ko만 사용자 검수. [U] (D078, D079, D085)
+- 배치: 6개 언어 모두 첫 창에 가로 스크롤이 없다(D069). 한중일 글꼴은 동봉하지 않고 OS 기본 글꼴. [U][AI] (D086, D089)
+- ffmpeg 안내 링크: GUI 언어의 README "ffmpeg 설치" 절(en은 README.md). F6 링크 대상을 대체. [U] (D088)
+- 예외: 해당 언어 .qm이 없거나 로드에 실패하면 지금처럼 영문 원문으로 동작한다. 저장값이 지원 목록 밖이면 로케일 규칙으로 정한다. [X] (gui/i18n.py)
+- 파일: `gui/translations/gaindb_{ko,zh_CN,ja,es,ru}.ts`·`.qm`, `GainDB.spec`에 6개 .qm을 모두 넣는다. [X][AI]
+- 인수 기준: [U][AI]
+  - Given 저장값 없음, 로케일 ja_JP / When 시작 / Then 日本語로 뜨고 OK·Cancel도 일본어다
+  - Given 저장값 없음, 로케일 zh_TW / When 시작 / Then English로 뜬다
+  - Given 어떤 언어 / When Language > Русский / Then 재시작 없이 바뀌고 재시작 뒤에도 Русский다. 메뉴 항목 6개의 이름은 언어와 관계없이 같다
+  - Given 5개 .ts / When 번역 파일 검사 / Then 미번역 0, %1 등 자리표시자·& 단축 문자·단축키가 원문과 일치, 보존 용어가 그대로다
+  - Given 6개 언어 각각 / When offscreen으로 첫 창 / Then 가로 스크롤이 없다
+  - Given 언어 es, ffmpeg 없음 / When Album 분석 시작 / Then 대화상자 링크가 README.es.md의 ffmpeg 절이다
+  - Given 언어 ru / When 분석·적용·undo 완료 / Then 상태바에 번역 안 된 영문 조각이 없다(보존 용어 제외)
+- 확인 방법: 자동 테스트(offscreen, 번역 파일 검사), 언어별 캡처 한 번, ko 새 문구는 사용자 검수. [U][AI] (D086, D087)
 ## 4. 기술 결정
 | 항목 | 선택 | 버린 안 (이유) | 근거 |
 |---|---|---|---|
@@ -169,6 +190,7 @@ Status: approved (2026-11-10) | 단계: 5 확정 | 갱신: 2026-11-11
 - 성능 (시작 시간, 반응 속도, 자원): 수 시간 곡도 메모리 폭증 없이 분석(스트리밍). [X] (D010)
 - 배포 형태: GitHub 소스 + Windows exe(onedir, 로컬에서 build_release.ps1로 빌드). macOS는 소스 실행, 배포물 없음(D045). 법률 관문은 해소. [X][U][AI] (D020, D026)
 - 로그 (위치, 형식, 상세 모드): GUI 로그 파일, ISO 8601, 영문. [X] (D016)
+- 공개 저장소: GitHub 공개. README는 일반 사용자 대상, 6개 언어(English 기본·한국어·简体中文·日本語·Español·Русский). [X][U] (D080)
 
 ## 6. 검증과 운영
 - 자동 테스트 대상 / 실기기 확인 대상과 결과 전달 방식: 코어·CLI·GUI 순수부는 unittest. 원본 mp3gain 대조는 CI에서 자동(Ubuntu·macOS의 mp3gain CLI). 실클릭 회귀(취소 후 무결성)는 수동. [X][U] (D019, D038, D039)
@@ -198,3 +220,4 @@ Status: approved (2026-11-10) | 단계: 5 확정 | 갱신: 2026-11-11
 | 2026-11-11 | F8 Re-calculate를 Tags 하위 메뉴에서 Options 바로 아래로 (§3). 사용자 승인으로 직접 수정 | D075 |
 | 2026-11-11 | F7 분석 로그를 행당 한 번으로 (§3). 사용자 승인으로 직접 수정 | D076 |
 | 2026-11-20 | metarche upgrade U6: 응답 끝 검사 항목 추가 (§6, 명령 없음). 사용자 승인으로 직접 수정 | upgrade U6 |
+| 2026-11-20 | 1.2 범위: F9 GUI 6개 언어, README 6개 언어·표준 구성, 1.2.0 릴리스 (§2.1, §3, §5). F6 링크 대상 대체 | Q058~Q060, D077~D089 |

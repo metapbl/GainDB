@@ -279,3 +279,15 @@ A: "추천대로 하되, 영문 글꼴을 윈도우즈 기본 영문 글꼴이 �
 Q: 1 CLI `-p` 버그 수정 포함 / 2 클리핑 방지는 원본 GUI 식, Track Gain만 / 3 재계산은 추가 때 태그를 읽지 않음 / 4 코어 변경·AVD 재동기화 감수 (모두 추천안)
 A: "추천대로". discover 결과가 저장되지 않아 "직접 수정 승인"
 → D071~D074, PRD §2.1 1.1 작업·F8
+### Q058 · 2026-11-20 · PRD 변경 (README·다국어) · [X] · 탐색
+Q: (탐색, 질문 없음) README와 GUI 다국어의 현재 상태
+A: README.md(영문, 151줄)·README.ko.md(141줄). 첫 줄이 `English | [한국어]` 텍스트 링크, 배지 2개(license, python)는 링크 없음·가운데 정렬 아님, 한 줄 설명 없음. GUI 다국어는 Qt 표준(tr() + .qm + QTranslator, `gui/i18n.py`), SUPPORTED = ("en", "ko"), ko 메시지 136개(`gui/translations/gaindb_ko.ts`). Language 메뉴로 즉시 전환, 저장값 없으면 시스템 로케일이 ko면 ko 아니면 en. ffmpeg 안내 링크는 언어별 README 절(main_window.py). CLI·로그는 영문 고정(D011).
+→ OPEN O34~O39
+### Q059 · 2026-11-20 · PRD 변경 (README·다국어) · [U] · 언어·번역·README·릴리스
+Q: 1 GUI 추가 언어 zh-CN·ja·es·ru / 2 CLI·로그 영문 고정 유지 / 3 AI 번역, ko만 사용자 검수, README에 AI 번역 표기 / 4 README 6개 언어, 영문 기본 / 5 README 표준 구성(언어 줄·번역 안내·링크 배지·한 줄 설명·절 순서, 라이선스 끝) / 6 1.2.0 Release, 1.1.0과 같은 완료 기준 (모두 추천안)
+A: "추천안대로"
+→ D077~D082
+### Q060 · 2026-11-20 · PRD 변경 (README·다국어) · [U] · 범위 되짚기·F9 세부
+Q: 범위 되짚기 1~9 확인 + 1 로케일(zh_CN·zh_SG→zh-CN, 번체·그 밖 en) / 2 메뉴는 언어 자기 이름 / 3 dB·ReplayGain·mp3gain·APEv2·ID3v2·ffmpeg·컬럼 약어 번역 안 함 / 4 6개 언어 첫 창 가로 스크롤 없음 + 언어별 캡처 / 5 .ts 자동 검사(미번역 0, %1·&·단축키 일치) / 6 언어별 README ffmpeg 절 링크 (모두 추천안)
+A: "맞음, 추천대로"
+→ D077~D082 확정, D083~D088

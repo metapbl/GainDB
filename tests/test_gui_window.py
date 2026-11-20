@@ -54,7 +54,7 @@ class WindowTestBase(unittest.TestCase):
 
 
 class TranslationCoverageTest(unittest.TestCase):
-    """화면 문구가 ko 번역에 모두 있는지 본다. lupdate 는 f-string 안의 tr 을 못 찾는다."""
+    """화면 문구가 지원 언어마다 번역에 모두 있는지 본다. lupdate 는 f-string 안의 tr 을 못 찾는다."""
 
     GUI = Path(__file__).resolve().parent.parent / "gui"
 
@@ -72,12 +72,45 @@ class TranslationCoverageTest(unittest.TestCase):
     def test_no_tr_inside_fstring(self):
         self.assertEqual([c[:2] for c in self._tr_calls() if c[2]], [])
 
+    def _ts_roots(self):
+        from gui.i18n import SUPPORTED
+        for lang in SUPPORTED:
+            if lang != "en":  # en 은 원문이라 .ts 가 없다
+                yield lang, ET.parse(self.GUI / "translations" / f"gaindb_{lang}.ts").getroot()
+
     def test_every_tr_source_is_translated(self):
-        root = ET.parse(self.GUI / "translations" / "gaindb_ko.ts").getroot()
-        done = {m.findtext("source") for m in root.iter("message")
-                if m.find("translation").get("type") is None
-                and (m.findtext("translation") or m.find("translation").find("numerusform") is not None)}
-        self.assertEqual(sorted({c[1] for c in self._tr_calls()} - done), [])
+        sources = {c[1] for c in self._tr_calls()}
+        for lang, root in self._ts_roots():
+            with self.subTest(lang=lang):
+                done = {m.findtext("source") for m in root.iter("message")
+                        if m.find("translation").get("type") is None
+                        and (m.findtext("translation") or m.find("translation").find("numerusform") is not None)}
+                self.assertEqual(sorted(sources - done), [])
+
+    # D085: 번역하지 않는 용어. 영문자·숫자 경계로 찾는다(한글 조사가 붙어도 맞게).
+    KEEP_TERMS = ("dB", "ReplayGain", "mp3gain", "MP3Gain", "APEv2", "ID3v2", "ffmpeg", "ffprobe")
+
+    def test_translations_keep_markers_and_terms(self):
+        """D087: 자리표시자·& 단축 문자·단축키·보존 용어가 원문과 일치한다."""
+        import re
+        checks = {
+            "placeholder": lambda s: sorted(re.findall(r"%(?:\d+|n)", s)),
+            "mnemonic": lambda s: len(re.findall(r"(?<!&)&(?!&)", s)),
+            "shortcut": lambda s: sorted(re.findall(r"\b(?:Ctrl|Shift|Alt|Cmd|Meta)\+\S+", s)),
+            "terms": lambda s: [t for t in self.KEEP_TERMS
+                                if re.search(rf"(?<![A-Za-z0-9]){t}(?![A-Za-z0-9])", s)],
+        }
+        for lang, root in self._ts_roots():
+            bad = []
+            for m in root.iter("message"):
+                src, tr = m.findtext("source"), m.find("translation")
+                forms = [n.text or "" for n in tr.findall("numerusform")] or [tr.text or ""]
+                for form in forms:
+                    for name, f in checks.items():
+                        if f(src) != f(form):
+                            bad.append((name, src, form))
+            with self.subTest(lang=lang):
+                self.assertEqual(bad, [])
 
 
 class ClipColorTest(WindowTestBase):

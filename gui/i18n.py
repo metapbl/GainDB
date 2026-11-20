@@ -32,8 +32,10 @@ from PySide6.QtCore import QLibraryInfo, QLocale, QSettings, QTranslator
 _SETTINGS_ORG = "GaindB"
 _SETTINGS_APP = "GaindB"
 
-# 지원 언어 코드. en 은 소스 원문이라 .qm 이 없다(폴백=원문).
-SUPPORTED = ("en", "ko")
+# 지원 언어 표: 코드(Qt 로케일 이름, .qm 이름에 그대로 씀) → 메뉴에 쓰는 자기 이름(D084).
+# en 은 소스 원문이라 .qm 이 없다(폴백=원문).
+LANGUAGES = {"en": "English", "ko": "한국어"}
+SUPPORTED = tuple(LANGUAGES)
 DEFAULT_LANGUAGE = "en"
 
 # 설치된 QTranslator 를 모듈 전역으로 보유(GC 방지 + 재설치 시 제거용).

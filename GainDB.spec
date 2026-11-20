@@ -19,7 +19,7 @@ ROOT = os.path.abspath(os.getcwd())
 datas = [
     (os.path.join(ROOT, "gui", "assets", "GainDB.png"), os.path.join("gui", "assets")),
     (os.path.join(ROOT, "gui", "assets", "icons"), os.path.join("gui", "assets", "icons")),
-    (os.path.join(ROOT, "gui", "translations", "gaindb_ko.qm"), os.path.join("gui", "translations")),
+    (os.path.join(ROOT, "gui", "translations", "gaindb_*.qm"), os.path.join("gui", "translations")),
 ]
 
 # We only use scipy.signal.lfilter and numpy. Let PyInstaller's standard

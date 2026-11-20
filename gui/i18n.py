@@ -34,7 +34,7 @@ _SETTINGS_APP = "GaindB"
 
 # 지원 언어 표: 코드(Qt 로케일 이름, .qm 이름에 그대로 씀) → 메뉴에 쓰는 자기 이름(D084).
 # en 은 소스 원문이라 .qm 이 없다(폴백=원문).
-LANGUAGES = {"en": "English", "ko": "한국어"}
+LANGUAGES = {"en": "English", "ko": "한국어", "zh_CN": "简体中文"}
 SUPPORTED = tuple(LANGUAGES)
 DEFAULT_LANGUAGE = "en"
 

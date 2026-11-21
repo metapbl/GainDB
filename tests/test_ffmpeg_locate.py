@@ -151,6 +151,10 @@ class NoFfmpegTest(BaseGainTest):
         self._assert_dialog_blocks("ko", "_on_analyze", "AnalyzeWorker",
                                    "README.ko.md#ffmpeg-설치")
 
+    def test_gui_album_es_links_spanish_readme(self):
+        self._assert_dialog_blocks("es", "_on_album_analyze", "AlbumAnalyzeWorker",
+                                   "README.es.md#instalar-ffmpeg")
+
     def test_gui_track_gain_on_unanalyzed_rows_shows_dialog(self):
         self._assert_dialog_blocks("en", "_on_gain", "ApplyWorker",
                                    "README.md#installing-ffmpeg")

@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import os
+import re
 import unittest
 from unittest import mock
 
@@ -100,3 +101,71 @@ class LayoutPerLanguageTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LanguageBehaviourTest(unittest.TestCase):
+    """F9 인수 기준 1·3·7. 사용자 QSettings 대신 GaindBTest 를 쓴다."""
+
+    def setUp(self) -> None:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtCore import QSettings
+        from PySide6.QtWidgets import QApplication
+        import gui.i18n as i18n
+        import gui.main_window as mw
+        self.mw, self.i18n = mw, i18n
+        self.app = QApplication.instance() or QApplication([])
+        for p in (mock.patch.object(mw, "_SETTINGS_ORG", "GaindBTest"),
+                  mock.patch.object(mw, "_SETTINGS_APP", "GaindBTest"),
+                  mock.patch.object(i18n, "_SETTINGS_ORG", "GaindBTest"),
+                  mock.patch.object(i18n, "_SETTINGS_APP", "GaindBTest")):
+            p.start()
+            self.addCleanup(p.stop)
+        self.addCleanup(i18n.install_translator, self.app, "en")
+        QSettings("GaindBTest", "GaindBTest").clear()
+        self.addCleanup(lambda: QSettings("GaindBTest", "GaindBTest").clear())
+
+    def window(self, lang: str):
+        self.i18n.install_translator(self.app, lang)
+        with mock.patch.object(self.mw, "resolve_language", return_value=lang):
+            win = self.mw.MainWindow()
+        self.addCleanup(win.deleteLater)
+        return win
+
+    def test_ja_standard_buttons_are_japanese(self):
+        from PySide6.QtWidgets import QDialogButtonBox
+        self.i18n.install_translator(self.app, "ja")
+        box = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
+        self.addCleanup(box.deleteLater)
+        self.assertIn("キャンセル", box.button(QDialogButtonBox.StandardButton.Cancel).text())
+
+    def test_switch_to_russian_now_and_after_restart(self):
+        win = self.window("en")
+        ru = next(a for a in win.menu_language.actions() if a.data() == "ru")
+        ru.trigger()
+        self.assertEqual(win.menu_analysis.title(), "Анализ")
+        self.assertEqual([a.text() for a in win.menu_language.actions()],
+                         list(self.i18n.LANGUAGES.values()))
+        from PySide6.QtCore import QLocale
+        with mock.patch.object(self.i18n.QLocale, "system", return_value=QLocale("en_US")):
+            self.assertEqual(self.i18n.resolve_language(), "ru")
+
+    def test_russian_summaries_have_no_english(self):
+        # 보존 용어(D091)와 숫자를 빼고 라틴 문자 낱말이 남으면 번역 안 된 조각이다.
+        win = self.window("ru")
+        bar = win.statusBar()
+        win._analyzed_count, win._applied_count, win._failed_count = 2, 3, 1
+        win._action_done = 2
+        win._on_worker_finished()
+        msgs = [bar.currentMessage()]
+        win._on_apply_finished()
+        msgs.append(bar.currentMessage())
+        for verb in (win.tr("Undoing"), "other"):
+            win._action_verb = verb
+            win._on_file_action_finished()
+            msgs.append(bar.currentMessage())
+        win._show_summary(["x"], cancelled=True)
+        msgs.append(bar.currentMessage().replace("x", ""))
+        for msg in msgs:
+            with self.subTest(msg=msg):
+                self.assertTrue(msg)
+                self.assertEqual(re.findall(r"[A-Za-z]{2,}", msg), [])

@@ -8,7 +8,7 @@ r"""gui/main_window.py — 메인 창(8단계: Track + Album, 태그 스캔·분
 Analysis 와 Gain 을 QThread 워커로 연결한다. 우클릭 팝업으로 Clear Analysis·
 Undo·Remove Tags·Play 를 제공한다.
 
-다국어(한글/영문): Language 메뉴로 English/한국어를 고른다(QActionGroup
+다국어(6개 언어): Language 메뉴로 언어를 고른다(QActionGroup
 상호배타). 선택 시 gui.i18n.save_language 로 영속화하고 install_translator 로
 즉시 전환한다(Qt 가 LanguageChange 이벤트를 흘리면 changeEvent 가
 _retranslate_ui 를 불러 정적 UI 문자열을 다시 tr() 한다). 화면 문자열만 tr()
@@ -664,7 +664,7 @@ class MainWindow(QMainWindow):
     def _build_language_menu(self):
         """Language 메뉴를 구성하고, 그 뒤에 Help 메뉴를 맨 오른쪽에 둔다.
 
-        English/한국어를 QActionGroup 으로 상호배타 체크한다. 현재 언어에 체크를
+        지원 언어(자기 이름 표기)를 QActionGroup 으로 상호배타 체크한다. 현재 언어에 체크를
         표시하고, 다른 언어를 고르면 _on_language_selected 가 저장+즉시 전환한다.
         언어 표기 자체는 각 언어의 자기 이름(English / 한국어)이라 tr() 대상이
         아니다(어느 언어로 보든 자기 이름은 동일하게 보이는 게 관례).

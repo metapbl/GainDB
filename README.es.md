@@ -96,7 +96,7 @@ Esto crea un entorno virtual en `.venv` e instala en él los paquetes.
 
 Abre la GUI (desde el código fuente: `python -m gui`), añade archivos o una
 carpeta y elige **Análisis > Análisis de álbum** y luego **Modificar > Ganancia
-del álbum**. El análisis rellena las columnas de dB; el paso de ganancia
+de álbum**. El análisis rellena las columnas de dB; el paso de ganancia
 modifica los archivos y guarda etiquetas para deshacer.
 
 En la línea de comandos, solo analizar no modifica el archivo:

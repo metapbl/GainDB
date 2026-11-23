@@ -1,15 +1,17 @@
 # PROGRESS — Gain dB (GaindB)
 
 ## 상태
-- 단계: 8 구현 · 활성 계획 없음 (`docs/plans/2026-11-23-readme-screenshots.md` 완료)
+- 단계: 8 구현 · 활성 계획 `docs/plans/2026-11-23-v130-gain-features.md` (1.3: F10 Constant Gain·Max No-clip GUI·steps==0 건너뛰기, D100~D106)
 - 버전: 1.2.0 게시 (태그 v1.2.0 = 9f2cbbe) · main은 README 스크린샷 반영(릴리스 없음, D097) · 테스트 221건 (로컬 OK, skip 3 = mp3gain 대조 / CI 3개 OS 초록, run 45176554058 at 5526e3c), 약 2분 (.venv Python 3.15.1)
-- 갱신: 2026-11-23 · README 스크린샷: 생성 스크립트 `tests/_readme_screenshots.py` (fb257a3, 5526e3c), 6개 언어 Screenshots 절·이미지 -v2 (9759e43, 5526e3c), D096~D099
+- 갱신: 2026-11-23 · 1.3 범위 PRD 변경 승인·계획 승인 (Q067~Q070)
+- 2026-11-23 · README 스크린샷: 생성 스크립트 `tests/_readme_screenshots.py` (fb257a3, 5526e3c), 6개 언어 Screenshots 절·이미지 -v2 (9759e43, 5526e3c), D096~D099
 - 2026-11-23 · v1.2.0 Release (GUI 6개 언어, README 6개 언어·표준 구성)
 - 이전: 2026-11-11 · v1.1.2 Release · AVD 사본 1.1.2 동기화 확인 (AVD 3278b23)
 
 ## 다음 할 일
-- AVD 사본 1.2.0 동기화 (D012): 사용자가 AVD 세션에서 직접 진행
-- 다음 범위는 정해지지 않음 (보류 목록 PRD §2.3은 사용자가 요구하기 전에 제안하지 않음)
+- 계획 작업 1부터: steps==0 현재 동작 고정 테스트
+- 1.3.0 뒤 다음 범위: scipy 제거 (D100, 별도 PRD 변경)
+- AVD 사본 1.2.0 동기화 완료(사용자 확인). 1.3에서 api 진입점이 늘면 다시 동기화 대상 (D012)
 - 참고: README 스크린샷은 주 창이 바뀌면 AGENTS.md 명령으로 다시 만들고, 내용이 바뀌면 파일 이름 버전(-v3 등)을 올린다 (D098·D099). 생성 중 `M:` 드라이브가 잠시 보임
 - 참고: 이 PC(한국어 Windows)에서 중·일 화면과 표·머리글은 한국어 글꼴로 대체 표시되고 `\`가 `₩`로 보임 (D089)
 

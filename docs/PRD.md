@@ -34,11 +34,15 @@ Status: approved (2026-11-23) | 단계: 5 확정 | 갱신: 2026-11-23
 - README 스크린샷 작업: [U][AI] (D096~D098)
   1. 스크린샷 생성 스크립트 — 합성 샘플 MP3를 넣고 Album 분석을 마친 주 창을 라이트·다크 PNG로 `docs/images/`에 쓴다. 완료 기준: 명령 한 번으로 두 파일이 다시 만들어지고, 각 2 MB 이하이며, 화면에 로컬 경로·사용자 이름·실제 파일 이름이 없다. [AI] (D098)
   2. README 갱신 — 6개 언어 README 기능 절 바로 뒤에 `## Screenshots` 절(라이트 왼쪽·다크 오른쪽 표, alt 텍스트). 완료 기준: readme 표준 §6 검사(§7 항목 포함) 통과. 릴리스 없이 main에만 반영 (D097). [U][AI] (D096, D097)
+- 1.3 작업 (순서대로): [U] (D100, D104)
+  1. F10 원본 GUI 게인 기능 (§3): Constant Gain, Max No-clip, steps==0 건너뛰기.
+  2. 1.3.0 GitHub Release — 완료 기준은 1.0.0과 같고, 빌드 결과 exe에서 Constant Gain과 Maximizing 메뉴를 띄운 캡처로 확인한다. [U][AI] (D104)
+  3. 그다음 범위: scipy 제거(용량 절감)는 1.3.0 뒤 별도 PRD 변경으로 다룬다. [U] (D100)
 ### 2.2 있으면 좋음
 - 없음. 보류 목록(2.3)이 그 역할. [U] (D034)
 ### 2.3 이번에는 안 함
 - AVD 연계 (다른 세션에서 진행). [U] (D032)
-- 사용자가 먼저 요구하기 전까지 보류: steps==0 태그 재확인 최적화, Constant Gain GUI, Max No-clip GUI, scipy 제거(용량 절감). [X]
+- 사용자가 먼저 요구하기 전까지 보류: scipy 제거(용량 절감, 1.3.0 뒤 진행 예정). [X][U] (D100)
 ### 2.4 반목표 (절대 그렇게 되면 안 되는 동작)
 - 타 포맷 지원. [X] (D001)
 - mp3gain 기능을 합의 없이 축소·단순화. [X] (D002)
@@ -151,7 +155,7 @@ Status: approved (2026-11-23) | 단계: 5 확정 | 갱신: 2026-11-23
   - Preserve file date/time: Track/Album Gain·Undo·Remove Tags가 파일 날짜를 지킨다.
   - Don't clip when doing Track Gain: Track Gain 적용 스텝 = min(제안 스텝, 클리핑 없는 최대 스텝). 제안이 0이어도 최대 스텝이 음수면 낮춘다. 최대 스텝 = floor(4·log2(32767/현재 최대 진폭)), 진폭을 모르면 낮추지 않는다. Album Gain에는 쓰지 않는다(원본 GUI와 같음, CLI `-k`와 다름).
   - Re-calculate (do not read tags): Options 바로 아래(원본은 Tags 하위 메뉴, 항목이 하나뿐이라 올림, D075). 파일 추가 때 태그를 읽지 않는다. 그래서 적용 때 태그 값을 쓰지 않고 새로 분석한다.
-- 범위 밖: 원본 "Ignore (do not read or write tags)", Max No-clip GUI(§2.3). [U]
+- 범위 밖: 원본 "Ignore (do not read or write tags)". Max No-clip GUI는 F10에서 다룬다. [U] (D102)
 - 코어 변경: 날짜 보존과 Track no-clip이 코어 api에 들어가 AVD 동기화 대상이다. [U] (D074)
 - 인수 기준: [AI]
   - Given 옵션 켬, 날짜를 바꿔 둔 사본 / When Track Gain·Album Gain·Undo·Remove Tags / Then 날짜가 그대로다
@@ -176,6 +180,26 @@ Status: approved (2026-11-23) | 단계: 5 확정 | 갱신: 2026-11-23
   - Given 언어 es, ffmpeg 없음 / When Album 분석 시작 / Then 대화상자 링크가 README.es.md의 ffmpeg 절이다
   - Given 언어 ru / When 분석·적용·undo 완료 / Then 상태바에 번역 안 된 영문 조각이 없다(보존 용어 제외)
 - 확인 방법: 자동 테스트(offscreen, 번역 파일 검사), 언어별 캡처 한 번, ko 새 문구는 사용자 검수. [U][AI] (D086, D087)
+### F10 원본 GUI 게인 기능 (1.3)
+- Constant Gain: Modify Gain > Apply Constant Gain...(Ctrl+O). 대화상자는 원본처럼 슬라이더 -8~+8 스텝(1 스텝 = 1.5 dB, dB는 소수 1자리로 함께 표시)과 "한 채널에만 적용"(왼쪽/오른쪽). OK면 선택 파일 전부에 분석 없이 적용하고 undo할 수 있다. 결과(오디오·태그)는 CLI `-g i`·`-l c i`와 같다. 0 스텝이면 아무것도 하지 않는다. [U][X] (D103, frmGetGain.frm)
+- Maximizing: Options에 "Enable \"Maximizing\" features" 체크 항목(기본 꺼짐, 설정 저장). 켤 때 원본처럼 "최대화는 음량 정규화가 아니다" 안내 창을 한 번 띄운다. 켜면 아래 메뉴와 Max Noclip 컬럼이 나타나고, 끄면 숨는다. [U] (D101)
+  - Analysis > Max No-clip analysis(Ctrl+M): 음량 분석 없이 최대 진폭만 구한다(CLI `-x` 경로). [U] (D102)
+  - Max Noclip 컬럼: 클리핑 없는 최대 스텝. [U] (D102)
+  - Modify Gain > Apply Max No-clip Gain for Each file(Ctrl+X): 곡마다 자기 최대 스텝을 적용. [U] (D102)
+  - Modify Gain > Apply Max No-clip Gain for Album(Ctrl+L): 앨범 묶음마다 공통 스텝(묶음에서 가장 작은 최대 스텝)을 적용. [U][AI] (D102)
+  - 수치·태그는 원본 exe 실행 결과를 기준으로 맞춘다. 최대 진폭을 모르는 곡은 먼저 최대 진폭만 구한다. [U][AI] (D102)
+- steps==0 건너뛰기: Track/Album Gain 적용 때 steps==0이고 태그가 최신인 곡은 GUI가 워커에 넘기지 않는다. 파일·태그·로그 결과는 지금과 같다. [AI] (D105)
+- 공통: 새 항목은 주 메뉴에만 넣는다(표 우클릭 메뉴 제외). 새 문자열은 F9 규칙으로 6개 언어 번역, ko만 사용자 검수. Maximizing 기본 꺼짐이라 README 스크린샷은 그대로다. 단축키 Ctrl+O·M·X·L은 지금 쓰는 키와 겹치지 않는다. [AI] (D106)
+- 코어 변경: Constant Gain·최대 진폭 분석·Max No-clip 적용의 GUI용 진입점이 `gaindb/api.py`에 들어가면 AVD 동기화 대상이다. [X] (D012)
+- 인수 기준: [AI]
+  - Given 사본 2개 / When Constant Gain +3 / Then 두 파일 결과가 CLI `-g 3`과 같고, Undo로 원래 오디오(audio_body_sha256)로 돌아온다
+  - Given 스테레오 사본 / When Constant Gain 한 채널(오른쪽) -2 / Then 결과가 CLI `-l 1 -2`와 같다
+  - Given Maximizing 꺼짐 / When 시작 / Then Max No-clip 메뉴 3개와 Max Noclip 컬럼이 보이지 않는다. 켜면 안내 창 뒤 보이고, 재시작 뒤에도 유지된다
+  - Given 사본 / When Max No-clip analysis / Then Max Amp·Max Noclip 칸이 채워지고 음량 칸은 그대로이며, 값이 원본 exe(또는 CLI `-x`)와 같다
+  - Given 앨범 사본 3개 / When Apply Max No-clip Gain for Each file·for Album / Then 적용 스텝과 태그가 원본 exe 실행 결과와 같고 클리핑이 없다
+  - Given steps==0이고 태그가 최신인 곡이 섞인 사본 / When Track Gain·Album Gain / Then 그 곡은 워커에 가지 않고, 모든 파일·태그·로그가 최적화 전과 같다
+  - Given 6개 언어 / When 새 메뉴·대화상자 / Then 번역 파일 검사 통과, 첫 창 가로 스크롤 없음
+- 확인 방법: 자동 테스트(tempfile 사본, offscreen), 원본 exe 대조는 CI mp3gain 대조 테스트 또는 로컬 exe 실행 결과, ko 문구 사용자 검수. [AI]
 ## 4. 기술 결정
 | 항목 | 선택 | 버린 안 (이유) | 근거 |
 |---|---|---|---|
@@ -227,3 +251,4 @@ Status: approved (2026-11-23) | 단계: 5 확정 | 갱신: 2026-11-23
 | 2026-11-20 | 1.2 범위: F9 GUI 6개 언어, README 6개 언어·표준 구성, 1.2.0 릴리스 (§2.1, §3, §5). F6 링크 대상 대체 | Q058~Q060, D077~D089 |
 | 2026-11-20 | F9 보존 용어에서 '컬럼 약어'를 빼고 머리글 번역 (§3). 사용자 승인으로 직접 수정 | Q063, D091 |
 | 2026-11-23 | README 스크린샷 작업 추가: 생성 스크립트, 6개 언어 Screenshots 절, 릴리스 없음 (§2.1, §5) | Q064~Q065, D096~D098 |
+| 2026-11-23 | 1.3 범위: F10 Constant Gain·Max No-clip GUI·steps==0 건너뛰기, 1.3.0 릴리스 (§2.1, §2.3, §3 F8·F10). scipy 제거는 그 뒤 | Q067~Q070, D100~D106 |

@@ -1,13 +1,14 @@
 # PROGRESS — Gain dB (GaindB)
 
 ## 상태
-- 단계: 8 구현 · 활성 계획 없음 (`docs/plans/2026-11-20-v120-i18n-readme.md` 완료)
+- 단계: 8 구현 · 활성 계획 `docs/plans/2026-11-23-readme-screenshots.md` (README 스크린샷, D096~D098) · 작업 0/3 완료
 - 버전: 1.2.0 게시 (태그 v1.2.0 = 9f2cbbe, Release에 노트·zip) · 테스트 217건 (로컬 OK, skip 3 = mp3gain 대조 / CI 3개 OS 초록, run 44881765387 at 1b15441), 약 2분 (.venv Python 3.15.1)
 - 갱신: 2026-11-23 · v1.2.0 Release (GUI 6개 언어, README 6개 언어·표준 구성)
 - 2026-11-21 · README 6개 언어 재작성·ffmpeg 링크 6개 (5440e03, d61807e) · GitHub 비공개 취약점 신고 켬·About 변경 (D092~D095) · 1.2.0 버전·노트 (68d9437) · 빌드 확인 (792d40b) · 인수: F9 기준 1·3·6·7 테스트 보강 (cbb07b7, 1b15441)
 - 이전: 2026-11-11 · v1.1.2 Release · AVD 사본 1.1.2 동기화 확인 (AVD 3278b23)
 
 ## 다음 할 일
+- 계획 작업 1: `tests/_readme_screenshots.py > render` — 먼저 실패 테스트 `tests/test_readme_screenshots.py` (두 PNG·2 MB 이하·Path 컬럼에 로컬 경로 없음)
 - AVD 사본 1.2.0 동기화 (D012): 코어 변경은 `gaindb/__init__.py` 버전 문자열뿐
 - 1.2 다음 범위는 정해지지 않음 (보류 목록 PRD §2.3은 사용자가 요구하기 전에 제안하지 않음)
 - 참고: 이 PC(한국어 Windows)에서 중·일 화면은 한국어 글꼴로 대체 표시되고 `\`가 `₩`로 보임 (ko와 같음, D089). 저장된 컬럼 폭은 언어를 바꿔도 유지돼 긴 언어에서 머리글이 잘릴 수 있음 (첫 창은 D086으로 확인)

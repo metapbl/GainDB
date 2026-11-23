@@ -45,6 +45,21 @@ mp3gain: the same dB values, gain steps and tags.
 Gain dB works on **MP3 files only**, by design: the lossless technique
 depends on the MP3 `global_gain` field, which other formats do not have.
 
+## Screenshots
+
+<table>
+  <tr>
+    <th>Light</th>
+    <th>Dark</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/main-light.png" alt="Gain dB main window in the light theme after Album Analysis of four sample MP3 files"></td>
+    <td><img src="docs/images/main-dark.png" alt="Gain dB main window in the dark theme after Album Analysis of four sample MP3 files"></td>
+  </tr>
+</table>
+
+Album Analysis of four sample files, showing each file's volume and its Track and Album gain.
+
 ## Requirements
 
 - **ffmpeg and ffprobe** — needed for analysis. They are not bundled; install

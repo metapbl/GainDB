@@ -44,6 +44,21 @@ Gain dB は MP3 ファイルがどれくらい大きく聞こえるかを測り�
 Gain dB は設計上 **MP3 ファイルのみ** を扱います。無劣化の方式は MP3 の
 `global_gain` フィールドに依存しており、ほかの形式にはこのフィールドがありません。
 
+## スクリーンショット
+
+<table>
+  <tr>
+    <th>ライト</th>
+    <th>ダーク</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/main-light.png" alt="サンプル MP3 4 件をアルバム解析した後の Gain dB メインウィンドウ（ライトテーマ）"></td>
+    <td><img src="docs/images/main-dark.png" alt="サンプル MP3 4 件をアルバム解析した後の Gain dB メインウィンドウ（ダークテーマ）"></td>
+  </tr>
+</table>
+
+サンプルファイル 4 件をアルバム解析した画面です。ファイルごとの音量と Track/Album ゲインが表示されます。
+
 ## 動作要件
 
 - **ffmpeg と ffprobe** — 解析に必要です。同梱していないので、各自で

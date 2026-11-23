@@ -42,6 +42,21 @@ Gain dB 测量 MP3 文件听起来有多响，并在**不重新编码**的情况
 Gain dB 按设计**只处理 MP3 文件**：无损方法依赖 MP3 的 `global_gain` 字段，
 其他格式没有这个字段。
 
+## 截图
+
+<table>
+  <tr>
+    <th>浅色</th>
+    <th>深色</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/main-light.png" alt="对四个示例 MP3 文件进行专辑分析后的 Gain dB 主窗口，浅色主题"></td>
+    <td><img src="docs/images/main-dark.png" alt="对四个示例 MP3 文件进行专辑分析后的 Gain dB 主窗口，深色主题"></td>
+  </tr>
+</table>
+
+对四个示例文件进行专辑分析后的界面：显示每个文件的音量以及 Track/Album 增益。
+
 ## 系统要求
 
 - **ffmpeg 和 ffprobe** — 分析时需要。软件不附带它们，请自行安装（见下文）。

@@ -71,7 +71,7 @@ class ReadmeTest(unittest.TestCase):
             name = readme_name(lang)
             text = read(name)
             own = anchors(text)
-            for target in re.findall(r'(?:\]\(|href=")([^)"]+)', text):
+            for target in re.findall(r'(?:\]\(|href="|src=")([^)"]+)', text):
                 if target.startswith(("http://", "https://")):
                     continue
                 with self.subTest(readme=name, link=target):
@@ -80,6 +80,22 @@ class ReadmeTest(unittest.TestCase):
                         self.assertTrue(os.path.exists(os.path.join(ROOT, path)), target)
                     else:
                         self.assertIn(unquote(frag), own)
+
+    def test_screenshots_section(self):
+        """D096: 기능 절 바로 다음 절에 라이트·다크 이미지(파일 있음, 2 MB 이하, alt 있음)."""
+        for lang in self.langs:
+            name = readme_name(lang)
+            with self.subTest(readme=name):
+                text = re.sub(r"```.*?```", "", read(name), flags=re.S)
+                sections = re.split(r"^## ", text, flags=re.M)
+                imgs = re.findall(r'<img src="(docs/images/[^"]+)" alt="([^"]*)"', sections[2])
+                self.assertEqual([src for src, _ in imgs],
+                                 ["docs/images/main-light.png", "docs/images/main-dark.png"])
+                for src, alt in imgs:
+                    path = os.path.join(ROOT, src)
+                    self.assertTrue(os.path.isfile(path), src)
+                    self.assertLessEqual(os.path.getsize(path), 2 * 1024 * 1024)
+                    self.assertTrue(alt.strip())
 
 
 if __name__ == "__main__":

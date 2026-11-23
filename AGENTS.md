@@ -15,6 +15,7 @@ MP3 음량을 재인코딩 없이 분석·조정하는 도구. mp3gain 소스를
 - fixture 생성: `.venv\Scripts\python.exe tests\_gen_fixtures.py` (ffmpeg 필요, 산출물은 `_local\test_audio\`)
 - 전체 테스트: `.venv\Scripts\python.exe -m unittest discover -s tests` (작업마다 실행)
 - 실행: `.venv\Scripts\python.exe gaindb_cli.py -h` · `.venv\Scripts\python.exe -m gui`
+- README 스크린샷: `.venv\Scripts\python.exe tests\_readme_screenshots.py docs\images` (실제 화면에서, 주 창이 바뀌면 다시 생성하고 내용이 바뀌면 파일 이름에 `-v2` 등, D098)
 - 편집 때 자동 검사: `.metarche/hooks/check.ps1`이 실행 (`py -m py_compile`)
 - 응답 끝 검사: `.metarche/hooks/finish.ps1`이 실행 (명령 없음. 전체 테스트는 작업마다 직접 실행)
 - 릴리스 빌드: dist의 GainDB.exe를 닫고 `pwsh -NoProfile -Command "& '.\.venv\Scripts\Activate.ps1'; & '.\build_release.ps1'"` (실행 전 확인, 성공은 `BUILD OK`, T17). 빌드 전 `.venv\Scripts\python.exe -m pip_audit -r requirements.txt` (D054)

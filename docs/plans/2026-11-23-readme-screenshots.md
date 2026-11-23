@@ -22,7 +22,7 @@ Status: active | 시작: 2026-11-23 (계획 시작 커밋 dc14d79) | 근거: PRD
 시험 접점: `tests/_readme_screenshots.render(out_dir)`가 돌려준 PNG 파일들과, 렌더 직전 창의 Path\File 컬럼 표시 문자열. README는 `tests/test_readme.py`처럼 파일을 직접 읽는다.
 
 ## 작업
-- [ ] 1. 스크린샷 생성 스크립트 — `tests/_readme_screenshots.py > render`
+- [x] 1. 스크린샷 생성 스크립트 — `tests/_readme_screenshots.py > render` (두 테스트 실패 확인 후 통과, 전체 219건 OK. 상대 경로로 `Album Sample.mp3`만 보임. 실제 앱 글꼴(_apply_platform_font) 사용, 한국어 Windows에서 표·머리글이 시스템 글꼴이라 `\`가 `₩`로 보여 생성 스크립트에서만 표·머리글에 앱 글꼴 지정(테마 바꿀 때마다). offscreen은 글꼴이 없어 README 이미지는 실제 플랫폼에서 생성. PNG 두 장 눈 확인 2026-11-23)
   - 먼저 실패 테스트 `tests/test_readme_screenshots.py::ReadmeScreenshotsTest::test_render_writes_light_and_dark` — 임시 폴더에 render 하면 `main-light.png`·`main-dark.png` 두 파일이 생기고, 각 2 MB 이하이며, 이미지 크기가 0이 아니다
   - 같은 파일 `::test_rows_show_no_local_path` — 렌더 직전 표의 Path\File 컬럼 문자열에 임시 폴더 경로·사용자 이름(`os.path.expanduser("~")`의 마지막 이름)·드라이브 문자가 없고, 모든 행이 Album 분석 결과(앨범 dB)를 가진다
   - 방법: 작업 폴더를 임시 폴더로 옮기고 상대 경로(`Album\01 Sample.mp3` 꼴)로 넣는다. 모델이 절대 경로로 바꿔 경로가 보이면 GUI를 고치지 말고 멈추고 보고한다. 샘플 파일 이름은 합성 fixture를 `01 Sample.mp3`~ 꼴로 복사한 것

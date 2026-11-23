@@ -71,6 +71,7 @@
 | T16 | exe 용량(≈215MB)을 `.spec` excludes로 줄이면 앱이 깨지거나 효과 없음 | scipy.signal이 fft·spatial 등에 의존, Qt 모듈은 훅이 DLL을 그대로 가져옴 | 근본 절감은 scipy `lfilter`를 numpy로 대체(≈145MB)뿐. 보류 항목(PRD §2.3), 하면 mp3gain 수치 재검증 | legacy 10.1 |
 | T17 | `build_release.ps1`이 실패했는데 출력 끝부분만 보고 놓칠 뻔함 | 실행 중인 GainDB.exe가 `dist`를 잠금 / .venv 밖에서 실행해 PyInstaller 없음 | 빌드 전 `Get-Process GainDB` 없음 확인, `.venv\Scripts\Activate.ps1` 먼저, 성공은 출력 전체에서 `BUILD OK`로 판정 | v1.0.0 (2026-11-09~10), v1.1.1 재발 (2026-11-11, CLAUDE.md 명령에 반영) |
 | T18 | 원본 mp3gain.exe를 돌렸는데 파일이 그대로라 "원본도 같다"고 잘못 판단 | 이 PC에 C 런타임 DLL이 없어 exe가 시작조차 못 함(0xC0000135, Git Bash는 dll 오류). 출력·종료 코드를 버려서 못 봄 | 원본 대조는 CI의 mp3gain(test_mp3gain_parity)으로. 로컬에서 exe를 쓰면 종료 코드와 파일 해시 변화를 먼저 확인 | v1.1 작업 1 (2026-11-10) |
+| T19 | 계획 자기 검토에 "F9 인수 기준은 작업 2~8의 테스트"라고 적었지만 기준 1·3·6·7은 테스트가 없었고, 인수 때 명세 검토에서야 드러남 | 인수 기준과 테스트를 이름으로 짝짓지 않고 "덮었다"고만 적음 | 계획에 기준마다 테스트 이름(`파일::테스트`)을 적고, 인수 때 그 이름이 실제로 있는지 확인. 언어 저장 테스트는 `gui.main_window`와 `gui.i18n` 양쪽 QSettings 이름을 GaindBTest로 바꿔야 사용자 설정을 덮지 않음 | v1.2 작업 11 (2026-11-21) |
 
 ## R§5 환경·도구
 - 개발 PC: Windows 11, PowerShell 7, Python 3.15 (`py` launcher; `python`은 스토어 별칭). `.venv`는 재생성 필요(D046).

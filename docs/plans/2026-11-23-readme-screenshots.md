@@ -1,5 +1,5 @@
 # README 스크린샷
-Status: active | 시작: 2026-11-23 (계획 시작 커밋 dc14d79) | 근거: PRD §2.1 README 스크린샷 작업, §5 (D096~D098)
+Status: done (2026-11-23) | 시작: 2026-11-23 (계획 시작 커밋 dc14d79) | 근거: PRD §2.1 README 스크린샷 작업, §5 (D096~D098)
 
 목표: 저장소 스크립트 한 번으로 Album 분석을 마친 주 창의 라이트·다크 PNG가 `docs/images/`에 다시 만들어지고, 6개 언어 README의 기능 절 바로 뒤 `## Screenshots`에 그 두 장이 라이트 왼쪽·다크 오른쪽으로 보인다. 릴리스는 하지 않는다.
 
@@ -31,7 +31,7 @@ Status: active | 시작: 2026-11-23 (계획 시작 커밋 dc14d79) | 근거: PRD
   - 먼저 실패 테스트 `tests/test_readme.py::ReadmeTest::test_screenshots_section` — 6개 README 모두 기능 절 바로 다음 `##`가 스크린샷 절이고, 그 안의 `<img src>`가 `docs/images/main-light.png`·`main-dark.png` 순서이며 두 파일이 있고 각 2 MB 이하, alt가 비어 있지 않다. 상대 링크 검사에 `src="..."`도 포함
   - 생성 명령 `.venv\Scripts\python.exe tests\_readme_screenshots.py docs\images` 실행 → README 절 작성 (라이트 왼쪽·다크 오른쪽 표, 언어별 alt). AGENTS.md 명령 절에 생성 명령 추가
   - 확인: 테스트 통과, readme 표준 §6 검사(§7 항목: 이미지 존재·2 MB 이하·alt·마지막 화면 변경 뒤 재생성·이미지에 금지 정보 없음·제3자 자산 없음), 전체 테스트 통과 → test_screenshots_section 실패 6건 확인 후 통과, 이미지 27KB씩·alt 6개 언어, `##` 12개·배지 4개 6개 파일 일치, 이미지는 GUI 변경 없는 현재 코드로 생성, 제3자 자산 없음, 전체 220건 OK (2026-11-23)
-- [ ] 3. 인수 — PRD §2.1 README 스크린샷 작업 완료 기준 (CI 초록 run 45133958072 at 9759e43, GitHub 이미지 표시 사용자 확인. 명세 검토 지적 처리 D099: 경로 패치 제거·subst로 실제 절대 경로, 임시 폴더·드라이브 정리, ru 표현, 이미지 -v2)
+- [x] 3. 인수 — PRD §2.1 README 스크린샷 작업 완료 기준 (CI 초록 run 45133958072 at 9759e43, GitHub 이미지 표시 사용자 확인. 명세 검토 지적 처리 D099: 경로 패치 제거·subst로 실제 절대 경로, 임시 폴더·드라이브 정리, ru 표현, 이미지 -v2. 재확인 CI 초록 221건 run 45176554058 at 5526e3c, Windows에서 subst 테스트 3건 실행 ok)
   - 확인: 전체 테스트 통과, push 확인 후 CI 3개 OS 초록, GitHub에서 README 이미지 표시 확인(사용자)
   - 명세 검토: 이 계획, PRD §2.1 README 스크린샷 작업·§5, `git diff dc14d79..`만 준 하위 에이전트의 결과
 

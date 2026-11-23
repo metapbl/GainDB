@@ -788,6 +788,8 @@ def _analyze_one(opt, path, info, file_tags):
 
     # --- maxAmpOnly: no dB analysis ---
     if opt.max_amp_only:
+        if info is not None:  # mp3gain -x: 진폭·min/max 만 태그에 (D108)
+            _fill_track_info(info, None, peak, min_gain, max_gain)
         return (None, peak, min_gain, max_gain, 0.0, info, file_tags)
 
     # --- raw_db: compute loudness if FULL, else tag track_gain ---
@@ -1004,7 +1006,8 @@ def _run_analysis(opt, tags, album_recalc):
             if not opt.skip_tag:
                 for path, _h, _p, _mn, _mx, info, _ft in album_results:
                     if info is not None:
-                        _fill_album_info(info, album_db, max_max_sample,
+                        _fill_album_info(info, None if opt.max_amp_only else album_db,
+                                         max_max_sample,
                                          min_min_gain, max_max_gain)
 
             db_change, steps = _quantize_steps(album_db, opt)

@@ -335,3 +335,7 @@ A: "1.3.0 릴리스 (추천)"
 Q: 측정 결과 지금 비용은 곡당 0.19ms(태그 있는 사본, 디코딩 없음). 1 빼고 종결 (추천) / 2 그대로 구현 → 사용자 반문 "mp3gain의 원본 동작과 동일한 작업이 되도록하려면?" → 원본 GUI(frmMain RadioGain·AlbumGain)는 값이 있는 곡이 0 스텝이면 mp3gain을 호출하지 않음(Track은 no-clip 켬·최대 스텝<0이면 예외). 원본은 분석 때 태그를 쓰지만 GainDB 분석은 비파괴라, 원본과 같은 결과는 "값을 태그에서 읽은 곡만 건너뛰기". 1 원본 조건대로 (추천) / 2 빼고 종결
 A: "원본 조건대로"
 → D107
+### Q072 · 2026-11-23 · 단계 8 (작업 3 CI) · [U] · CLI -x 태그 동작
+Q: CI 원본 대조(run 45187522187)에서 3곡 `-x` 뒤 `-g 3`의 `-s c -o` 표가 다름. mp3gain `-x`는 Track 진폭·min/max와 Album 진폭·min/max만 기록(gain은 안 씀). GaindB `-x`는 Track 진폭·min/max를 안 쓰고 Album gain에 0을 씀. 원본 GUI Max No-clip analysis도 `/x`라 태그를 씀. 1 지금 CLI·analyze_file_max_amp를 mp3gain에 맞게 고치기 (추천) / 2 CLI는 두고 F10만
+A: "지금 고치기"
+→ D108

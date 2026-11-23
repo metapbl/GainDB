@@ -71,8 +71,10 @@ def _fill_track_info(info, db_gain, peak, min_gain, max_gain):
     db_gain: 89dB 기준 raw dB. peak: 정규화 peak. min/max: scan_gain 결과.
     값을 info 에 채우고, 무언가 바뀌면 info.dirty 를 켠다.
     """
-    # track gain: 미보유거나 0.01dB 이상 차이면 갱신.
-    if (not info.have_track_gain) or (abs(db_gain - info.track_gain) >= _GAIN_EPS):
+    # track gain: 미보유거나 0.01dB 이상 차이면 갱신. None 이면(-x, 진폭만) 건드리지 않는다.
+    if db_gain is not None and (
+        (not info.have_track_gain) or (abs(db_gain - info.track_gain) >= _GAIN_EPS)
+    ):
         info.dirty = True
         info.have_track_gain = True
         info.track_gain = db_gain
@@ -103,7 +105,9 @@ def _fill_album_info(info, db_gain, album_peak, album_min, album_max):
     album_peak 은 곡별 track_peak 의 max(정규화). album_min/max 는 곡별 min/max 의
     min/max. db_gain 은 89dB 기준 album raw dB.
     """
-    if (not info.have_album_gain) or (abs(db_gain - info.album_gain) >= _GAIN_EPS):
+    if db_gain is not None and (  # None 이면(-x, 진폭만) album gain 을 건드리지 않는다
+        (not info.have_album_gain) or (abs(db_gain - info.album_gain) >= _GAIN_EPS)
+    ):
         info.dirty = True
         info.have_album_gain = True
         info.album_gain = db_gain

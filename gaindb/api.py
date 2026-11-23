@@ -49,8 +49,11 @@ from gaindb.tag import (
     read_mp3gain_tags,
     change_gain_and_tag,
     remove_mp3gain_ape_tag,
+    _write_mp3gain_tag,
 )
-from gaindb.apply_gain import apply_track_gain, _apply_one_album_file, max_no_clip_steps
+from gaindb.apply_gain import (
+    apply_track_gain, _apply_one_album_file, _fill_track_info, max_no_clip_steps,
+)
 
 
 # 목표 음량 기준: 89 dB ReplayGain 레퍼런스.
@@ -307,13 +310,15 @@ def apply_file_constant_gain(path: str, steps: int, channel: int | None = None,
     return {"status": "ok", "steps": steps}
 
 
-def analyze_file_max_amp(path: str,
+def analyze_file_max_amp(path: str, use_id3: bool = False,
+                         save_timestamp: bool = False,
                          should_cancel: Callable[[], bool] | None = None,
                          on_progress: Callable[[float], None] | None = None,
                          ) -> dict:
-    """음량 분석 없이 최대 진폭만 구한다(비파괴). CLI `-x` 와 같은 값.
+    """음량 분석 없이 최대 진폭만 구한다. 한 곡에 CLI `-x` 를 실행한 것과 같다.
 
-    원본 GUI Max No-clip analysis 용. max_noclip_steps 는 클리핑 없는 최대 스텝.
+    원본 GUI Max No-clip analysis(한 곡씩 mp3gain /x)처럼 진폭·min/max 만 태그에
+    기록하고 gain 값은 건드리지 않는다(D108). max_noclip_steps 는 클리핑 없는 최대 스텝.
     """
     peak = 0.0
 
@@ -325,6 +330,11 @@ def analyze_file_max_amp(path: str,
     decode_pcm_streaming(path, on_chunk=feed,
                          should_cancel=should_cancel, on_progress=on_progress)
     min_gain, max_gain = scan_gain(path)
+    info, file_tags = read_mp3gain_tags(path, use_id3)
+    _fill_track_info(info, None, peak, min_gain, max_gain)
+    if info.dirty:
+        _write_mp3gain_tag(path, info, file_tags, save_timestamp=save_timestamp,
+                           use_id3=use_id3)
     return {
         "status": "ok",
         "peak": peak,

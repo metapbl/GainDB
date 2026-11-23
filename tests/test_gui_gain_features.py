@@ -152,18 +152,38 @@ class CoreEntryPointTest(BaseGainTest):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(_bytes(a), _bytes(b))
 
-    def test_max_amp_matches_cli_x_and_is_read_only(self):
+    def _tag_table(self, *paths):
+        from tests.test_mp3gain_parity import _table
+        r = self.run_cli(["-s", "c", "-o", *paths])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return _table(r.stdout)
+
+    def test_max_amp_matches_cli_x_and_writes_amp_tags(self):
+        # 원본 GUI Max No-clip analysis 는 한 곡씩 mp3gain /x: 진폭·min/max 만 태그에 (D108)
         from math import floor, log2
         from gaindb.api import analyze_file_max_amp
-        path = self.copy_fixture("test_gain_44k.mp3")
-        before = _bytes(path)
+        path, cli = self._pair("test_gain_44k.mp3")
         res = analyze_file_max_amp(path)
-        self.assertEqual(_bytes(path), before)
 
-        r = self.run_cli(["-x", "-o", path])
+        r = self.run_cli(["-x", "-o", cli])
         self.assertEqual(r.returncode, 0, r.stderr)
-        cols = [l.split("\t") for l in r.stdout.splitlines() if l.startswith(path)][0]
+        cols = [l.split("	") for l in r.stdout.splitlines() if l.startswith(cli)][0]
         self.assertAlmostEqual(res["peak"] * 32768.0, float(cols[3]), places=3)
         self.assertEqual((res["max_gain"], res["min_gain"]), (int(cols[4]), int(cols[5])))
         self.assertEqual(res["max_noclip_steps"],
                          floor(4 * log2(32767 / (res["peak"] * 32768))))
+
+        got = self._tag_table(path)["test_gain_44k.mp3"]
+        self.assertEqual(got[:2], ["NA", "NA"])                 # Track gain 없음
+        self.assertAlmostEqual(float(got[2]), res["peak"] * 32768.0, delta=0.1)  # 태그는 소수 6자리
+        self.assertEqual(got[3:5], [str(res["max_gain"]), str(res["min_gain"])])
+        self.assertEqual(got, self._tag_table(cli)["test_gain_44k_cli.mp3"])
+
+    def test_cli_x_album_writes_amp_not_gain(self):
+        # mp3gain -x 여러 파일: Album 진폭·min/max 만, Album gain 은 쓰지 않는다 (D108, CI 원본 대조)
+        a, b = self._pair("test_gain_44k.mp3")
+        r = self.run_cli(["-x", a, b])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        for row in self._tag_table(a, b).values():
+            self.assertEqual([row[0], row[1], row[5], row[6]], ["NA"] * 4)
+            self.assertNotIn("NA", row[2:5] + row[7:10])

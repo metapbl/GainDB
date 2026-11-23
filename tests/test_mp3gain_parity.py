@@ -76,7 +76,9 @@ class Mp3gainParityTest(BaseGainTest):
             self.assertEqual(len(got[key]), len(cols), key)
             for i, (w, g) in enumerate(zip(cols, got[key])):
                 with self.subTest(args=args, row=key, col=i):
-                    if i in db_cols:
+                    if "NA" in (w, g):  # 태그에 없는 값(-s c)은 양쪽 모두 NA 여야 한다
+                        self.assertEqual(g, w)
+                    elif i in db_cols:
                         self.assertLessEqual(abs(float(g) - float(w)), DB_TOL)
                     elif i in peak_cols:
                         self.assertLessEqual(abs(float(g) - float(w)),

@@ -130,6 +130,7 @@ from gui.i18n import LANGUAGES, resolve_language, save_language, install_transla
 from gaindb.api import (
     DEFAULT_TARGET_DB, recompute_target, shift_after_apply, group_by_album,
 )
+from gaindb.apply_gain import track_no_clip_steps
 from gaindb.decode import DecodeError, find_ffmpeg
 
 # 진행바 세분 합산 스케일. 정수 진행바에 소수 진행(파일 내부 fraction)을 싣기
@@ -1465,11 +1466,12 @@ class MainWindow(QMainWindow):
             return
 
         rows = self._target_source_rows()
+        target_db = self.spin_target.value()
         paths = []
         seed_results = {}
         for r in rows:
             fr = self.model.get_row(r)
-            if fr is None:
+            if fr is None or self._tag_zero_step(fr, target_db):
                 continue
             paths.append(fr.path)
             seed_results[fr.path] = fr.result
@@ -1486,7 +1488,6 @@ class MainWindow(QMainWindow):
         if unanalyzed and self._ffmpeg_missing():
             return
 
-        target_db = self.spin_target.value()
         self._analyzed_count = 0
         self._applied_count = 0
         self._failed_count = 0
@@ -1563,6 +1564,22 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(_fill(
             self.tr("Analyzing %1 file(s) in %2 album(s)..."), len(paths), len(groups)))
         self._worker.start()
+
+    def _tag_zero_step(self, fr, target_db) -> bool:
+        """원본 GUI처럼 태그에 이미 있는 값이 0 스텝이면 건너뛴다(D107).
+
+        no-clip이 켜져 있고 클리핑 없는 최대 스텝이 음수면 낮춰야 하므로 건너뛰지 않는다.
+        """
+        res = fr.result
+        if not fr.from_tag or not res or res.get("status") != "ok":
+            return False
+        if res.get("target_db") != target_db:
+            res = recompute_target(res, target_db)
+        if res.get("steps") != 0:
+            return False
+        peak = res.get("peak")
+        return not (self.act_track_no_clip.isChecked() and peak is not None
+                    and track_no_clip_steps(0, peak) < 0)
 
     def _on_album_gain(self):
         """Album Gain 적용. AlbumApplyWorker 위임."""

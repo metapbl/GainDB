@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 
 from tests._support import BaseGainTest
+from tests.test_gui_window import WindowTestBase
 
 TARGET = 89.0
 
@@ -76,3 +77,48 @@ class ZeroStepCharacterizationTest(BaseGainTest):
         self.assertLess(max_steps, 0)
 
         self.assertEqual(self._run(path, seed, 105.0, no_clip=True), [max_steps])
+
+
+class ZeroStepSkipTest(WindowTestBase):
+    """D107: 태그 스캔 값이 0 스텝인 곡은 원본 GUI처럼 워커에 넘기지 않는다."""
+
+    def _result(self, steps=0, peak=0.5):
+        return {"status": "ok", "target_db": TARGET, "track_db": steps * 1.5,
+                "steps": steps, "peak": peak}
+
+    def _gain_paths(self):
+        from unittest import mock
+        self.win.table.selectAll()
+        self.addCleanup(setattr, self.win, "_worker", None)
+        with mock.patch.object(self.mw, "ApplyWorker") as worker, \
+                mock.patch.object(self.win, "_ffmpeg_missing", return_value=False):
+            self.win._on_gain()
+        return worker.call_args.args[0] if worker.called else None
+
+    def test_tag_zero_step_skipped_analyzed_kept(self):
+        self.win.model.get_row(0).set_tag_result(self._result())
+        self.win.model.get_row(1).set_result(self._result())
+        self.assertEqual(self._gain_paths(), ["b.mp3"])
+
+    def test_all_skipped_reports_nothing_to_apply(self):
+        for r in (0, 1):
+            self.win.model.get_row(r).set_tag_result(self._result())
+        self.assertIsNone(self._gain_paths())
+        self.assertIn("Nothing to apply", self.win.statusBar().currentMessage())
+
+    def test_nonzero_and_applied_rows(self):
+        self.win.model.get_row(0).set_tag_result(self._result(steps=2))
+        self.win.model.get_row(1).mark_applied(self._result())  # 적용 뒤 태그가 있다
+        self.assertEqual(self._gain_paths(), ["a.mp3"])
+
+    def test_no_clip_lowering_not_skipped(self):
+        self.win.act_track_no_clip.setChecked(True)
+        self.win.model.get_row(0).set_tag_result(self._result(peak=1.2))  # 최대 스텝 < 0
+        self.win.model.get_row(1).set_tag_result(self._result(peak=None))  # 진폭 모름: 낮추지 않음
+        self.assertEqual(self._gain_paths(), ["a.mp3"])
+
+    def test_other_target_uses_recomputed_steps(self):
+        self.win.model.get_row(0).set_tag_result(self._result())
+        self.win.model.get_row(1).set_tag_result(self._result())
+        self.win.spin_target.setValue(92.0)  # 2 스텝 차이 → 둘 다 적용 대상
+        self.assertEqual(self._gain_paths(), ["a.mp3", "b.mp3"])

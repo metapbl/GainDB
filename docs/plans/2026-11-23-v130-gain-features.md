@@ -32,7 +32,7 @@ Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D1
 ## 작업
 - [x] 1. 특성화 테스트 (224건 OK, skip 3) — 바뀌지 않아야 할 현재 결과를 고정: 디코딩 분석 값이 0 스텝인 곡은 Track/Album Gain 뒤 태그가 기록되고, 태그가 온전한 0 스텝 곡은 파일 바이트가 그대로다. no-clip 켬·최대 스텝<0 태그 곡은 낮춰진다 — `tests/test_gui_gain_features.py`
   - 확인: 새 테스트가 지금 코드에서 통과
-- [ ] 2. steps==0 건너뛰기 (원본 GUI 조건, D107) — `gui/main_window.py > _on_gain, _on_album_gain`, 값의 출처(태그 스캔/분석)를 행에 남김 (after: 1)
+- [x] 2. steps==0 건너뛰기 (원본 GUI 조건, D107, 229건 OK, skip 3) — `gui/main_window.py > _on_gain, _on_album_gain`, 값의 출처(태그 스캔/분석)를 행에 남김 (after: 1)
   - 참고: Album Gain 씨앗은 이번 세션의 Album 분석 결과뿐이고 태그 스캔은 Album 값을 씨앗으로 쓰지 않으므로(`_on_album_gain`), D107의 Album 조건은 걸리는 곡이 없다. Track만 바뀐다
   - 먼저 실패 테스트: 태그 스캔 값이 0 스텝인 곡은 워커 경로 목록에 없고, 태그 항목 일부가 빠져도 파일 바이트가 그대로다. 1의 테스트는 그대로 통과
   - 확인: 전체 테스트 통과

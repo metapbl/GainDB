@@ -33,17 +33,21 @@ class FileRow:
     error_msg: str = ""
     tag_scanned: bool = False
     analysis_logged: bool = False  # 분석 로그는 행당 한 번(원본 동작, D076)
+    # 값이 파일 태그에 이미 있다(태그 스캔·적용 뒤). 0 스텝 건너뛰기 기준(D107)
+    from_tag: bool = False
 
     def set_result(self, result: dict) -> None:
         self.result = result
         self.status = "analyzed"
         self.error_msg = ""
         self.tag_scanned = True
+        self.from_tag = False
 
     def mark_applied(self, result: dict) -> None:
         self.result = result
         self.status = "applied"
         self.error_msg = ""
+        self.from_tag = True
 
     def mark_error(self, msg: str) -> None:
         self.status = "error"
@@ -59,12 +63,14 @@ class FileRow:
         self.status = "pending"
         self.error_msg = ""
         self.analysis_logged = False
+        self.from_tag = False
 
     def set_tag_result(self, result: dict) -> None:
         """파일 추가 시 태그 스캔 결과를 반영한다."""
         self.result = result
         self.error_msg = ""
         self.analysis_logged = False
+        self.from_tag = True
         self.status = "analyzed" if result.get("status") == "ok" else "pending"
         self.tag_scanned = True
 

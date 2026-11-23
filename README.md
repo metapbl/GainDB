@@ -53,8 +53,8 @@ depends on the MP3 `global_gain` field, which other formats do not have.
     <th>Dark</th>
   </tr>
   <tr>
-    <td><img src="docs/images/main-light.png" alt="Gain dB main window in the light theme after Album Analysis of four sample MP3 files"></td>
-    <td><img src="docs/images/main-dark.png" alt="Gain dB main window in the dark theme after Album Analysis of four sample MP3 files"></td>
+    <td><img src="docs/images/main-light-v2.png" alt="Gain dB main window in the light theme after Album Analysis of four sample MP3 files"></td>
+    <td><img src="docs/images/main-dark-v2.png" alt="Gain dB main window in the dark theme after Album Analysis of four sample MP3 files"></td>
   </tr>
 </table>
 

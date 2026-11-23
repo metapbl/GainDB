@@ -1,5 +1,5 @@
 # v1.3.0 — Constant Gain · Max No-clip GUI · steps==0 건너뛰기 · Release
-Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D106)
+Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D107)
 
 목표: 원본 mp3gain GUI 1.3.4의 Apply Constant Gain과 Maximizing 기능 4가지를 GUI에 옮기고, Track/Album Gain에서 변화가 없는 최신 태그 곡을 건너뛴 뒤 v1.3.0을 게시한다.
 
@@ -30,10 +30,10 @@ Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D1
 - 테스트 진입점: 코어는 `gaindb/api.py` 함수, GUI는 offscreen 주 창의 QAction 트리거
 
 ## 작업
-- [ ] 1. 특성화 테스트 — Track/Album Gain에 steps==0·최신 태그 곡이 섞인 사본의 현재 결과(audio_body_sha256, 태그 바이트, 로그 줄)를 고정 — `tests/test_gui_gain_features.py`
+- [ ] 1. 특성화 테스트 — 바뀌지 않아야 할 현재 결과를 고정: 디코딩 분석 값이 0 스텝인 곡은 Track/Album Gain 뒤 태그가 기록되고, 태그가 온전한 0 스텝 곡은 파일 바이트가 그대로다. no-clip 켬·최대 스텝<0 태그 곡은 낮춰진다 — `tests/test_gui_gain_features.py`
   - 확인: 새 테스트가 지금 코드에서 통과
-- [ ] 2. steps==0 건너뛰기 — `gui/main_window.py > _on_gain, _on_album_gain` (after: 1)
-  - 먼저 실패 테스트: 그 곡이 워커 경로 목록에 없다. 1의 결과 테스트는 그대로 통과
+- [ ] 2. steps==0 건너뛰기 (원본 GUI 조건, D107) — `gui/main_window.py > _on_gain, _on_album_gain`, 값의 출처(태그 스캔/분석)를 행에 남김 (after: 1)
+  - 먼저 실패 테스트: 태그 스캔 값이 0 스텝인 곡은 워커 경로 목록에 없고, 태그 항목 일부가 빠져도 파일 바이트가 그대로다. 1의 테스트는 그대로 통과
   - 확인: 전체 테스트 통과
 - [ ] 3. 코어 진입점 — `gaindb/api.py`에 Constant Gain(양 채널·한 채널), 최대 진폭만 분석, Max No-clip 적용(곡별·앨범 공통 = 묶음 최소 최대 스텝)
   - 먼저 실패 테스트: 결과가 CLI `-g 3`, `-l 1 -2`, `-x`와 같다. mp3gain이 PATH에 있으면 원본과 대조(`test_mp3gain_parity.py`)

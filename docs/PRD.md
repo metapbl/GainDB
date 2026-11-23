@@ -188,7 +188,7 @@ Status: approved (2026-11-23) | 단계: 5 확정 | 갱신: 2026-11-23
   - Modify Gain > Apply Max No-clip Gain for Each file(Ctrl+X): 곡마다 자기 최대 스텝을 적용. [U] (D102)
   - Modify Gain > Apply Max No-clip Gain for Album(Ctrl+L): 앨범 묶음마다 공통 스텝(묶음에서 가장 작은 최대 스텝)을 적용. [U][AI] (D102)
   - 수치·태그는 원본 exe 실행 결과를 기준으로 맞춘다. 최대 진폭을 모르는 곡은 먼저 최대 진폭만 구한다. [U][AI] (D102)
-- steps==0 건너뛰기: Track/Album Gain 적용 때 steps==0이고 태그가 최신인 곡은 GUI가 워커에 넘기지 않는다. 파일·태그·로그 결과는 지금과 같다. [AI] (D105)
+- steps==0 건너뛰기 (원본 GUI 조건): 값을 태그 스캔으로 얻은 곡이 Track Gain에서 0 스텝(no-clip 켬·최대 스텝<0이면 제외)이거나 Album Gain에서 앨범 0 스텝이면 워커에 넘기지 않고 태그도 다시 쓰지 않는다. 디코딩 분석으로 값을 얻은 곡은 지금처럼 코어로 보내 태그를 기록한다(원본은 분석 때 태그를 씀). 태그 항목 일부가 빠진 곡도 채우지 않는다(CLI `-r`과는 다름). [U][X] (D107)
 - 공통: 새 항목은 주 메뉴에만 넣는다(표 우클릭 메뉴 제외). 새 문자열은 F9 규칙으로 6개 언어 번역, ko만 사용자 검수. Maximizing 기본 꺼짐이라 README 스크린샷은 그대로다. 단축키 Ctrl+O·M·X·L은 지금 쓰는 키와 겹치지 않는다. [AI] (D106)
 - 코어 변경: Constant Gain·최대 진폭 분석·Max No-clip 적용의 GUI용 진입점이 `gaindb/api.py`에 들어가면 AVD 동기화 대상이다. [X] (D012)
 - 인수 기준: [AI]
@@ -197,7 +197,7 @@ Status: approved (2026-11-23) | 단계: 5 확정 | 갱신: 2026-11-23
   - Given Maximizing 꺼짐 / When 시작 / Then Max No-clip 메뉴 3개와 Max Noclip 컬럼이 보이지 않는다. 켜면 안내 창 뒤 보이고, 재시작 뒤에도 유지된다
   - Given 사본 / When Max No-clip analysis / Then Max Amp·Max Noclip 칸이 채워지고 음량 칸은 그대로이며, 값이 원본 exe(또는 CLI `-x`)와 같다
   - Given 앨범 사본 3개 / When Apply Max No-clip Gain for Each file·for Album / Then 적용 스텝과 태그가 원본 exe 실행 결과와 같고 클리핑이 없다
-  - Given steps==0이고 태그가 최신인 곡이 섞인 사본 / When Track Gain·Album Gain / Then 그 곡은 워커에 가지 않고, 모든 파일·태그·로그가 최적화 전과 같다
+  - Given 태그 스캔 값이 0 스텝인 곡과 디코딩 분석 값이 0 스텝인 곡이 섞인 사본 / When Track Gain·Album Gain / Then 앞 곡은 워커에 가지 않고 파일 바이트가 그대로다. 뒤 곡은 지금처럼 태그가 기록된다. no-clip 켬·최대 스텝<0인 태그 곡은 건너뛰지 않고 낮춘다
   - Given 6개 언어 / When 새 메뉴·대화상자 / Then 번역 파일 검사 통과, 첫 창 가로 스크롤 없음
 - 확인 방법: 자동 테스트(tempfile 사본, offscreen), 원본 exe 대조는 CI mp3gain 대조 테스트 또는 로컬 exe 실행 결과, ko 문구 사용자 검수. [AI]
 ## 4. 기술 결정
@@ -252,3 +252,4 @@ Status: approved (2026-11-23) | 단계: 5 확정 | 갱신: 2026-11-23
 | 2026-11-20 | F9 보존 용어에서 '컬럼 약어'를 빼고 머리글 번역 (§3). 사용자 승인으로 직접 수정 | Q063, D091 |
 | 2026-11-23 | README 스크린샷 작업 추가: 생성 스크립트, 6개 언어 Screenshots 절, 릴리스 없음 (§2.1, §5) | Q064~Q065, D096~D098 |
 | 2026-11-23 | 1.3 범위: F10 Constant Gain·Max No-clip GUI·steps==0 건너뛰기, 1.3.0 릴리스 (§2.1, §2.3, §3 F8·F10). scipy 제거는 그 뒤 | Q067~Q070, D100~D106 |
+| 2026-11-23 | F10 steps==0 건너뛰기를 원본 GUI 조건(태그에서 읽은 값만)으로 (§3). 사용자 승인으로 직접 수정 | Q071, D107 |

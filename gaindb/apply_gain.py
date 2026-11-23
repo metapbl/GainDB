@@ -56,9 +56,13 @@ def track_no_clip_steps(steps: int, peak: float) -> int:
     최대 스텝 = floor(4·log2(32767 / 현재 최대 진폭)), 진폭 = peak·32768.
     진폭이 0 이하이거나 1e6 이상이면 원본처럼 최대 스텝을 0 으로 본다.
     """
+    return min(steps, max_no_clip_steps(peak))
+
+
+def max_no_clip_steps(peak: float) -> int:
+    """클리핑 없는 최대 스텝(원본 GUI Max Noclip). 진폭 = peak·32768."""
     amp = peak * 32768.0
-    max_steps = floor(4.0 * log2(32767.0 / amp)) if 0 < amp < 1e6 else 0
-    return min(steps, max_steps)
+    return floor(4.0 * log2(32767.0 / amp)) if 0 < amp < 1e6 else 0
 
 
 def _fill_track_info(info, db_gain, peak, min_gain, max_gain):

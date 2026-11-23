@@ -50,7 +50,7 @@ from gaindb.tag import (
     change_gain_and_tag,
     remove_mp3gain_ape_tag,
 )
-from gaindb.apply_gain import apply_track_gain, _apply_one_album_file
+from gaindb.apply_gain import apply_track_gain, _apply_one_album_file, max_no_clip_steps
 
 
 # 목표 음량 기준: 89 dB ReplayGain 레퍼런스.
@@ -282,6 +282,57 @@ def undo_file_gain(path: str, use_id3: bool = False,
                         wrap=info.undo_wrap, save_timestamp=save_timestamp,
                         use_id3=use_id3)
     return {"status": "ok", "undo_steps": undo_left}
+
+
+def apply_file_constant_gain(path: str, steps: int, channel: int | None = None,
+                             use_id3: bool = False, save_timestamp: bool = False,
+                             should_cancel: Callable[[], bool] | None = None,
+                             on_progress: Callable[[float], None] | None = None,
+                             ) -> dict:
+    """분석 없이 정해진 스텝을 적용한다(파괴적). CLI `-g` / `-l` 과 같은 결과.
+
+    channel: None 이면 양 채널, 0 이면 왼쪽, 그 밖은 오른쪽(STEREO 전용, writer 가 검사).
+    원본 GUI Constant Gain 과 Max No-clip 적용이 이 경로를 쓴다.
+    """
+    if channel is None:
+        left = right = steps
+    elif channel == 0:
+        left, right = steps, 0
+    else:
+        left, right = 0, steps
+    info, file_tags = read_mp3gain_tags(path, use_id3)
+    change_gain_and_tag(path, left, right, info, file_tags,
+                        save_timestamp=save_timestamp, use_id3=use_id3,
+                        should_cancel=should_cancel, on_progress=on_progress)
+    return {"status": "ok", "steps": steps}
+
+
+def analyze_file_max_amp(path: str,
+                         should_cancel: Callable[[], bool] | None = None,
+                         on_progress: Callable[[float], None] | None = None,
+                         ) -> dict:
+    """음량 분석 없이 최대 진폭만 구한다(비파괴). CLI `-x` 와 같은 값.
+
+    원본 GUI Max No-clip analysis 용. max_noclip_steps 는 클리핑 없는 최대 스텝.
+    """
+    peak = 0.0
+
+    def feed(left, right):
+        nonlocal peak
+        if left.size:
+            peak = max(peak, track_peak(left, right))
+
+    decode_pcm_streaming(path, on_chunk=feed,
+                         should_cancel=should_cancel, on_progress=on_progress)
+    min_gain, max_gain = scan_gain(path)
+    return {
+        "status": "ok",
+        "peak": peak,
+        "curr_max_amp": round(peak * 32768.0),
+        "min_gain": min_gain,
+        "max_gain": max_gain,
+        "max_noclip_steps": max_no_clip_steps(peak),
+    }
 
 
 def remove_file_tags(path: str, use_id3: bool = False,

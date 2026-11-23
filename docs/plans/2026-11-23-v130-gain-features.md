@@ -36,7 +36,7 @@ Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D1
   - 참고: Album Gain 씨앗은 이번 세션의 Album 분석 결과뿐이고 태그 스캔은 Album 값을 씨앗으로 쓰지 않으므로(`_on_album_gain`), D107의 Album 조건은 걸리는 곡이 없다. Track만 바뀐다
   - 먼저 실패 테스트: 태그 스캔 값이 0 스텝인 곡은 워커 경로 목록에 없고, 태그 항목 일부가 빠져도 파일 바이트가 그대로다. 1의 테스트는 그대로 통과
   - 확인: 전체 테스트 통과
-- [ ] 3. 코어 진입점 — `gaindb/api.py`에 Constant Gain(양 채널·한 채널), 최대 진폭만 분석, Max No-clip 적용(곡별·앨범 공통 = 묶음 최소 최대 스텝)
+- [ ] 3. 코어 진입점 (로컬 233건 OK, skip 4 · CI mp3gain 대조 대기) — `gaindb/api.py`에 `apply_file_constant_gain`(양 채널·한 채널), `analyze_file_max_amp`(최대 진폭만, `max_noclip_steps` 포함). 원본 GUI는 Max No-clip 적용을 곡마다 `/g N`(앨범은 묶음 최솟값)으로 하므로 별도 적용 진입점 없이 Constant Gain 경로를 쓴다. 로컬 원본 exe는 DLL이 없어 실행 불가(0xC0000135)
   - 먼저 실패 테스트: 결과가 CLI `-g 3`, `-l 1 -2`, `-x`와 같다. mp3gain이 PATH에 있으면 원본과 대조(`test_mp3gain_parity.py`)
   - 확인: 전체 테스트 통과, CI mp3gain 대조 초록
 - [ ] 4. Constant Gain GUI — Modify Gain > Apply Constant Gain...(Ctrl+O), 대화상자, 워커 (after: 3)

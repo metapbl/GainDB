@@ -115,6 +115,21 @@ class Mp3gainParityTest(BaseGainTest):
             with self.subTest(args=args):
                 self.assertEqual(kept["gaindb"], kept["mp3gain"])
 
+    def test_max_amp_and_constant_gain_match(self):
+        """F10 의 바탕인 -x, -g, -l 이 원본과 같다 (D102, D103)."""
+        self._assert_tables_equal(("-x", "-o"), db_cols={1}, peak_cols={2})
+        for side in self.sides:
+            self._run(side, "-g", "3")
+            stereo = [str(f) for f in self.sides[side] if f.name == "test_stereo_44k.mp3"]
+            args = ["-l", "1", "-2", *stereo]
+            r = (subprocess.run([MP3GAIN, *args], capture_output=True, text=True,
+                                errors="replace") if side == "mp3gain" else self.run_cli(args))
+            self.assertEqual(r.returncode, 0, f"{side} -l: {r.stderr}")
+        self._assert_tables_equal(("-s", "c", "-o"), db_cols={1, 6}, peak_cols={2, 7})
+        for f, g in zip(self.sides["mp3gain"], self.sides["gaindb"]):
+            with self.subTest(file=f.name):
+                self.assertEqual(self.audio_body_sha256(str(g)), self.audio_body_sha256(str(f)))
+
     def test_album_with_broken_file_matches(self):
         """깨진 파일이 낀 앨범: 나머지 파일의 스텝·Album 값이 원본과 같다 (D064)."""
         tables = {}

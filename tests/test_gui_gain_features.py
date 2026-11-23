@@ -122,3 +122,48 @@ class ZeroStepSkipTest(WindowTestBase):
         self.win.model.get_row(1).set_tag_result(self._result())
         self.win.spin_target.setValue(92.0)  # 2 스텝 차이 → 둘 다 적용 대상
         self.assertEqual(self._gain_paths(), ["a.mp3", "b.mp3"])
+
+
+class CoreEntryPointTest(BaseGainTest):
+    """F10 코어 진입점: CLI -g / -l / -x 와 같은 결과 (D102, D103)."""
+
+    def _pair(self, name):
+        import shutil
+        a = self.copy_fixture(name)
+        b = a[:-4] + "_cli.mp3"
+        shutil.copy2(a, b)
+        return a, b
+
+    def test_constant_gain_matches_cli_g(self):
+        from gaindb.api import apply_file_constant_gain
+        a, b = self._pair("test_gain_44k.mp3")
+        before = self.audio_body_sha256(a)
+        apply_file_constant_gain(a, 3)
+        r = self.run_cli(["-g", "3", b])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotEqual(self.audio_body_sha256(a), before)
+        self.assertEqual(_bytes(a), _bytes(b))
+
+    def test_one_channel_matches_cli_l(self):
+        from gaindb.api import apply_file_constant_gain
+        a, b = self._pair("test_stereo_44k.mp3")
+        apply_file_constant_gain(a, -2, channel=1)
+        r = self.run_cli(["-l", "1", "-2", b])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(_bytes(a), _bytes(b))
+
+    def test_max_amp_matches_cli_x_and_is_read_only(self):
+        from math import floor, log2
+        from gaindb.api import analyze_file_max_amp
+        path = self.copy_fixture("test_gain_44k.mp3")
+        before = _bytes(path)
+        res = analyze_file_max_amp(path)
+        self.assertEqual(_bytes(path), before)
+
+        r = self.run_cli(["-x", "-o", path])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        cols = [l.split("\t") for l in r.stdout.splitlines() if l.startswith(path)][0]
+        self.assertAlmostEqual(res["peak"] * 32768.0, float(cols[3]), places=3)
+        self.assertEqual((res["max_gain"], res["min_gain"]), (int(cols[4]), int(cols[5])))
+        self.assertEqual(res["max_noclip_steps"],
+                         floor(4 * log2(32767 / (res["peak"] * 32768))))

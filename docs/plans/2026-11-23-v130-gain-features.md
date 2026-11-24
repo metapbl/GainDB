@@ -55,7 +55,7 @@ Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D1
   - 확인: `gaindb_cli.py -v` 출력 1.3.0, `test_readme.py` 통과, readme 표준 §6 검사, 노트 승인
 - [x] 9. 빌드·캡처 (CI 3개 OS 초록 run 45355300913 at 31ef261 254건, pip-audit 취약점 없음, BUILD OK, zip 96MB에 gaindb_*.qm 5개·licenses/LICENSE·NOTICE·THIRD_PARTY_LICENSES·qt, 빌드 exe를 ko로 띄워 수정 > 고정 게인 적용 Ctrl+O와 옵션 > "최대화" 기능 사용(꺼짐, Max 메뉴·컬럼 숨김) 확인 2026-11-24. 사용자 설정을 바꾸지 않으려고 옵션은 켜 보지 않음) — pip-audit, `build_release.ps1`, 빌드 exe에서 Constant Gain 대화상자와 Maximizing 메뉴 캡처 (실행 전 사용자 확인)
   - 확인: pip_audit 결과, `BUILD OK`, 캡처 PNG 확인
-- [ ] 10. Release — 태그 v1.3.0, GitHub Release (실행 전 사용자 확인)
+- [x] 10. Release (태그 v1.3.0 = 6215ffd, https://github.com/metapbl/GainDB/releases/tag/v1.3.0, 첨부 GainDB-1.3.0-windows.zip 96461508 bytes, 노트 = docs/release-notes-1.3.0.md, 2026-11-24. AVD 동기화 대상: api 진입점 2개·apply_gain·CLI `-x`) — 태그 v1.3.0, GitHub Release (실행 전 사용자 확인)
   - 확인: Release에 태그·노트·zip, zip에 LICENSE·NOTICE·THIRD_PARTY_LICENSES·licenses/qt. AVD 동기화 대상 고지
 - [ ] 11. 인수 — F10 인수 기준 7개 실행
   - 확인: 전체 테스트 통과, CI 3개 OS 초록 | 실기기: exe에서 Constant Gain·Maximizing 동작 확인

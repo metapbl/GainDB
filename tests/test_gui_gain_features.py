@@ -187,3 +187,93 @@ class CoreEntryPointTest(BaseGainTest):
         for row in self._tag_table(a, b).values():
             self.assertEqual([row[0], row[1], row[5], row[6]], ["NA"] * 4)
             self.assertNotIn("NA", row[2:5] + row[7:10])
+
+
+class ConstantGainDialogTest(BaseGainTest):
+    """원본 frmGetGain: 슬라이더 -8~+8, dB 표시, 한 채널 옵션 (D103)."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        _qt_app()
+        from gui.dialogs.constant_gain_dialog import ConstantGainDialog
+        self.dlg = ConstantGainDialog()
+        self.addCleanup(self.dlg.deleteLater)
+
+    def test_slider_and_db_label(self):
+        self.assertEqual((self.dlg.slider.minimum(), self.dlg.slider.maximum()), (-8, 8))
+        self.assertEqual(self.dlg.steps(), 0)
+        self.dlg.slider.setValue(3)
+        self.assertEqual(self.dlg.steps(), 3)
+        self.assertEqual(self.dlg.lbl_db.text(), "4.5")
+        self.dlg.slider.setValue(-8)
+        self.assertEqual(self.dlg.lbl_db.text(), "-12.0")
+
+    def test_one_channel(self):
+        self.assertIsNone(self.dlg.channel())
+        self.assertFalse(self.dlg.rb_left.isEnabled())
+        self.dlg.chk_one.setChecked(True)
+        self.assertTrue(self.dlg.rb_left.isEnabled())
+        self.assertEqual(self.dlg.channel(), 0)          # 기본 왼쪽
+        self.dlg.rb_right.setChecked(True)
+        self.assertEqual(self.dlg.channel(), 1)
+
+
+class ConstantGainWindowTest(WindowTestBase):
+    def _run(self, steps, channel=None, accepted=True):
+        from unittest import mock
+        from PySide6.QtWidgets import QDialog
+        dlg = mock.MagicMock()
+        dlg.exec.return_value = (QDialog.DialogCode.Accepted if accepted
+                                 else QDialog.DialogCode.Rejected)
+        dlg.steps.return_value = steps
+        dlg.channel.return_value = channel
+        self.addCleanup(setattr, self.win, "_worker", None)
+        with mock.patch.object(self.mw, "ConstantGainDialog", return_value=dlg), \
+                mock.patch.object(self.mw, "FileActionWorker") as worker:
+            self.win.act_constant_gain.trigger()
+        return worker
+
+    def test_menu_item(self):
+        act = self.win.act_constant_gain
+        self.assertEqual(act.text(), "Apply Constant Gain...")
+        self.assertEqual(act.shortcut().toString(), "Ctrl+O")
+        acts = self.win.menu_modify.actions()
+        self.assertIs(acts[acts.index(self.win.act_album_gain) + 1], act)
+        self.assertNotIn(act, self.win.ctx_menu.actions())
+
+    def test_applies_to_all_rows_without_selection(self):
+        worker = self._run(3, 1)
+        self.assertEqual(worker.call_args.args[:2], (["a.mp3", "b.mp3"], "constant"))
+        self.assertEqual((worker.call_args.kwargs["steps"],
+                          worker.call_args.kwargs["channel"]), (3, 1))
+
+    def test_zero_or_cancel_does_nothing(self):
+        self._run(0).assert_not_called()
+        self._run(3, accepted=False).assert_not_called()
+
+
+class ConstantGainWorkerTest(BaseGainTest):
+    def setUp(self) -> None:
+        super().setUp()
+        _qt_app()
+
+    def test_matches_cli_and_undo_restores(self):
+        import shutil
+        from gui.workers import FileActionWorker
+        a = self.copy_fixture("test_gain_44k.mp3")
+        s = self.copy_fixture("test_stereo_44k.mp3")
+        cli = [shutil.copy2(p, p[:-4] + "_cli.mp3") for p in (a, s)]
+        before = self.audio_body_sha256(a)
+        changed = []
+        w = FileActionWorker([a], "constant", steps=3)
+        w.row_gain_changed.connect(lambda p, n: changed.append(n))
+        w.run()
+        FileActionWorker([s], "constant", steps=-2, channel=1).run()
+        self.assertEqual(self.run_cli(["-g", "3", cli[0]]).returncode, 0)
+        self.assertEqual(self.run_cli(["-l", "1", "-2", cli[1]]).returncode, 0)
+        self.assertEqual(changed, [3])
+        self.assertEqual(_bytes(a), _bytes(cli[0]))
+        self.assertEqual(_bytes(s), _bytes(cli[1]))
+
+        FileActionWorker([a], "undo").run()
+        self.assertEqual(self.audio_body_sha256(a), before)

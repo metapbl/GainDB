@@ -14,6 +14,7 @@ from gaindb.api import (
     shift_after_apply,
     undo_file_gain,
     remove_file_tags,
+    apply_file_constant_gain,
     analyze_album_file,
     album_gain_from_files,
     compute_album_display,
@@ -190,15 +191,18 @@ class FileActionWorker(QThread):
     current = Signal(str)
     progress = Signal(int, int)
     row_undone = Signal(str, int)
+    row_gain_changed = Signal(str, int)  # Constant Gain: path, 적용 steps
     row_tags_removed = Signal(str)
     failed = Signal(str, str)
     done = Signal()
 
     def __init__(self, paths, action, use_id3=False, parent=None,
-                 save_timestamp=False):
+                 save_timestamp=False, steps=0, channel=None):
         super().__init__(parent)
         self._paths = list(paths)
         self._action = action
+        self._steps = steps        # action == "constant" 일 때만
+        self._channel = channel
         self._use_id3 = use_id3
         self._save_timestamp = save_timestamp
         self._cancel = False
@@ -227,6 +231,11 @@ class FileActionWorker(QThread):
                         self.failed.emit(path, "No changes to undo.")
                     else:
                         self.failed.emit(path, "No undo information in file.")
+                elif self._action == "constant":
+                    apply_file_constant_gain(path, self._steps, self._channel,
+                                             use_id3=self._use_id3,
+                                             save_timestamp=self._save_timestamp)
+                    self.row_gain_changed.emit(path, self._steps)
                 else:
                     remove_file_tags(path, use_id3=self._use_id3,
                                      save_timestamp=self._save_timestamp)

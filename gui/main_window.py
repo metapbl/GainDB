@@ -107,7 +107,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox,
     QTableView, QToolBar, QProgressBar, QPushButton, QFileDialog,
     QAbstractItemView, QHeaderView, QRubberBand, QStyledItemDelegate, QMenu,
-    QSystemTrayIcon, QStyle, QApplication, QMessageBox,
+    QSystemTrayIcon, QStyle, QApplication, QMessageBox, QDialog,
 )
 
 from PySide6.QtGui import QAction, QActionGroup, QColor, QKeySequence, QPainter
@@ -125,6 +125,7 @@ from gui.logging import (
 )
 from gui.dialogs.logs_dialog import LogsDialog
 from gui.dialogs.about_dialog import AboutDialog
+from gui.dialogs.constant_gain_dialog import ConstantGainDialog
 from gui.resources import app_icon
 from gui.i18n import LANGUAGES, resolve_language, save_language, install_translator
 from gaindb.api import (
@@ -487,6 +488,7 @@ class MainWindow(QMainWindow):
         self._batch_total = 0
         self._action_done = 0
         self._action_verb = ""
+        self._action_kind = ""
         self._current_name = ""
         self._current_fraction = 0.0
         # 진행바 전용 base(완료 곡 수). file_progress 와 progress 가
@@ -536,6 +538,13 @@ class MainWindow(QMainWindow):
         self.act_album_gain.setShortcut(QKeySequence("Ctrl+B"))
         self._set_shortcut_tip(self.act_album_gain, self.tr("Apply album gain to files per folder/group"))
         self.act_album_gain.triggered.connect(self._on_album_gain)
+
+        # Apply Constant Gain(원본 GUI Modify Gain 메뉴, D103).
+        self.act_constant_gain = QAction(self.tr("Apply Constant Gain..."), self)
+        self.act_constant_gain.setShortcut(QKeySequence("Ctrl+O"))
+        self._set_shortcut_tip(self.act_constant_gain, self.tr(
+            "Apply the same gain change to files without analysis"))
+        self.act_constant_gain.triggered.connect(self._on_constant_gain)
 
         # Clear Analysis(선택 행 표시 리셋) — 팝업 핸들러 재사용.
         self.act_clear_analysis = QAction(self.tr("Clear Analysis"), self)
@@ -649,6 +658,7 @@ class MainWindow(QMainWindow):
 
         self.menu_modify.addAction(self.act_gain)
         self.menu_modify.addAction(self.act_album_gain)
+        self.menu_modify.addAction(self.act_constant_gain)
         self.menu_modify.addSeparator()
         self.menu_modify.addAction(self.act_undo)
 
@@ -739,6 +749,9 @@ class MainWindow(QMainWindow):
         self._set_shortcut_tip(self.act_album_analyze, self.tr("Analyze album gain per folder/group without applying"))
         self.act_album_gain.setText(self.tr("Album Gain"))
         self._set_shortcut_tip(self.act_album_gain, self.tr("Apply album gain to files per folder/group"))
+        self.act_constant_gain.setText(self.tr("Apply Constant Gain..."))
+        self._set_shortcut_tip(self.act_constant_gain, self.tr(
+            "Apply the same gain change to files without analysis"))
 
         # 분석/수정/옵션 부속 액션.
         self.act_clear_analysis.setText(self.tr("Clear Analysis"))
@@ -1257,6 +1270,7 @@ class MainWindow(QMainWindow):
         self.act_gain.setEnabled(has_rows and not busy)
         self.act_album_analyze.setEnabled(has_rows and not busy)
         self.act_album_gain.setEnabled(has_rows and not busy)
+        self.act_constant_gain.setEnabled(has_rows and not busy)
         self.act_clear.setEnabled(has_rows and not busy)
         self._update_selection_actions()
 
@@ -1741,11 +1755,22 @@ class MainWindow(QMainWindow):
 
     # --- 파일 액션 워커(undo / remove_tags) 시작 ---
 
-    def _start_file_action(self, action: str):
-        """선택 행에 대해 FileActionWorker(undo|remove_tags)를 돌린다."""
+    def _on_constant_gain(self):
+        """Apply Constant Gain: 대화상자에서 고른 스텝을 분석 없이 적용(선택 행, 없으면 전체)."""
         if self._is_busy():
             return
-        rows = self._selected_source_rows()
+        dlg = ConstantGainDialog(self)
+        if dlg.exec() != QDialog.DialogCode.Accepted or dlg.steps() == 0:
+            return
+        self._start_file_action("constant", self._target_source_rows(),
+                                steps=dlg.steps(), channel=dlg.channel())
+
+    def _start_file_action(self, action: str, rows=None, steps=0, channel=None):
+        """FileActionWorker(undo|remove_tags|constant)를 돌린다. rows 기본은 선택 행."""
+        if self._is_busy():
+            return
+        if rows is None:
+            rows = self._selected_source_rows()
         paths = []
         for r in rows:
             fr = self.model.get_row(r)
@@ -1758,14 +1783,18 @@ class MainWindow(QMainWindow):
         self._action_done = 0
         self._failed_count = 0
         self._batch_total = len(paths)
-        self._action_verb = (self.tr("Undoing") if action == "undo"
-                             else self.tr("Removing tags"))
+        self._action_kind = action
+        self._action_verb = {"undo": self.tr("Undoing"),
+                             "constant": self.tr("Changing gain")}.get(
+                                 action, self.tr("Removing tags"))
         self._worker = FileActionWorker(paths, action, use_id3=False, parent=self,
-                                        save_timestamp=self.act_preserve_time.isChecked())
+                                        save_timestamp=self.act_preserve_time.isChecked(),
+                                        steps=steps, channel=channel)
         self._worker_kind = "action"
         self._worker.current.connect(self._on_action_current)
         self._worker.progress.connect(self._on_action_progress)
         self._worker.row_undone.connect(self._on_action_undone)
+        self._worker.row_gain_changed.connect(self._on_action_undone)  # 표시·로그 처리가 같다
         self._worker.row_tags_removed.connect(self._on_action_tags_removed)
         self._worker.failed.connect(self._on_worker_failed)
         self._worker.done.connect(self._on_file_action_finished)
@@ -1774,8 +1803,9 @@ class MainWindow(QMainWindow):
         self.progress.setValue(0)
         self._update_action_states()
         self.statusBar().showMessage(_fill(
-            self.tr("Undoing %1 file(s)...") if action == "undo"
-            else self.tr("Removing tags from %1 file(s)..."), len(paths)))
+            {"undo": self.tr("Undoing %1 file(s)..."),
+             "constant": self.tr("Applying constant gain to %1 file(s)...")}.get(
+                 action, self.tr("Removing tags from %1 file(s)...")), len(paths)))
         self._worker.start()
 
     # --- 태그 스캔 워커 슬롯 ---
@@ -2031,9 +2061,9 @@ class MainWindow(QMainWindow):
         self._update_action_states()
         done = self._action_done
         failed = self._failed_count
-        done_text = (self.tr("Undone %1 file(s)")
-                     if self._action_verb == self.tr("Undoing")
-                     else self.tr("Removed tags from %1 file(s)"))
+        done_text = {"undo": self.tr("Undone %1 file(s)"),
+                     "constant": self.tr("Changed gain of %1 file(s)")}.get(
+                         self._action_kind, self.tr("Removed tags from %1 file(s)"))
         parts = [_fill(done_text, done)]
         if failed:
             parts.append(_fill(self.tr("%1 failed"), failed))

@@ -39,7 +39,7 @@ Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D1
 - [x] 3. 코어 진입점 (234건, CI 3개 OS 초록 run 45189213103 at c61c233 · 첫 CI에서 CLI `-x` 태그 차이 발견해 수정, D108·T22) — `gaindb/api.py`에 `apply_file_constant_gain`(양 채널·한 채널), `analyze_file_max_amp`(최대 진폭만, `max_noclip_steps` 포함). 원본 GUI는 Max No-clip 적용을 곡마다 `/g N`(앨범은 묶음 최솟값)으로 하므로 별도 적용 진입점 없이 Constant Gain 경로를 쓴다. 로컬 원본 exe는 DLL이 없어 실행 불가(0xC0000135)
   - 먼저 실패 테스트: 결과가 CLI `-g 3`, `-l 1 -2`, `-x`와 같다. mp3gain이 PATH에 있으면 원본과 대조(`test_mp3gain_parity.py`)
   - 확인: 전체 테스트 통과, CI mp3gain 대조 초록
-- [ ] 4. Constant Gain GUI — Modify Gain > Apply Constant Gain...(Ctrl+O), 대화상자, 워커 (after: 3)
+- [x] 4. Constant Gain GUI (240건 OK, skip 4. 새 문구 12개는 5개 언어 AI 번역까지 넣음, ko 검수는 7에서) — Modify Gain > Apply Constant Gain...(Ctrl+O), 대화상자, 워커 (after: 3)
   - 먼저 실패 테스트: +3 적용 결과가 CLI `-g 3`과 같고 Undo로 원래 audio_body_sha256, 한 채널 -2가 `-l 1 -2`와 같음, 0 스텝은 아무것도 안 함
   - 확인: 테스트 통과
 - [ ] 5. Maximizing 옵션·Max No-clip analysis·Max Noclip 컬럼 — 기본 꺼짐, 켤 때 안내 창, 설정 저장 (after: 3)

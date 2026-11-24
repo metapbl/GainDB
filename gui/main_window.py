@@ -142,7 +142,7 @@ _PROGRESS_SCALE = 1000
 _FILE_WRITING_KINDS = ("apply", "album_apply", "action")
 
 # 이 값이 저장값과 다르면 이전 창 크기·컬럼 폭을 한 번 무시한다(1.0 기본 배치, D069).
-_LAYOUT_VERSION = 1
+_LAYOUT_VERSION = 2  # 1.4: 두 줄 머리글·좁은 폭을 기존 사용자도 한 번 보게 저장 폭 초기화(D115)
 
 # QSettings 조직/앱 이름(크로스플랫폼: Win=레지스트리, macOS=plist).
 _SETTINGS_ORG = "GaindB"
@@ -962,6 +962,7 @@ class MainWindow(QMainWindow):
         # 창 밖으로 넘치면 가로 스크롤 — 창 크기와 독립).
         # 마지막 섹션 자동 확장을 꺼야 "드래그 반대편이 움직이는" 현상이 없다.
         header.setStretchLastSection(False)
+        self.model.header_advance = lambda text: header.fontMetrics().horizontalAdvance(text)
         for cdef in COLUMNS:
             header.setSectionResizeMode(
                 int(cdef.index), QHeaderView.ResizeMode.Interactive)
@@ -1158,13 +1159,14 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(_fill(self.tr("Log write failed: %1"), exc))
 
     def _default_column_width(self, cdef) -> int:
-        """숫자 컬럼은 헤더 글자(영문·현재 언어 중 넓은 쪽)+여백·정렬 화살표 30px 에 맞춘다."""
+        """숫자 컬럼은 두 줄 머리글의 긴 줄+여백·정렬 화살표 30px 과 값("-12.0") 폭 중 큰 값(D115)."""
         if cdef.index == Col.NAME:
             return cdef.default_width
-        fm = self.table.horizontalHeader().fontMetrics()
         header = self.model.headerData(int(cdef.index), Qt.Orientation.Horizontal)
-        text = max(fm.horizontalAdvance(cdef.header), fm.horizontalAdvance(header))
-        return max(cdef.default_width, text + 30)
+        fm = self.table.horizontalHeader().fontMetrics()
+        text = max(fm.horizontalAdvance(line) for line in header.split("\n"))
+        value = self.table.fontMetrics().horizontalAdvance("-12.0") + 16
+        return max(cdef.default_width, text + 30, value)
 
     def _default_window_extent(self) -> tuple[int, int]:
         """가로 스크롤이 생기지 않는 창 폭과 황금비(폭/1.618) 높이."""

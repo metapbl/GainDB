@@ -35,3 +35,53 @@ class WrapHeaderTest(unittest.TestCase):
         self.assertEqual(self.wrap("当前最大振幅"), ("当前\n最大振幅", 4))
         self.assertEqual(self.wrap("削波"), ("削波", 2))
         self.assertEqual(self.wrap("削波(专辑)"), ("削波\n(专辑)", 4))
+
+
+# 1.3.1 의 숫자 컬럼 최소 폭과 Path\File 폭 (폭 비교 기준, 같은 환경에서 다시 계산한다)
+_OLD_MIN = {1: 72, 2: 80, 3: 72, 5: 100, 6: 88, 7: 88, 8: 104}
+_OLD_NAME = 420
+
+
+class NarrowWindowTest(unittest.TestCase):
+    """F11 인수 기준 2: 첫 창이 1.3.1 보다 20% 이상 좁고, 머리글이 다 보인다 (D115)."""
+
+    def test_six_languages(self):
+        import os
+        from unittest import mock
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtCore import QCoreApplication, QSettings, Qt
+        from PySide6.QtWidgets import QApplication
+        import gui.main_window as mw
+        from gui.columns import COLUMNS, Col
+        from gui.i18n import LANGUAGES, install_translator
+        app = QApplication.instance() or QApplication([])
+        self.addCleanup(install_translator, app, "en")
+        self.addCleanup(lambda: QSettings("GaindBTest", "GaindBTest").clear())
+        for lang in LANGUAGES:
+            with self.subTest(lang=lang), \
+                    mock.patch.object(mw, "_SETTINGS_ORG", "GaindBTest"), \
+                    mock.patch.object(mw, "_SETTINGS_APP", "GaindBTest"), \
+                    mock.patch.object(mw, "resolve_language", return_value=lang):
+                install_translator(app, lang)
+                win = mw.MainWindow()
+                self.addCleanup(win.deleteLater)
+                fm = win.table.horizontalHeader().fontMetrics()
+                new = sum(win.table.columnWidth(i) for i in range(len(COLUMNS)))
+                old = _OLD_NAME
+                for i, w in _OLD_MIN.items():
+                    tr = QCoreApplication.translate("FileTableModel", COLUMNS[i].header)
+                    old += max(w, fm.horizontalAdvance(COLUMNS[i].header) + 30,
+                               fm.horizontalAdvance(tr) + 30)
+                extra = win._default_window_extent()[0] - new
+                self.assertLessEqual(new + extra, 0.8 * (old + extra))
+                for c in COLUMNS:
+                    if c.index == Col.NAME or win.table.isColumnHidden(int(c.index)):
+                        continue
+                    lines = win.model.headerData(int(c.index), Qt.Orientation.Horizontal).split("\n")
+                    self.assertLessEqual(len(lines), 2)
+                    self.assertGreaterEqual(win.table.columnWidth(int(c.index)),
+                                            max(fm.horizontalAdvance(x) for x in lines) + 30)
+
+    def test_layout_version_resets_saved_widths_once(self):
+        import gui.main_window as mw
+        self.assertEqual(mw._LAYOUT_VERSION, 2)

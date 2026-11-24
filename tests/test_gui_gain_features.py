@@ -305,7 +305,7 @@ class MaximizingTest(WindowTestBase):
         header = self.win.model.headerData(int(Col.MAX_NOCLIP), self.mw.Qt.Orientation.Horizontal)
         fm = self.win.table.horizontalHeader().fontMetrics()
         self.assertGreaterEqual(self.win.table.columnWidth(int(Col.MAX_NOCLIP)),
-                                fm.horizontalAdvance(header) + 30)
+                                max(map(fm.horizontalAdvance, header.split("\n"))) + 30)
         again = self.mw.MainWindow()
         self.addCleanup(again.deleteLater)
         self.assertEqual(self._shown(again), (True, True))
@@ -326,7 +326,7 @@ class MaximizingTest(WindowTestBase):
         m.get_row(0).set_tag_result({"status": "ok", "peak": 0.5})   # 최대 스텝 3
         m.get_row(1).set_tag_result({"status": "ok", "peak": 1.2})   # 최대 스텝 -2
         self.assertEqual(m.headerData(int(Col.MAX_NOCLIP), self.mw.Qt.Orientation.Horizontal),
-                         "Max Noclip Gain")
+                         "Max Noclip\nGain")  # 두 줄 머리글(D115)
         self.assertEqual(m.index(0, int(Col.MAX_NOCLIP)).data(), "4.5")
         self.assertEqual(m.index(1, int(Col.MAX_NOCLIP)).data(), "-3.0")
         self.assertIsNotNone(m.index(1, int(Col.MAX_NOCLIP)).data(

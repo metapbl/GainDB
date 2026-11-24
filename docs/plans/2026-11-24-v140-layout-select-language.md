@@ -28,7 +28,7 @@ Status: active | 시작: 2026-11-24 | 근거: PRD §2.1 1.4 작업, F11 (D110~D1
 ## 작업
 - [x] 1. 머리글 줄바꿈 함수 (wrap_header, 266건 OK) — `gui/columns.py`
   - 먼저 실패 테스트: "Track Gain"→"Track\nGain", "clip(Album)"→"clip\n(Album)", "볼륨"·"클리핑"·"トラックゲイン" 그대로, "클립(앨범)"→"클립\n(앨범)", "현재 최대 진폭"→"현재\n최대 진폭", "アルバム音量"→"アルバム\n音量", "当前最大振幅"→"当前\n最大振幅", 한글·라틴 단어 중간에서 나누지 않음
-- [ ] 2. 두 줄 머리글과 좁은 기본 폭 — `model.headerData`, `_default_column_width`, Path\File 300 (after: 1)
+- [x] 2. 두 줄 머리글과 좁은 기본 폭 (268건 OK, 실제 글꼴 창 폭이 시안과 같음 en 825·ko 758·zh 742·ja 958·es 920·ru 924, D116) — `model.headerData`, `_default_column_width`, Path\File 300 (after: 1)
   - 기존 사용자가 새 모양을 보도록 `_LAYOUT_VERSION`을 올려 저장된 창 크기·컬럼 폭을 한 번 초기화한다 [AI]
   - 먼저 실패 테스트: 6개 언어 첫 창이 1.3.1 공식으로 계산한 폭보다 20% 이상 좁고 가로 스크롤 없음, 모든 숫자 컬럼이 머리글 긴 줄+30 이상
 - [ ] 3. 머리글 잘림 수정 — 언어 변경·저장 폭 복원 때 좁은 컬럼만 넓힘 (after: 2)

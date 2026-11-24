@@ -11,7 +11,7 @@ from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QColor
 
 from gui import theme
-from gui.columns import COLUMNS, COLUMN_COUNT, Col
+from gui.columns import COLUMNS, COLUMN_COUNT, Col, wrap_header
 from gaindb.analysis import DB_PER_STEP
 from gaindb.apply_gain import max_no_clip_steps
 
@@ -141,6 +141,8 @@ class FileTableModel(QAbstractTableModel):
         self._seen: set[str] = set()
         # path -> row index. 워커 시그널의 path->행 역참조를 O(1) 로.
         self._index: dict[str, int] = {}
+        # 머리글 두 줄 계산용 폭 함수(str -> px). main_window 가 머리글 글꼴로 넣는다.
+        self.header_advance = None
 
     # ---- Qt required overrides -------------------------------------------
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
@@ -156,7 +158,11 @@ class FileTableModel(QAbstractTableModel):
             # 헤더 원문은 columns.py 에 영문 상수로 두고, 표시 시점에 tr() 로
             # 번역한다(원문=상수, 번역=표시 시점). 언어 전환 시 main_window 가
             # headerDataChanged 를 방출하면 뷰가 이 함수를 다시 불러 갱신된다.
-            return self.tr(COLUMNS[section].header)
+            text = self.tr(COLUMNS[section].header)
+            # 숫자 컬럼 머리글은 두 줄로(D115). 폭 함수는 main_window 가 머리글 글꼴로 넣는다.
+            if section != Col.NAME and self.header_advance is not None:
+                text = wrap_header(text, self.header_advance)[0]
+            return text
         return None
 
     def data(self, index: QModelIndex, role=Qt.ItemDataRole.DisplayRole) -> Any:

@@ -301,7 +301,7 @@ class DefaultWindowTest(WindowTestBase):
             header = self.win.model.headerData(int(cdef.index), Qt.Orientation.Horizontal)
             with self.subTest(column=cdef.header):
                 self.assertGreaterEqual(self.win.table.columnWidth(int(cdef.index)),
-                                        fm.horizontalAdvance(header) + 30)
+                                        max(map(fm.horizontalAdvance, header.split("\n"))) + 30)  # 두 줄 머리글(D115)
 
     def test_default_size_has_no_horizontal_scroll_and_golden_height(self):
         width, height = self.win._default_window_extent()

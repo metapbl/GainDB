@@ -53,7 +53,7 @@ Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D1
   - 확인: `test_i18n.py` 통과(미번역 0, 자리표시자·단축 문자 일치), 6개 언어 첫 창 가로 스크롤 없음, ko 검수 결과
 - [x] 8. 버전·README (407638a, 254건 OK, `-v` 1.3.0, 노트 사용자 승인 2026-11-24) — 1.3.0, 6개 언어 README 기능 절에 Constant Gain·Maximizing 설명, 노트 초안(사용자 승인). 스크린샷은 다시 만들지 않는다(D106)
   - 확인: `gaindb_cli.py -v` 출력 1.3.0, `test_readme.py` 통과, readme 표준 §6 검사, 노트 승인
-- [ ] 9. 빌드·캡처 — pip-audit, `build_release.ps1`, 빌드 exe에서 Constant Gain 대화상자와 Maximizing 메뉴 캡처 (실행 전 사용자 확인)
+- [x] 9. 빌드·캡처 (CI 3개 OS 초록 run 45355300913 at 31ef261 254건, pip-audit 취약점 없음, BUILD OK, zip 96MB에 gaindb_*.qm 5개·licenses/LICENSE·NOTICE·THIRD_PARTY_LICENSES·qt, 빌드 exe를 ko로 띄워 수정 > 고정 게인 적용 Ctrl+O와 옵션 > "최대화" 기능 사용(꺼짐, Max 메뉴·컬럼 숨김) 확인 2026-11-24. 사용자 설정을 바꾸지 않으려고 옵션은 켜 보지 않음) — pip-audit, `build_release.ps1`, 빌드 exe에서 Constant Gain 대화상자와 Maximizing 메뉴 캡처 (실행 전 사용자 확인)
   - 확인: pip_audit 결과, `BUILD OK`, 캡처 PNG 확인
 - [ ] 10. Release — 태그 v1.3.0, GitHub Release (실행 전 사용자 확인)
   - 확인: Release에 태그·노트·zip, zip에 LICENSE·NOTICE·THIRD_PARTY_LICENSES·licenses/qt. AVD 동기화 대상 고지

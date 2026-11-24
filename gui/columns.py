@@ -95,3 +95,39 @@ COLUMNS: tuple[ColumnDef, ...] = (
 )
 
 COLUMN_COUNT = len(COLUMNS)
+
+def _script(ch: str):
+    """줄을 나눌 수 있는 문자 종류. 한글·라틴은 None(단어 안에서 나누지 않는다)."""
+    o = ord(ch)
+    if 0x4E00 <= o <= 0x9FFF:
+        return "han"
+    if 0x3040 <= o <= 0x309F:
+        return "hira"
+    if 0x30A0 <= o <= 0x30FF:
+        return "kata"
+    return None
+
+
+def wrap_header(text: str, advance: Callable[[str], int]) -> tuple[str, int]:
+    """머리글을 두 줄로 나눠 (표시 문자열, 긴 줄 폭)을 돌려준다(D115).
+
+    나눌 곳: 띄어쓰기, 괄호 앞, 일본어 문자 종류가 바뀌는 곳, 한자 연속의 두 글자 단위.
+    두 줄 중 긴 줄이 가장 짧아지는 곳을 고르고, 한 줄보다 좁아지지 않으면 그대로 둔다.
+    advance 는 문자열 폭 함수(QFontMetrics.horizontalAdvance 등).
+    """
+    cuts = [i for i, ch in enumerate(text) if i > 0 and ch in " ("]
+    han_run = 0
+    for i in range(1, len(text)):
+        a, b = _script(text[i - 1]), _script(text[i])
+        han_run = han_run + 1 if a == "han" else 0
+        if a and b and a != b:
+            cuts.append(i)
+        elif a == b == "han" and han_run % 2 == 0:
+            cuts.append(i)
+    best, best_width = text, advance(text)
+    for i in sorted(cuts):
+        top, bottom = text[:i].rstrip(), text[i:].lstrip()
+        width = max(advance(top), advance(bottom))
+        if width < best_width:
+            best, best_width = f"{top}\n{bottom}", width
+    return best, best_width

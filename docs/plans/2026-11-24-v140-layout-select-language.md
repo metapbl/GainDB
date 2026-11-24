@@ -26,7 +26,7 @@ Status: active | 시작: 2026-11-24 | 근거: PRD §2.1 1.4 작업, F11 (D110~D1
 - 커밋은 작업마다 1개, 작업마다 전체 테스트
 
 ## 작업
-- [ ] 1. 머리글 줄바꿈 함수 — `gui/columns.py`
+- [x] 1. 머리글 줄바꿈 함수 (wrap_header, 266건 OK) — `gui/columns.py`
   - 먼저 실패 테스트: "Track Gain"→"Track\nGain", "clip(Album)"→"clip\n(Album)", "볼륨"·"클리핑"·"トラックゲイン" 그대로, "클립(앨범)"→"클립\n(앨범)", "현재 최대 진폭"→"현재\n최대 진폭", "アルバム音量"→"アルバム\n音量", "当前最大振幅"→"当前\n最大振幅", 한글·라틴 단어 중간에서 나누지 않음
 - [ ] 2. 두 줄 머리글과 좁은 기본 폭 — `model.headerData`, `_default_column_width`, Path\File 300 (after: 1)
   - 기존 사용자가 새 모양을 보도록 `_LAYOUT_VERSION`을 올려 저장된 창 크기·컬럼 폭을 한 번 초기화한다 [AI]

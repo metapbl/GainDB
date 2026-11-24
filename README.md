@@ -175,7 +175,9 @@ This opens the main window. It has file and folder lists, Track/Album
 analysis and gain, a right-click menu, cancel, a log window and a tray icon.
 The Language menu and Options > Theme change the screen at once. The
 Options menu can keep file dates, avoid clipping in Track Gain, and always
-recalculate instead of reading stored tags.
+recalculate instead of reading stored tags. Modify > Apply Constant Gain
+changes files by a fixed number of steps, and Options > Enable "Maximizing"
+features adds the max no-clip analysis and gain of the original mp3gain GUI.
 
 ## How this project relates to mp3gain
 

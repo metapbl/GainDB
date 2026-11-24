@@ -179,7 +179,10 @@ ganancia Track/Album, un menú contextual, cancelación, una ventana de registro
 y un icono en la bandeja. El menú Idioma y Opciones > Tema cambian la pantalla
 al instante. El menú Opciones permite conservar la fecha de los archivos, evitar
 el recorte en la ganancia Track y recalcular siempre en lugar de leer las
-etiquetas guardadas.
+etiquetas guardadas. Modificar > Aplicar ganancia constante cambia los archivos
+un número fijo de pasos, y Opciones > Activar las funciones de "maximización"
+añade el análisis y la ganancia máximos sin saturación de la GUI original de
+mp3gain.
 
 ## Relación con mp3gain
 

@@ -46,7 +46,7 @@ Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D1
   - 컬럼 위치는 원본 순서(Track 묶음 뒤, Album 묶음 앞)를 따르고 저장된 컬럼 폭·Reset Column Widths가 깨지지 않는지 확인
   - 먼저 실패 테스트: 꺼짐이면 메뉴 3개·컬럼 숨김, 켜면 보이고 재시작 뒤 유지. 분석 뒤 Max Amp·Max Noclip 칸이 채워지고 음량 칸은 그대로, 값이 CLI `-x`와 같음
   - 확인: 테스트 통과
-- [ ] 6. Max No-clip 적용 — for Each file(Ctrl+X), for Album(Ctrl+L), 최대 진폭이 없으면 먼저 구함 (after: 5)
+- [x] 6. Max No-clip 적용 (254건 OK, skip 4. 원본 GUI exe는 `_local`에 소스만 있고 CLI exe도 DLL이 없어 로컬 대조 불가 → 바탕인 `-x`·`-g`는 CI mp3gain 대조로 확인됨, 적용 규칙은 원본 소스 MaxNoClipGain·GroupMaxNoClipGain 기준) — for Each file(Ctrl+X), for Album(Ctrl+L), 최대 진폭이 없으면 먼저 구함 (after: 5)
   - 먼저 실패 테스트: 앨범 사본 3개에서 적용 스텝·태그가 원본 exe 실행 결과(또는 3의 진입점 기대값)와 같고 클리핑 없음
   - 확인: 테스트 통과, 원본 GUI exe로 같은 사본을 처리한 결과와 한 번 대조(로컬)
 - [ ] 7. 번역 — 5개 언어 .ts/.qm, ko는 사용자 검수 (after: 4, 5, 6)

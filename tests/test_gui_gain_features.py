@@ -380,3 +380,105 @@ class ColumnSchemaChangeTest(WindowTestBase):
         again = self.mw.MainWindow()
         self.addCleanup(again.deleteLater)
         self.assertEqual(again.table.horizontalHeader().sortIndicatorSection(), int(Col.NAME))
+
+
+class MaxNoClipApplyWorkerTest(BaseGainTest):
+    """Max No-clip 적용: 곡마다(또는 앨범 묶음 최솟값) 클리핑 없는 최대 스텝을 Constant Gain 으로 (D102)."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        _qt_app()
+        from gaindb.api import analyze_file_max_amp, apply_file_constant_gain
+        self.a = self.copy_fixture("test_gain_44k.mp3")
+        self.b = self.copy_fixture("test_mono_44k.mp3")
+        apply_file_constant_gain(self.a, -4)   # 여유를 만들어 둔다
+        apply_file_constant_gain(self.b, -8)
+        self.want = {p: analyze_file_max_amp(p)["max_noclip_steps"] for p in (self.a, self.b)}
+        self.assertNotEqual(self.want[self.a], self.want[self.b])
+
+    def _run(self, groups, peaks=None):
+        from gui.workers import FileActionWorker
+        changed, amps, failed = {}, [], []
+        w = FileActionWorker([p for g in groups for p in g], "max_noclip",
+                             groups=groups, peaks=peaks or {})
+        w.row_gain_changed.connect(lambda p, n: changed.__setitem__(p, n))
+        w.row_max_amp.connect(lambda p, res: amps.append(p))
+        w.failed.connect(lambda p, msg: failed.append(msg))
+        w.run()
+        self.assertEqual(failed, [])
+        return changed, amps
+
+    def _no_clip_left(self):
+        from gaindb.api import analyze_file_max_amp
+        return [analyze_file_max_amp(p)["max_noclip_steps"] for p in (self.a, self.b)]
+
+    def test_each_file(self):
+        changed, amps = self._run([[self.a], [self.b]])
+        self.assertEqual(changed, self.want)
+        self.assertEqual(sorted(amps), sorted([self.a, self.b]))   # 진폭을 몰라 먼저 구함
+        self.assertEqual(self._no_clip_left(), [0, 0])
+
+    def test_album_uses_smallest(self):
+        from gaindb.api import analyze_file_max_amp
+        low = min(self.want.values())
+        peak_a = analyze_file_max_amp(self.a)["peak"]
+        changed, amps = self._run([[self.a, self.b]], peaks={self.a: peak_a})
+        self.assertEqual(changed, {self.a: low, self.b: low})
+        self.assertEqual(amps, [self.b])                            # 아는 곡은 다시 안 구함
+
+    def test_zero_does_nothing(self):
+        self._run([[self.a]])
+        before = _bytes(self.a)
+        changed, _ = self._run([[self.a]])
+        self.assertEqual(changed, {})
+        self.assertEqual(_bytes(self.a), before)
+
+
+class MaxNoClipMenuTest(WindowTestBase):
+    def _enable(self):
+        from unittest import mock
+        with mock.patch.object(self.mw.QMessageBox, "information"):
+            self.win.act_maximizing.setChecked(True)
+
+    def test_menu_items_follow_option(self):
+        each, album = self.win.act_max_noclip_each, self.win.act_max_noclip_album
+        self.assertEqual((each.text(), each.shortcut().toString()),
+                         ("Apply Max No-clip Gain for Each file", "Ctrl+X"))
+        self.assertEqual((album.text(), album.shortcut().toString()),
+                         ("Apply Max No-clip Gain for Album", "Ctrl+L"))
+        acts = self.win.menu_modify.actions()
+        i = acts.index(self.win.act_constant_gain)
+        self.assertEqual(acts[i + 1:i + 3], [each, album])
+        self.assertEqual((each.isVisible(), album.isVisible()), (False, False))
+        self._enable()
+        self.assertEqual((each.isVisible(), album.isVisible()), (True, True))
+
+    def _trigger(self, act):
+        from unittest import mock
+        self._enable()
+        self.win.model.get_row(0).set_tag_result({"status": "ok", "peak": 0.5})
+        self.addCleanup(setattr, self.win, "_worker", None)
+        with mock.patch.object(self.mw, "FileActionWorker") as worker, \
+                mock.patch.object(self.win, "_ffmpeg_missing", return_value=False):
+            act.trigger()
+        return worker.call_args
+
+    def test_each_file_groups_and_known_peaks(self):
+        call = self._trigger(self.win.act_max_noclip_each)
+        self.assertEqual(call.args[1], "max_noclip")
+        self.assertEqual(call.kwargs["groups"], [["a.mp3"], ["b.mp3"]])
+        self.assertEqual(call.kwargs["peaks"], {"a.mp3": 0.5})
+
+    def test_album_groups_follow_each_folder_option(self):
+        self.win.act_each_folder_album.setChecked(False)
+        call = self._trigger(self.win.act_max_noclip_album)
+        self.assertEqual(call.kwargs["groups"], [["a.mp3", "b.mp3"]])
+
+
+class MaxNoClipCountTest(WindowTestBase):
+    def test_amp_found_during_apply_is_not_counted(self):
+        self.win._action_kind, self.win._action_done = "max_noclip", 0
+        amp = {"peak": 0.5, "curr_max_amp": 16384, "min_gain": 1, "max_gain": 2}
+        self.win._on_action_max_amp("a.mp3", amp)
+        self.win._on_action_undone("a.mp3", 3)
+        self.assertEqual(self.win._action_done, 1)

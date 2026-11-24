@@ -22,6 +22,7 @@ from gaindb.api import (
     apply_file_album_gain,
     result_from_album_raw,
 )
+from gaindb.apply_gain import max_no_clip_steps
 from gaindb.decode import DecodeCancelled
 
 
@@ -199,12 +200,14 @@ class FileActionWorker(QThread):
     done = Signal()
 
     def __init__(self, paths, action, use_id3=False, parent=None,
-                 save_timestamp=False, steps=0, channel=None):
+                 save_timestamp=False, steps=0, channel=None, groups=None, peaks=None):
         super().__init__(parent)
         self._paths = list(paths)
         self._action = action
         self._steps = steps        # action == "constant" 일 때만
         self._channel = channel
+        self._groups = groups or []      # action == "max_noclip": 공통 스텝을 쓸 곡 묶음들
+        self._peaks = dict(peaks or {})  # 이미 아는 진폭(정규화 peak)
         self._use_id3 = use_id3
         self._save_timestamp = save_timestamp
         self._cancel = False
@@ -216,7 +219,51 @@ class FileActionWorker(QThread):
     def was_cancelled(self):
         return self._cancel
 
+    def _run_max_noclip(self):
+        """원본 GUI Max No-clip 적용: 묶음마다 진폭을 모르는 곡을 먼저 구하고,
+        묶음에서 가장 작은 클리핑 없는 최대 스텝을 Constant Gain 으로 적용한다(0 이면 그대로)."""
+        total = len(self._paths)
+        done = 0
+        for group in self._groups:
+            peaks = {}
+            for path in group:
+                if self._cancel:
+                    break
+                peak = self._peaks.get(path)
+                if peak is None:
+                    self.current.emit(path)
+                    try:
+                        res = analyze_file_max_amp(
+                            path, use_id3=self._use_id3, save_timestamp=self._save_timestamp,
+                            should_cancel=lambda: self._cancel)
+                    except DecodeCancelled:
+                        break
+                    except Exception as exc:
+                        self.failed.emit(path, str(exc))
+                        continue
+                    self.row_max_amp.emit(path, res)
+                    peak = res["peak"]
+                peaks[path] = peak
+            if self._cancel:
+                break
+            steps = min((max_no_clip_steps(pk) for pk in peaks.values()), default=0)
+            for path in group:
+                if steps and path in peaks:
+                    self.current.emit(path)
+                    try:
+                        apply_file_constant_gain(path, steps, use_id3=self._use_id3,
+                                                 save_timestamp=self._save_timestamp)
+                        self.row_gain_changed.emit(path, steps)
+                    except Exception as exc:
+                        self.failed.emit(path, str(exc))
+                done += 1
+                self.progress.emit(done, total)
+        self.done.emit()
+
     def run(self):
+        if self._action == "max_noclip":
+            self._run_max_noclip()
+            return
         total = len(self._paths)
         done = 0
         for path in self._paths:

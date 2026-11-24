@@ -1835,6 +1835,11 @@ class MainWindow(QMainWindow):
                 "louder or quieter than each other. Use Track Gain or Album Gain "
                 "to make volumes even."))
         self._apply_maximizing()
+        if on and not self.isMaximized():  # 새 컬럼만큼 넓혀 가로 스크롤을 피한다(화면 안에서, D115)
+            width = min(self._default_window_extent()[0],
+                        self.screen().availableGeometry().width())
+            if width > self.width():
+                self.resize(width, self.height())
 
     def _on_max_amp_analysis(self):
         """Max No-clip analysis: 음량 분석 없이 최대 진폭만 구한다(선택 행, 없으면 전체).

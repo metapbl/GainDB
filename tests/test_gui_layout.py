@@ -87,8 +87,8 @@ class NarrowWindowTest(unittest.TestCase):
         self.assertEqual(mw._LAYOUT_VERSION, 2)
 
 
-class HeaderFitTest(unittest.TestCase):
-    """F11 인수 기준 1: 언어를 바꾸거나 다시 실행해도 머리글이 잘리지 않는다 (D111)."""
+class _WindowBase(unittest.TestCase):
+    """테스트 전용 설정 이름과 언어로 주 창을 만든다."""
 
     def setUp(self) -> None:
         import os
@@ -114,6 +114,10 @@ class HeaderFitTest(unittest.TestCase):
             win = self.mw.MainWindow()
         self.addCleanup(win.deleteLater)
         return win
+
+
+class HeaderFitTest(_WindowBase):
+    """F11 인수 기준 1: 언어를 바꾸거나 다시 실행해도 머리글이 잘리지 않는다 (D111)."""
 
     def _squeeze(self, win):
         # en 폭보다 좁게 저장해 둔 상황(1.3 이전 저장값·사용자가 줄인 폭). 한 컬럼은 넓혀 둔다.
@@ -150,3 +154,39 @@ class HeaderFitTest(unittest.TestCase):
         win._save_settings()
         install_translator(self.app, "ru")
         self._assert_fit(self._window("ru"))
+
+
+class MaximizingWidensWindowTest(_WindowBase):
+    """F11 인수 기준 3: 실행 중 Maximizing 을 켜면 창이 컬럼만큼 넓어진다 (D115)."""
+
+    def _turn_on(self, win, screen_width=5000, maximized=False):
+        from unittest import mock
+        screen = mock.MagicMock()
+        screen.availableGeometry.return_value.width.return_value = screen_width
+        with mock.patch.object(self.mw.QMessageBox, "information"), \
+                mock.patch.object(win, "screen", return_value=screen), \
+                mock.patch.object(win, "isMaximized", return_value=maximized):
+            win.act_maximizing.setChecked(True)
+        self.app.processEvents()
+
+    def test_widens_without_horizontal_scroll(self):
+        win = self._window("es")
+        win.model.add_paths(["a.mp3"])
+        win.resize(*win._default_window_extent())
+        win.show()
+        self.app.processEvents()
+        self._turn_on(win)
+        self.assertEqual(win.width(), win._default_window_extent()[0])
+        self.assertEqual(win.table.horizontalScrollBar().maximum(), 0)
+
+    def test_capped_by_screen_and_kept_when_maximized(self):
+        win = self._window("es")
+        win.resize(*win._default_window_extent())
+        before = win.width()
+        self._turn_on(win, screen_width=before + 10)
+        self.assertEqual(win.width(), before + 10)
+        again = self._window("es")
+        again.resize(*again._default_window_extent())
+        width = again.width()
+        self._turn_on(again, maximized=True)
+        self.assertEqual(again.width(), width)

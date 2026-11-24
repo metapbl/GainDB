@@ -54,8 +54,9 @@ class LanguageMenuTest(unittest.TestCase):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         from PySide6.QtCore import QSettings
         from PySide6.QtWidgets import QApplication
+        import gui.i18n as i18n
         import gui.main_window as mw
-        from gui.i18n import LANGUAGES, install_translator
+        from gui.i18n import LANGUAGES, install_translator, save_language
         app = QApplication.instance() or QApplication([])
         self.addCleanup(install_translator, app, "en")
         self.addCleanup(lambda: QSettings("GaindBTest", "GaindBTest").clear())
@@ -63,12 +64,16 @@ class LanguageMenuTest(unittest.TestCase):
             with self.subTest(lang=lang), \
                     mock.patch.object(mw, "_SETTINGS_ORG", "GaindBTest"), \
                     mock.patch.object(mw, "_SETTINGS_APP", "GaindBTest"), \
+                    mock.patch.object(i18n, "_SETTINGS_ORG", "GaindBTest"), \
+                    mock.patch.object(i18n, "_SETTINGS_APP", "GaindBTest"), \
                     mock.patch.object(mw, "resolve_language", return_value=lang):
+                save_language(lang)
                 install_translator(app, lang)
                 win = mw.MainWindow()
-                acts = win.menu_language.actions()
+                acts = [a for a in win.menu_language.actions() if a.data() in LANGUAGES]
                 self.assertEqual([a.text() for a in acts], list(LANGUAGES.values()))
-                self.assertEqual([a.data() for a in acts if a.isChecked()], [lang])
+                self.assertEqual([a.data() for a in win.menu_language.actions() if a.isChecked()],
+                                 [lang])
                 win.deleteLater()
 
 
@@ -143,7 +148,8 @@ class LanguageBehaviourTest(unittest.TestCase):
         ru = next(a for a in win.menu_language.actions() if a.data() == "ru")
         ru.trigger()
         self.assertEqual(win.menu_analysis.title(), "Анализ")
-        self.assertEqual([a.text() for a in win.menu_language.actions()],
+        self.assertEqual([a.text() for a in win.menu_language.actions()
+                          if a.data() in self.i18n.LANGUAGES],
                          list(self.i18n.LANGUAGES.values()))
         from PySide6.QtCore import QLocale
         with mock.patch.object(self.i18n.QLocale, "system", return_value=QLocale("en_US")):
@@ -169,3 +175,21 @@ class LanguageBehaviourTest(unittest.TestCase):
             with self.subTest(msg=msg):
                 self.assertTrue(msg)
                 self.assertEqual(re.findall(r"[A-Za-z]{2,}", msg), [])
+
+    def test_system_default_clears_saved_and_follows_locale(self):
+        """F11 인수 기준 5: 언어 메뉴 System default (D114)."""
+        from PySide6.QtCore import QLocale, QSettings
+        self.i18n.save_language("ru")
+        with mock.patch.object(self.i18n.QLocale, "system", return_value=QLocale("ja_JP")):
+            win = self.window("ru")
+            acts = win.menu_language.actions()
+            self.assertEqual(acts[0].data(), "")
+            self.assertTrue(acts[1].isSeparator())
+            self.assertEqual(acts[0].text(), "Системный")
+            self.assertFalse(acts[0].isChecked())
+            acts[0].trigger()
+            self.assertEqual(win.menu_analysis.title(), "解析")
+            self.assertEqual(QSettings("GaindBTest", "GaindBTest").value("i18n/language", ""), "")
+            self.assertEqual(self.i18n.resolve_language(), "ja")
+            again = self.window(self.i18n.resolve_language())
+            self.assertEqual([a.data() for a in again.menu_language.actions() if a.isChecked()], [""])

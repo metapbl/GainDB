@@ -68,9 +68,8 @@ def resolve_language() -> str:
     - 없거나 미지원 값이면 QLocale.system() 의 언어(D083): 간체 지역(zh_CN·zh_SG)은
       zh_CN, 번체 지역은 지원 밖, 그 밖은 언어 부분(ja_JP→ja). 지원 밖이면 en.
     """
-    settings = QSettings(_SETTINGS_ORG, _SETTINGS_APP)
-    saved = settings.value("i18n/language", "", type=str)
-    if saved in SUPPORTED:
+    saved = saved_language()
+    if saved:
         return saved
 
     sys_name = QLocale.system().name()  # 예: "ko_KR", "zh_TW"
@@ -80,11 +79,20 @@ def resolve_language() -> str:
     return lang if lang in SUPPORTED else DEFAULT_LANGUAGE
 
 
+def saved_language() -> str:
+    """사용자가 메뉴에서 고른 언어. 없거나 지원 밖이면 ""(시스템 기본값)."""
+    saved = QSettings(_SETTINGS_ORG, _SETTINGS_APP).value("i18n/language", "", type=str)
+    return saved if saved in SUPPORTED else ""
+
+
 def save_language(lang: str) -> None:
-    """사용자가 고른 언어를 QSettings 에 영속화한다."""
+    """사용자가 고른 언어를 QSettings 에 영속화한다. ""면 지워 시스템 기본값으로(D114)."""
+    settings = QSettings(_SETTINGS_ORG, _SETTINGS_APP)
+    if not lang:
+        settings.remove("i18n/language")
+        return
     if lang not in SUPPORTED:
         lang = DEFAULT_LANGUAGE
-    settings = QSettings(_SETTINGS_ORG, _SETTINGS_APP)
     settings.setValue("i18n/language", lang)
 
 

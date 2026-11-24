@@ -127,7 +127,7 @@ from gui.dialogs.logs_dialog import LogsDialog
 from gui.dialogs.about_dialog import AboutDialog
 from gui.dialogs.constant_gain_dialog import ConstantGainDialog
 from gui.resources import app_icon
-from gui.i18n import LANGUAGES, resolve_language, save_language, install_translator
+from gui.i18n import LANGUAGES, resolve_language, save_language, saved_language, install_translator
 from gaindb.api import (
     DEFAULT_TARGET_DB, recompute_target, shift_after_apply, group_by_album,
 )
@@ -730,11 +730,21 @@ class MainWindow(QMainWindow):
         self._lang_group = QActionGroup(self)
         self._lang_group.setExclusive(True)
 
+        # 맨 위 System default: 고른 언어가 없으면 체크(D114). data "" = 저장값 지우기.
+        saved = saved_language()
+        self.act_lang_system = QAction(self.tr("System default"), self)
+        self.act_lang_system.setCheckable(True)
+        self.act_lang_system.setData("")
+        self.act_lang_system.setChecked(not saved)
+        self._lang_group.addAction(self.act_lang_system)
+        self.menu_language.addAction(self.act_lang_system)
+        self.menu_language.addSeparator()
+
         for code, name in LANGUAGES.items():
             act = QAction(name, self)
             act.setCheckable(True)
             act.setData(code)
-            act.setChecked(code == self._current_language)  # 현재 언어에 체크 표시
+            act.setChecked(code == saved)  # 고른 언어에 체크 표시
             self._lang_group.addAction(act)
             self.menu_language.addAction(act)
 
@@ -745,12 +755,12 @@ class MainWindow(QMainWindow):
         self.menu_help.addAction(self.act_about)
 
     def _on_language_selected(self, action: QAction):
-        """언어 메뉴 선택: 같은 언어면 무시, 아니면 저장 + 즉시 전환."""
-        lang = action.data()
+        """언어 메뉴 선택: 저장(System default 면 지움) 후, 언어가 바뀌면 즉시 전환."""
+        save_language(action.data())
+        lang = resolve_language()
         if lang == self._current_language:
             return
         self._current_language = lang
-        save_language(lang)
         app = QApplication.instance()
         if app is not None:
             install_translator(app, lang)
@@ -774,6 +784,7 @@ class MainWindow(QMainWindow):
         self.menu_options.setTitle(self.tr("Options"))
         self.menu_help.setTitle(self.tr("Help"))
         self.menu_language.setTitle(self.tr("Language"))
+        self.act_lang_system.setText(self.tr("System default"))
 
         # Track 액션.
         self.act_add_files.setText(self.tr("Add Files"))

@@ -1,26 +1,26 @@
 # PROGRESS — Gain dB (GaindB)
 
 ## 상태
-- 단계: 8 구현 · 활성 계획 `docs/plans/2026-11-23-v130-gain-features.md` (1.3: F10 Constant Gain·Max No-clip GUI·steps==0 건너뛰기, D100~D108) · 작업 1~3 완료
-- 버전: 1.2.0 게시 (태그 v1.2.0 = 9f2cbbe) · main은 README 스크린샷 반영(릴리스 없음, D097) · 테스트 234건 (로컬 OK, skip 4 = mp3gain 대조 / CI 3개 OS 초록, run 45189213103 at c61c233), 약 2분 (.venv Python 3.15.1)
-- 갱신: 2026-11-24 · 1.3 작업 1~3: steps==0 건너뛰기(원본 GUI 조건, D107, 988eb68), api 진입점 apply_file_constant_gain·analyze_file_max_amp (c4020af), CLI `-x` 태그를 mp3gain과 일치 (D108, c61c233)
-- 2026-11-23 · 1.3 범위 PRD 변경 승인·계획 승인 (Q067~Q070)
-- 2026-11-23 · README 스크린샷: 생성 스크립트 `tests/_readme_screenshots.py` (fb257a3, 5526e3c), 6개 언어 Screenshots 절·이미지 -v2 (9759e43, 5526e3c), D096~D099
-- 2026-11-23 · v1.2.0 Release (GUI 6개 언어, README 6개 언어·표준 구성)
-- 이전: 2026-11-11 · v1.1.2 Release · AVD 사본 1.1.2 동기화 확인 (AVD 3278b23)
+- 단계: 8 구현 · 활성 계획 없음 (`docs/plans/2026-11-23-v130-gain-features.md` 완료)
+- 버전: 1.3.1 게시 (태그 v1.3.1 = cac4261, v1.3.0 = 6215ffd) · 테스트 262건 (로컬 OK, skip 4 = mp3gain 대조 / CI 3개 OS 초록, run 45357639832 at cac4261), 약 2.5분 (.venv Python 3.15.1)
+- 갱신: 2026-11-24 · v1.3.1 Release: 게인 변경 뒤 진폭 갱신(Max No-clip 두 번 적용 시 클리핑 버그), Max No-clip analysis는 모르는 파일만, 1e6 이상 빈칸 (D109, fc5d1fc)
+- 2026-11-24 · v1.3.0 Release: F10 Constant Gain·Maximizing(Max No-clip analysis·컬럼·곡별/앨범 적용)·steps==0 건너뛰기(D107), CLI `-x` 태그를 mp3gain과 일치(D108)
+- 2026-11-23 · README 스크린샷 생성 스크립트·6개 언어 Screenshots 절 (D096~D099)
+- 이전: 2026-11-23 · v1.2.0 Release (GUI 6개 언어, README 6개 언어)
 
 ## 다음 할 일
-- 계획 작업 4부터: Constant Gain GUI (메뉴·대화상자·워커)
-- 1.3.0 뒤 다음 범위: scipy 제거 (D100, 별도 PRD 변경)
-- AVD 사본 1.2.0 동기화 완료(사용자 확인). 1.3에서 api 진입점 2개와 `-x` 태그 수정이 생겨 1.3.0 뒤 다시 동기화 대상 (D012)
+- AVD 사본 1.3.1 동기화 (D012): `gaindb/api.py`(apply_file_constant_gain·analyze_file_max_amp·shift_after_apply), `gaindb/apply_gain.py`(max_no_clip_steps, gain 없이 진폭만 채우기), `gaindb_cli.py`(`-x`). 사용자가 AVD 세션에서 진행
+- 다음 범위: scipy 제거 (용량 절감, D100, 별도 PRD 변경으로 시작)
+- 참고: 컬럼이 9개가 되어 기존 사용자의 저장된 컬럼 폭·정렬은 1.3에서 한 번 기본값으로 돌아감. README 스크린샷 생성 스크립트는 실제 앱 설정을 읽어 결과가 설정에 따라 달라짐(기존 동작)
 - 참고: README 스크린샷은 주 창이 바뀌면 AGENTS.md 명령으로 다시 만들고, 내용이 바뀌면 파일 이름 버전(-v3 등)을 올린다 (D098·D099). 생성 중 `M:` 드라이브가 잠시 보임
 - 참고: 이 PC(한국어 Windows)에서 중·일 화면과 표·머리글은 한국어 글꼴로 대체 표시되고 `\`가 `₩`로 보임 (D089)
+- 참고: 로컬 `_local/mp3gain/src/mp3gain.exe`는 DLL이 없어 실행 불가(0xC0000135). 원본 대조는 CI에서만
 
 ## 미해결
 - 없음
 
 ## 확인 대기 (사람만 확인 가능)
-- 없음
+- 1.3.1 exe에서 파일 사본으로 Constant Gain, Maximizing 켜기 → Max No-clip analysis·곡별/앨범 적용을 직접 해 보기 (자동 테스트·메뉴 표시만 확인됨)
 <!-- head:end — 이 줄 위(40줄 이내)만 자동 주입된다. 갱신은 이 위만 고친다. -->
 
 ## 완료 기록

@@ -1,5 +1,5 @@
 # v1.3.0 — Constant Gain · Max No-clip GUI · steps==0 건너뛰기 · Release
-Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D107)
+Status: done (2026-11-24) | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D109)
 
 목표: 원본 mp3gain GUI 1.3.4의 Apply Constant Gain과 Maximizing 기능 4가지를 GUI에 옮기고, Track/Album Gain에서 변화가 없는 최신 태그 곡을 건너뛴 뒤 v1.3.0을 게시한다.
 
@@ -57,7 +57,7 @@ Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D1
   - 확인: pip_audit 결과, `BUILD OK`, 캡처 PNG 확인
 - [x] 10. Release (태그 v1.3.0 = 6215ffd, https://github.com/metapbl/GainDB/releases/tag/v1.3.0, 첨부 GainDB-1.3.0-windows.zip 96461508 bytes, 노트 = docs/release-notes-1.3.0.md, 2026-11-24. AVD 동기화 대상: api 진입점 2개·apply_gain·CLI `-x`) — 태그 v1.3.0, GitHub Release (실행 전 사용자 확인)
   - 확인: Release에 태그·노트·zip, zip에 LICENSE·NOTICE·THIRD_PARTY_LICENSES·licenses/qt. AVD 동기화 대상 고지
-- [ ] 11. 인수 — F10 인수 기준 7개 실행
+- [x] 11. 인수 (인수 기준 1~4·6·7 자동 테스트, 5·6 Album은 작업 14에서 보강. 명세 검토가 진폭 버그 등 4건을 찾아 1.3.1로 수정(D109). 빌드 exe는 메뉴 표시만 확인, 실제 파일 적용은 사람 확인 대기) — F10 인수 기준 7개 실행
   - 확인: 전체 테스트 통과, CI 3개 OS 초록 | 실기기: exe에서 Constant Gain·Maximizing 동작 확인
   - 명세 검토: 대화 맥락 없는 서브에이전트에 이 파일, PRD F10, `git diff {시작 커밋}..`을 주고 누락·요청 외 추가·잘못된 구현을 받는다
 
@@ -71,5 +71,5 @@ Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D1
   - 먼저 실패 테스트: Constant Gain 뒤 표시 peak가 다시 구한 값과 같다, Max No-clip 적용을 두 번 해도 두 번째는 0 스텝, 진폭만 분석한 행도 옮겨진다
 - [x] 13. Max No-clip analysis는 진폭을 모르는 파일만, 진폭 1e6 이상이면 Max Noclip 칸 비움 — `_on_max_amp_analysis`, `gui/model.py > _max_noclip`
 - [x] 14. 인수 기준 테스트 보강 (두 테스트 모두 처음부터 통과: 현재 동작이 기준을 만족) — 앨범 3곡 Max No-clip 뒤 태그·클리핑, Album Gain은 0 스텝 태그 곡도 지금처럼 워커로 감(D107 Album 조건 해당 없음)
-- [ ] 15. 1.3.1 버전·노트(승인)·CI·빌드·Release (실행 전 확인), AVD 동기화 고지
+- [x] 15. 1.3.1 (CI 3개 OS 초록 run 45357639832 at cac4261 262건, pip-audit 취약점 없음, BUILD OK, 태그 v1.3.1 = cac4261, https://github.com/metapbl/GainDB/releases/tag/v1.3.1, zip 96461620 bytes, 2026-11-24) — 버전·노트(승인)·CI·빌드·Release, AVD 동기화 고지
 

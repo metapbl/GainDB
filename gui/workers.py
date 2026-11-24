@@ -15,6 +15,7 @@ from gaindb.api import (
     undo_file_gain,
     remove_file_tags,
     apply_file_constant_gain,
+    analyze_file_max_amp,
     analyze_album_file,
     album_gain_from_files,
     compute_album_display,
@@ -192,6 +193,7 @@ class FileActionWorker(QThread):
     progress = Signal(int, int)
     row_undone = Signal(str, int)
     row_gain_changed = Signal(str, int)  # Constant Gain: path, 적용 steps
+    row_max_amp = Signal(str, dict)      # Max No-clip analysis: path, 결과
     row_tags_removed = Signal(str)
     failed = Signal(str, str)
     done = Signal()
@@ -236,10 +238,16 @@ class FileActionWorker(QThread):
                                              use_id3=self._use_id3,
                                              save_timestamp=self._save_timestamp)
                     self.row_gain_changed.emit(path, self._steps)
+                elif self._action == "max_amp":
+                    self.row_max_amp.emit(path, analyze_file_max_amp(
+                        path, use_id3=self._use_id3, save_timestamp=self._save_timestamp,
+                        should_cancel=lambda: self._cancel))
                 else:
                     remove_file_tags(path, use_id3=self._use_id3,
                                      save_timestamp=self._save_timestamp)
                     self.row_tags_removed.emit(path)
+            except DecodeCancelled:  # max_amp 디코딩 중 취소
+                break
             except Exception as exc:
                 self.failed.emit(path, str(exc))
             done += 1

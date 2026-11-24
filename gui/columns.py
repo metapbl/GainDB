@@ -5,10 +5,10 @@ r"""gui/columns.py — 리스트뷰 컬럼 정의(상수 테이블).
 메인 창의 컬럼 구성을 관찰해 정의한다. MVP 는 Track 묶음(Volume / Track Gain /
 clipping)에 더해 Album 묶음(Album Volume / Album Gain / clip(Album))을
 mp3gain 과 동일한 순서로 노출한다:
-  Path\File / Volume / Track Gain / clipping /
+  Path\File / Volume / Track Gain / clipping / Max Noclip Gain /
   Album Volume / Album Gain / clip(Album) / Curr Max Amp
-(clip(Track)·Max Noclip 은 MVP 제외 — CLAUDE.md 참조. 컬럼 순서상 Track 묶음
-뒤에 Album 묶음, 맨 끝이 Curr Max Amp.)
+(clip(Track)은 제외. Max Noclip Gain 은 원본처럼 Track 묶음 뒤에 두고, Options 의
+"Maximizing" 기능을 켰을 때만 보인다(F10, D101). 맨 끝이 Curr Max Amp.)
 
 헤더 문자열은 mp3gain 과 동일한 영문 표기 그대로 둔다. 다국어화는 GUI 계층의
 tr() 책임이며 후속 작업이다(CLAUDE.md 8단계 합의). 정렬·표시 배선은 model 의
@@ -39,10 +39,11 @@ class Col(IntEnum):
     VOLUME = 1
     TRACK_GAIN = 2
     CLIP = 3
-    ALBUM_VOLUME = 4
-    ALBUM_GAIN = 5
-    ALBUM_CLIP = 6
-    MAX_AMP = 7
+    MAX_NOCLIP = 4
+    ALBUM_VOLUME = 5
+    ALBUM_GAIN = 6
+    ALBUM_CLIP = 7
+    MAX_AMP = 8
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,8 @@ COLUMNS: tuple[ColumnDef, ...] = (
               lambda row: _num_or_min(None)),
     ColumnDef(Col.CLIP, QT_TRANSLATE_NOOP("FileTableModel", "clipping"), _CENTER, 72,
               lambda row: ""),
+    ColumnDef(Col.MAX_NOCLIP, QT_TRANSLATE_NOOP("FileTableModel", "Max Noclip Gain"), _RIGHT, 112,
+              lambda row: _num_or_min(None)),
     ColumnDef(Col.ALBUM_VOLUME, QT_TRANSLATE_NOOP("FileTableModel", "Album Volume"), _RIGHT, 100,
               lambda row: _num_or_min(None)),
     ColumnDef(Col.ALBUM_GAIN, QT_TRANSLATE_NOOP("FileTableModel", "Album Gain"), _RIGHT, 88,

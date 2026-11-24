@@ -296,8 +296,8 @@ class DefaultWindowTest(WindowTestBase):
         from gui.columns import COLUMNS, Col
         fm = self.win.table.horizontalHeader().fontMetrics()
         for cdef in COLUMNS:
-            if cdef.index == Col.NAME:
-                continue
+            if cdef.index == Col.NAME or self.win.table.isColumnHidden(int(cdef.index)):
+                continue  # 숨긴 컬럼(Max Noclip Gain)은 test_gui_gain_features 가 본다
             header = self.win.model.headerData(int(cdef.index), Qt.Orientation.Horizontal)
             with self.subTest(column=cdef.header):
                 self.assertGreaterEqual(self.win.table.columnWidth(int(cdef.index)),

@@ -42,7 +42,7 @@ Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D1
 - [x] 4. Constant Gain GUI (240건 OK, skip 4. 새 문구 12개는 5개 언어 AI 번역까지 넣음, ko 검수는 7에서) — Modify Gain > Apply Constant Gain...(Ctrl+O), 대화상자, 워커 (after: 3)
   - 먼저 실패 테스트: +3 적용 결과가 CLI `-g 3`과 같고 Undo로 원래 audio_body_sha256, 한 채널 -2가 `-l 1 -2`와 같음, 0 스텝은 아무것도 안 함
   - 확인: 테스트 통과
-- [ ] 5. Maximizing 옵션·Max No-clip analysis·Max Noclip 컬럼 — 기본 꺼짐, 켤 때 안내 창, 설정 저장 (after: 3)
+- [x] 5. Maximizing 옵션·Max No-clip analysis·Max Noclip 컬럼 (247건 OK, skip 4. 컬럼 이름은 원본대로 "Max Noclip Gain", 값은 최대 스텝×1.505 dB. 컬럼 수가 바뀌어 기존 사용자의 저장된 컬럼 폭은 한 번 기본값으로 돌아가고, 저장된 정렬 번호도 같은 조건으로 무시) — 기본 꺼짐, 켤 때 안내 창, 설정 저장 (after: 3)
   - 컬럼 위치는 원본 순서(Track 묶음 뒤, Album 묶음 앞)를 따르고 저장된 컬럼 폭·Reset Column Widths가 깨지지 않는지 확인
   - 먼저 실패 테스트: 꺼짐이면 메뉴 3개·컬럼 숨김, 켜면 보이고 재시작 뒤 유지. 분석 뒤 Max Amp·Max Noclip 칸이 채워지고 음량 칸은 그대로, 값이 CLI `-x`와 같음
   - 확인: 테스트 통과

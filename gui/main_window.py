@@ -509,6 +509,7 @@ class MainWindow(QMainWindow):
         self._build_statusbar()
         self._build_context_menu()
         self._build_tray()
+        self._apply_maximizing()  # 창 기본 폭 계산 전에 숨김 컬럼을 정한다
         self._restore_settings()
         self._update_action_states()
 
@@ -533,6 +534,13 @@ class MainWindow(QMainWindow):
         self.act_album_analyze.setShortcut(QKeySequence("Ctrl+U"))
         self._set_shortcut_tip(self.act_album_analyze, self.tr("Analyze album gain per folder/group without applying"))
         self.act_album_analyze.triggered.connect(self._on_album_analyze)
+
+        # Max No-clip analysis(원본: Maximizing 기능을 켰을 때만 보임, D101·D102).
+        self.act_max_amp_analysis = QAction(self.tr("Max No-clip analysis"), self)
+        self.act_max_amp_analysis.setShortcut(QKeySequence("Ctrl+M"))
+        self._set_shortcut_tip(self.act_max_amp_analysis, self.tr(
+            "Find only the max amplitude of files, without loudness analysis"))
+        self.act_max_amp_analysis.triggered.connect(self._on_max_amp_analysis)
 
         self.act_album_gain = QAction(self.tr("Album Gain"), self)
         self.act_album_gain.setShortcut(QKeySequence("Ctrl+B"))
@@ -582,6 +590,10 @@ class MainWindow(QMainWindow):
         self.act_recalc_tags = self._add_option_action(
             "options/recalc_tags", self.tr("Re-calculate (do not read tags)"),
             self.tr("Do not read stored values when adding files; Track Gain analyzes them"))
+        self.act_maximizing = self._add_option_action(
+            "options/maximizing", self.tr("Enable \"Maximizing\" features"),
+            self.tr("Show Max No-clip analysis and the Max Noclip Gain column"))
+        self.act_maximizing.toggled.connect(self._on_toggle_maximizing)
 
         # Theme — 시스템 따라가기/다크/라이트 상호배타 선택(즉시 전환·저장).
         self.menu_theme = QMenu(self.tr("Theme"), self)
@@ -653,6 +665,7 @@ class MainWindow(QMainWindow):
 
         self.menu_analysis.addAction(self.act_analyze)
         self.menu_analysis.addAction(self.act_album_analyze)
+        self.menu_analysis.addAction(self.act_max_amp_analysis)
         self.menu_analysis.addSeparator()
         self.menu_analysis.addAction(self.act_clear_analysis)
 
@@ -667,6 +680,7 @@ class MainWindow(QMainWindow):
         self.menu_options.addAction(self.act_preserve_time)
         self.menu_options.addAction(self.act_track_no_clip)
         self.menu_options.addAction(self.act_recalc_tags)
+        self.menu_options.addAction(self.act_maximizing)
         self.menu_options.addSeparator()
         self.menu_options.addMenu(self.menu_theme)
         self.menu_options.addAction(self.act_logs)
@@ -774,6 +788,12 @@ class MainWindow(QMainWindow):
         self.act_recalc_tags.setText(self.tr("Re-calculate (do not read tags)"))
         self.act_recalc_tags.setToolTip(self.tr(
             "Do not read stored values when adding files; Track Gain analyzes them"))
+        self.act_maximizing.setText(self.tr("Enable \"Maximizing\" features"))
+        self.act_maximizing.setToolTip(self.tr(
+            "Show Max No-clip analysis and the Max Noclip Gain column"))
+        self.act_max_amp_analysis.setText(self.tr("Max No-clip analysis"))
+        self._set_shortcut_tip(self.act_max_amp_analysis, self.tr(
+            "Find only the max amplitude of files, without loudness analysis"))
         self.menu_theme.setTitle(self.tr("Theme"))
         self.act_theme_system.setText(self.tr("System"))
         self.act_theme_dark.setText(self.tr("Dark"))
@@ -1169,7 +1189,8 @@ class MainWindow(QMainWindow):
         # 정렬 복원. sortByColumn 재생 -> 프록시/QCollator/None 뒤로 정책이
         # 그대로 태워진다. 저장값 없으면 NAME 오름 유지.
         sort_col = self._settings.value("sort/column", type=int)
-        if sort_col is not None and 0 <= sort_col < COLUMN_COUNT:
+        # 컬럼 구성이 바뀌었으면(1.3 Max Noclip Gain 추가 등) 저장된 번호가 다른 컬럼을 가리킨다
+        if sort_col is not None and saved_count == COLUMN_COUNT and 0 <= sort_col < COLUMN_COUNT:
             order_val = self._settings.value("sort/order", type=int)
             order = (Qt.SortOrder.DescendingOrder if order_val == 1
                      else Qt.SortOrder.AscendingOrder)
@@ -1271,6 +1292,7 @@ class MainWindow(QMainWindow):
         self.act_album_analyze.setEnabled(has_rows and not busy)
         self.act_album_gain.setEnabled(has_rows and not busy)
         self.act_constant_gain.setEnabled(has_rows and not busy)
+        self.act_max_amp_analysis.setEnabled(has_rows and not busy)
         self.act_clear.setEnabled(has_rows and not busy)
         self._update_selection_actions()
 
@@ -1755,6 +1777,27 @@ class MainWindow(QMainWindow):
 
     # --- 파일 액션 워커(undo / remove_tags) 시작 ---
 
+    def _apply_maximizing(self):
+        """Maximizing 기능 메뉴와 Max Noclip Gain 컬럼을 옵션에 맞춰 보이거나 숨긴다."""
+        on = self.act_maximizing.isChecked()
+        self.act_max_amp_analysis.setVisible(on)
+        self.table.setColumnHidden(int(Col.MAX_NOCLIP), not on)
+
+    def _on_toggle_maximizing(self, on: bool):
+        if on:  # 원본처럼 켤 때 한 번 안내한다
+            QMessageBox.information(self, self.tr("Note on Maximizing"), self.tr(
+                "Maximizing raises each file as far as it can go without clipping. "
+                "It is not volume normalizing: maximized files can still sound "
+                "louder or quieter than each other. Use Track Gain or Album Gain "
+                "to make volumes even."))
+        self._apply_maximizing()
+
+    def _on_max_amp_analysis(self):
+        """Max No-clip analysis: 음량 분석 없이 최대 진폭만 구한다(선택 행, 없으면 전체)."""
+        if self._is_busy() or self._ffmpeg_missing():
+            return
+        self._start_file_action("max_amp", self._target_source_rows())
+
     def _on_constant_gain(self):
         """Apply Constant Gain: 대화상자에서 고른 스텝을 분석 없이 적용(선택 행, 없으면 전체)."""
         if self._is_busy():
@@ -1785,7 +1828,8 @@ class MainWindow(QMainWindow):
         self._batch_total = len(paths)
         self._action_kind = action
         self._action_verb = {"undo": self.tr("Undoing"),
-                             "constant": self.tr("Changing gain")}.get(
+                             "constant": self.tr("Changing gain"),
+                             "max_amp": self.tr("Finding max amplitude")}.get(
                                  action, self.tr("Removing tags"))
         self._worker = FileActionWorker(paths, action, use_id3=False, parent=self,
                                         save_timestamp=self.act_preserve_time.isChecked(),
@@ -1795,6 +1839,7 @@ class MainWindow(QMainWindow):
         self._worker.progress.connect(self._on_action_progress)
         self._worker.row_undone.connect(self._on_action_undone)
         self._worker.row_gain_changed.connect(self._on_action_undone)  # 표시·로그 처리가 같다
+        self._worker.row_max_amp.connect(self._on_action_max_amp)
         self._worker.row_tags_removed.connect(self._on_action_tags_removed)
         self._worker.failed.connect(self._on_worker_failed)
         self._worker.done.connect(self._on_file_action_finished)
@@ -1804,7 +1849,8 @@ class MainWindow(QMainWindow):
         self._update_action_states()
         self.statusBar().showMessage(_fill(
             {"undo": self.tr("Undoing %1 file(s)..."),
-             "constant": self.tr("Applying constant gain to %1 file(s)...")}.get(
+             "constant": self.tr("Applying constant gain to %1 file(s)..."),
+             "max_amp": self.tr("Finding max amplitude of %1 file(s)...")}.get(
                  action, self.tr("Removing tags from %1 file(s)...")), len(paths)))
         self._worker.start()
 
@@ -2041,6 +2087,18 @@ class MainWindow(QMainWindow):
             self.model.row_changed(r)
         self._safe_log(log_change, self._log_config, path, undo_steps)
 
+    def _on_action_max_amp(self, path: str, amp: dict):
+        """최대 진폭만 갱신한다. 음량 값은 그대로 두고 clipping 표시만 새 진폭으로 다시 계산."""
+        self._action_done += 1
+        r = self.model.find_row_by_path(path)
+        if r is None:
+            return
+        fr = self.model.get_row(r)
+        res = dict(fr.result or {"status": "max_amp"})
+        res.update({k: amp[k] for k in ("peak", "curr_max_amp", "min_gain", "max_gain")})
+        fr.result = recompute_target(res, res.get("target_db", self.spin_target.value()))
+        self.model.row_changed(r)
+
     def _on_action_tags_removed(self, path: str):
         """태그 제거 성공: 행 result 를 비워 미분석(빈칸) 복귀."""
         self._action_done += 1
@@ -2062,7 +2120,8 @@ class MainWindow(QMainWindow):
         done = self._action_done
         failed = self._failed_count
         done_text = {"undo": self.tr("Undone %1 file(s)"),
-                     "constant": self.tr("Changed gain of %1 file(s)")}.get(
+                     "constant": self.tr("Changed gain of %1 file(s)"),
+                     "max_amp": self.tr("Found max amplitude of %1 file(s)")}.get(
                          self._action_kind, self.tr("Removed tags from %1 file(s)"))
         parts = [_fill(done_text, done)]
         if failed:

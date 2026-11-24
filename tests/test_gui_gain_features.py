@@ -277,3 +277,106 @@ class ConstantGainWorkerTest(BaseGainTest):
 
         FileActionWorker([a], "undo").run()
         self.assertEqual(self.audio_body_sha256(a), before)
+
+
+class MaximizingTest(WindowTestBase):
+    """Options > Enable "Maximizing" features 와 Max No-clip analysis·컬럼 (D101, D102)."""
+
+    def _toggle(self, on):
+        from unittest import mock
+        with mock.patch.object(self.mw.QMessageBox, "information") as note:
+            self.win.act_maximizing.setChecked(on)
+        return note
+
+    def _shown(self, win=None):
+        from gui.columns import Col
+        win = win or self.win
+        return (win.act_max_amp_analysis.isVisible(),
+                not win.table.isColumnHidden(int(Col.MAX_NOCLIP)))
+
+    def test_off_by_default_hides_menu_and_column(self):
+        self.assertFalse(self.win.act_maximizing.isChecked())
+        self.assertEqual(self._shown(), (False, False))
+
+    def test_on_shows_note_once_and_persists(self):
+        self._toggle(True).assert_called_once()
+        self.assertEqual(self._shown(), (True, True))
+        from gui.columns import Col
+        header = self.win.model.headerData(int(Col.MAX_NOCLIP), self.mw.Qt.Orientation.Horizontal)
+        fm = self.win.table.horizontalHeader().fontMetrics()
+        self.assertGreaterEqual(self.win.table.columnWidth(int(Col.MAX_NOCLIP)),
+                                fm.horizontalAdvance(header) + 30)
+        again = self.mw.MainWindow()
+        self.addCleanup(again.deleteLater)
+        self.assertEqual(self._shown(again), (True, True))
+        self._toggle(False).assert_not_called()
+        self.assertEqual(self._shown(), (False, False))
+
+    def test_menu_places(self):
+        act = self.win.act_max_amp_analysis
+        self.assertEqual((act.text(), act.shortcut().toString()), ("Max No-clip analysis", "Ctrl+M"))
+        acts = self.win.menu_analysis.actions()
+        self.assertIs(acts[acts.index(self.win.act_album_analyze) + 1], act)
+        self.assertIn(self.win.act_maximizing, self.win.menu_options.actions())
+        self.assertNotIn(act, self.win.ctx_menu.actions())
+
+    def test_column_shows_max_noclip_db(self):
+        from gui.columns import Col
+        m = self.win.model
+        m.get_row(0).set_tag_result({"status": "ok", "peak": 0.5})   # 최대 스텝 3
+        m.get_row(1).set_tag_result({"status": "ok", "peak": 1.2})   # 최대 스텝 -2
+        self.assertEqual(m.headerData(int(Col.MAX_NOCLIP), self.mw.Qt.Orientation.Horizontal),
+                         "Max Noclip Gain")
+        self.assertEqual(m.index(0, int(Col.MAX_NOCLIP)).data(), "4.5")
+        self.assertEqual(m.index(1, int(Col.MAX_NOCLIP)).data(), "-3.0")
+        self.assertIsNotNone(m.index(1, int(Col.MAX_NOCLIP)).data(
+            self.mw.Qt.ItemDataRole.ForegroundRole))
+
+    def test_analysis_runs_on_target_rows_and_merges(self):
+        from unittest import mock
+        from gui.columns import Col
+        self._toggle(True)
+        self.addCleanup(setattr, self.win, "_worker", None)
+        with mock.patch.object(self.mw, "FileActionWorker") as worker, \
+                mock.patch.object(self.win, "_ffmpeg_missing", return_value=False):
+            self.win.act_max_amp_analysis.trigger()
+        self.assertEqual(worker.call_args.args[:2], (["a.mp3", "b.mp3"], "max_amp"))
+
+        m = self.win.model
+        m.get_row(0).set_tag_result({"status": "ok", "volume": 92.0, "peak": 0.1})
+        amp = {"status": "ok", "peak": 0.5, "curr_max_amp": 16384,
+               "min_gain": 150, "max_gain": 200, "max_noclip_steps": 3}
+        self.win._on_action_max_amp("a.mp3", amp)
+        self.win._on_action_max_amp("b.mp3", amp)
+        self.assertEqual(m.index(0, int(Col.VOLUME)).data(), "92.0")   # 음량 칸은 그대로
+        for r in (0, 1):
+            self.assertEqual(m.index(r, int(Col.MAX_AMP)).data(), "16384")
+            self.assertEqual(m.index(r, int(Col.MAX_NOCLIP)).data(), "4.5")
+
+
+class MaxAmpWorkerTest(BaseGainTest):
+    def test_worker_emits_core_result(self):
+        _qt_app()
+        from gui.workers import FileActionWorker
+        path = self.copy_fixture("test_gain_44k.mp3")
+        got = []
+        w = FileActionWorker([path], "max_amp")
+        w.row_max_amp.connect(lambda p, res: got.append(res))
+        w.run()
+        self.assertEqual(len(got), 1)
+        self.assertGreater(got[0]["peak"], 0)
+
+
+class ColumnSchemaChangeTest(WindowTestBase):
+    def test_old_sort_column_ignored_after_column_added(self):
+        # 1.2 까지 8열: 저장된 4(Album Volume)를 새 9열 구성에 그대로 쓰지 않는다
+        from PySide6.QtCore import QSettings
+        from gui.columns import Col
+        s = QSettings("GaindBTest", "GaindBTest")
+        s.setValue("layout/version", self.mw._LAYOUT_VERSION)
+        s.setValue("columns/count", 8)
+        s.setValue("sort/column", 4)
+        s.setValue("sort/order", 1)
+        again = self.mw.MainWindow()
+        self.addCleanup(again.deleteLater)
+        self.assertEqual(again.table.horizontalHeader().sortIndicatorSection(), int(Col.NAME))

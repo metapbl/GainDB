@@ -12,6 +12,8 @@ from PySide6.QtGui import QColor
 
 from gui import theme
 from gui.columns import COLUMNS, COLUMN_COUNT, Col
+from gaindb.analysis import DB_PER_STEP
+from gaindb.apply_gain import max_no_clip_steps
 
 # Custom role used by the sort proxy to fetch the raw (typed) sort value
 # instead of the formatted display string.
@@ -104,6 +106,12 @@ def _fmt_int(value: Optional[int]) -> str:
     return "" if value is None else str(value)
 
 
+def _max_noclip(result: dict) -> Optional[int]:
+    """클리핑 없는 최대 스텝(원본 Max Noclip). 진폭을 모르면 None."""
+    peak = result.get("peak")
+    return None if peak is None else max_no_clip_steps(peak)
+
+
 # Warning colors only (theme token names). "none" is intentionally left unset so
 # the palette supplies the normal text color.
 _CLIP_COLORS = {
@@ -170,6 +178,8 @@ class FileTableModel(QAbstractTableModel):
                     return _clip_color(row.result.get("clip_state"))
                 if col.index == Col.ALBUM_CLIP:
                     return _clip_color(row.result.get("album_clip_state"))
+                if col.index == Col.MAX_NOCLIP and (_max_noclip(row.result) or 0) < 0:
+                    return QColor(theme.color("danger"))  # 원본: 이미 클리핑이면 빨강
             return None
 
         if role == Qt.ItemDataRole.TextAlignmentRole:
@@ -199,6 +209,9 @@ class FileTableModel(QAbstractTableModel):
             return _fmt_db(r.get("track_gain_db"))
         if key == Col.CLIP:
             return _CLIP_TEXT.get(r.get("clip_state"), "")
+        if key == Col.MAX_NOCLIP:
+            steps = _max_noclip(r)
+            return "" if steps is None else _fmt_db(steps * DB_PER_STEP)
         if key == Col.ALBUM_VOLUME:
             return _fmt_db(r.get("album_volume"))
         if key == Col.ALBUM_GAIN:
@@ -223,6 +236,8 @@ class FileTableModel(QAbstractTableModel):
             return r.get("track_gain_db")
         if key == Col.CLIP:
             return r.get("clip_state", "")
+        if key == Col.MAX_NOCLIP:
+            return _max_noclip(r)
         if key == Col.ALBUM_VOLUME:
             return r.get("album_volume")
         if key == Col.ALBUM_GAIN:

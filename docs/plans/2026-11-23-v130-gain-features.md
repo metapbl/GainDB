@@ -49,7 +49,7 @@ Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D1
 - [x] 6. Max No-clip 적용 (254건 OK, skip 4. 원본 GUI exe는 `_local`에 소스만 있고 CLI exe도 DLL이 없어 로컬 대조 불가 → 바탕인 `-x`·`-g`는 CI mp3gain 대조로 확인됨, 적용 규칙은 원본 소스 MaxNoClipGain·GroupMaxNoClipGain 기준) — for Each file(Ctrl+X), for Album(Ctrl+L), 최대 진폭이 없으면 먼저 구함 (after: 5)
   - 먼저 실패 테스트: 앨범 사본 3개에서 적용 스텝·태그가 원본 exe 실행 결과(또는 3의 진입점 기대값)와 같고 클리핑 없음
   - 확인: 테스트 통과, 원본 GUI exe로 같은 사본을 처리한 결과와 한 번 대조(로컬)
-- [ ] 7. 번역 — 5개 언어 .ts/.qm, ko는 사용자 검수 (after: 4, 5, 6)
+- [x] 7. 번역 (작업 4~6에서 문구마다 5개 언어 165개 완료, ko 새 문구 28개 사용자 검수 "이대로 확정" 2026-11-24, test_i18n·번역 검사·가로 스크롤 테스트 통과) — 5개 언어 .ts/.qm, ko는 사용자 검수 (after: 4, 5, 6)
   - 확인: `test_i18n.py` 통과(미번역 0, 자리표시자·단축 문자 일치), 6개 언어 첫 창 가로 스크롤 없음, ko 검수 결과
 - [ ] 8. 버전·README — 1.3.0, 6개 언어 README 기능 절에 Constant Gain·Maximizing 설명, 노트 초안(사용자 승인). 스크린샷은 다시 만들지 않는다(D106)
   - 확인: `gaindb_cli.py -v` 출력 1.3.0, `test_readme.py` 통과, readme 표준 §6 검사, 노트 승인

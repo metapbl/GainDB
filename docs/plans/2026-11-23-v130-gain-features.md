@@ -65,3 +65,11 @@ Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D1
 - 빠진 PRD 기능: 없음 (F10 전부, §2.1 1.3 작업 1·2. 3 scipy는 다음 계획)
 - 테스트로 바꾸지 못한 인수 기준: 없음. 원본 GUI exe 대조는 자동화가 어려워 6에서 로컬 한 번 확인으로 보강
 - 순서: 2 after 1 · 4, 5 after 3 · 6 after 5 · 7 after 4·5·6 · 8~11 순서대로
+
+## 1.3.1 (작업 11 명세 검토 지적, D109)
+- [x] 12. 게인 변경 뒤 진폭 갱신 (262건 OK. 같은 원인으로 Undo 뒤 Track Gain이 옛 peak를 태그에 쓸 수 있던 것도 함께 해결) — `gaindb/api.py > shift_after_apply`가 `peak`도 옮기고 진폭만 분석한 행도 옮김, `gui/main_window.py > _on_action_undone`
+  - 먼저 실패 테스트: Constant Gain 뒤 표시 peak가 다시 구한 값과 같다, Max No-clip 적용을 두 번 해도 두 번째는 0 스텝, 진폭만 분석한 행도 옮겨진다
+- [x] 13. Max No-clip analysis는 진폭을 모르는 파일만, 진폭 1e6 이상이면 Max Noclip 칸 비움 — `_on_max_amp_analysis`, `gui/model.py > _max_noclip`
+- [x] 14. 인수 기준 테스트 보강 (두 테스트 모두 처음부터 통과: 현재 동작이 기준을 만족) — 앨범 3곡 Max No-clip 뒤 태그·클리핑, Album Gain은 0 스텝 태그 곡도 지금처럼 워커로 감(D107 Album 조건 해당 없음)
+- [ ] 15. 1.3.1 버전·노트(승인)·CI·빌드·Release (실행 전 확인), AVD 동기화 고지
+

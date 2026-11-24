@@ -482,3 +482,119 @@ class MaxNoClipCountTest(WindowTestBase):
         self.win._on_action_max_amp("a.mp3", amp)
         self.win._on_action_undone("a.mp3", 3)
         self.assertEqual(self.win._action_done, 1)
+
+
+class AmplitudeShiftTest(BaseGainTest):
+    """D109: 게인 변경 뒤 표시값의 진폭을 원본 AlterDb 처럼 함께 옮긴다."""
+
+    def test_peak_follows_gain_change(self):
+        from gaindb.api import (analyze_file, analyze_file_max_amp,
+                                apply_file_constant_gain, shift_after_apply)
+        path = self.copy_fixture("test_gain_44k.mp3")
+        shown = shift_after_apply(analyze_file(path), -3)
+        apply_file_constant_gain(path, -3)
+        fresh = analyze_file_max_amp(path)["peak"]
+        self.assertAlmostEqual(shown["peak"], fresh, delta=fresh * 1e-3)
+        self.assertEqual(shown["curr_max_amp"], round(shown["peak"] * 32768.0))
+
+    def test_amplitude_only_row_is_shifted(self):
+        from gaindb.api import shift_after_apply
+        shown = shift_after_apply({"status": "max_amp", "peak": 0.5,
+                                   "curr_max_amp": 16384}, 4)
+        self.assertAlmostEqual(shown["peak"], 1.0)
+        self.assertEqual(shown["curr_max_amp"], 32768)
+
+
+class MaxNoClipTwiceTest(WindowTestBase):
+    def test_second_apply_is_zero_after_display_shift(self):
+        # 적용 뒤 표시값이 옮겨지면 두 번째 Max No-clip 은 0 스텝이라 아무것도 안 한다
+        from unittest import mock
+        with mock.patch.object(self.mw.QMessageBox, "information"):
+            self.win.act_maximizing.setChecked(True)
+        self.win.model.get_row(0).set_tag_result({"status": "max_amp", "peak": 0.25,
+                                                  "curr_max_amp": 8192})
+        self.win._action_kind, self.win._action_done = "max_noclip", 0
+        self.win._on_action_undone("a.mp3", 7)                     # 첫 적용(최대 스텝 7)
+        self.win.table.selectRow(0)
+        self.addCleanup(setattr, self.win, "_worker", None)
+        with mock.patch.object(self.mw, "FileActionWorker") as worker:
+            self.win.act_max_noclip_each.trigger()
+        from gaindb.apply_gain import max_no_clip_steps
+        self.assertEqual(max_no_clip_steps(worker.call_args.kwargs["peaks"]["a.mp3"]), 0)
+
+
+class MaxAmpOnlyUnknownTest(WindowTestBase):
+    """D109: Max No-clip analysis 는 진폭을 모르는 파일만, 1e6 이상 진폭은 빈칸 (원본)."""
+
+    def _trigger(self):
+        from unittest import mock
+        with mock.patch.object(self.mw.QMessageBox, "information"):
+            self.win.act_maximizing.setChecked(True)
+        self.addCleanup(setattr, self.win, "_worker", None)
+        with mock.patch.object(self.mw, "FileActionWorker") as worker, \
+                mock.patch.object(self.win, "_ffmpeg_missing", return_value=False):
+            self.win.act_max_amp_analysis.trigger()
+        return worker
+
+    def test_only_unknown_amplitude(self):
+        self.win.model.get_row(0).set_tag_result({"status": "ok", "peak": 0.5})
+        self.assertEqual(self._trigger().call_args.args[0], ["b.mp3"])
+
+    def test_all_known_does_nothing(self):
+        for r in (0, 1):
+            self.win.model.get_row(r).set_tag_result({"status": "ok", "peak": 0.5})
+        self._trigger().assert_not_called()
+        self.assertEqual(self.win.statusBar().currentMessage(), "No files to analyze")
+
+    def test_huge_amplitude_blank(self):
+        from gui.columns import Col
+        self.win.model.get_row(0).set_tag_result({"status": "ok", "peak": 1e6 / 32768.0})
+        self.assertEqual(self.win.model.index(0, int(Col.MAX_NOCLIP)).data(), "")
+
+
+class MaxNoClipAlbumAcceptanceTest(BaseGainTest):
+    """F10 인수 기준 5: 앨범 3곡 Max No-clip 뒤 적용 스텝·태그가 맞고 클리핑이 없다."""
+
+    def test_three_file_album(self):
+        _qt_app()
+        from gaindb.api import analyze_file_max_amp, apply_file_constant_gain
+        from gui.workers import FileActionWorker
+        from tests.test_mp3gain_parity import _table
+        paths = []
+        for name, lower in (("test_gain_44k.mp3", -2), ("test_stereo_44k.mp3", -5),
+                            ("test_mono_44k.mp3", -8)):
+            p = self.copy_fixture(name)
+            apply_file_constant_gain(p, lower)
+            paths.append(p)
+        before = {p: analyze_file_max_amp(p)["max_noclip_steps"] for p in paths}
+        changed = {}
+        w = FileActionWorker(paths, "max_noclip", groups=[paths])
+        w.row_gain_changed.connect(lambda p, n: changed.__setitem__(p, n))
+        w.run()
+        low = min(before.values())
+        self.assertGreater(low, 0)
+        self.assertEqual(changed, {p: low for p in paths})
+
+        after = {p: analyze_file_max_amp(p) for p in paths}
+        self.assertEqual(min(a["max_noclip_steps"] for a in after.values()), 0)  # 더 올리면 클리핑
+        r = self.run_cli(["-s", "c", "-o", *paths])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        for p, row in zip(paths, _table(r.stdout).values()):
+            with self.subTest(file=os.path.basename(p)):
+                self.assertAlmostEqual(float(row[2]), after[p]["peak"] * 32768.0, delta=0.5)
+                self.assertEqual(row[3:5], [str(after[p]["max_gain"]), str(after[p]["min_gain"])])
+
+
+class AlbumGainZeroStepTest(WindowTestBase):
+    def test_album_gain_still_sends_tag_zero_step_rows(self):
+        # F10 인수 기준 6의 Album 쪽: 태그 씨앗을 쓰지 않으므로 지금처럼 모두 워커로 간다(D107)
+        from unittest import mock
+        for r in (0, 1):
+            self.win.model.get_row(r).set_tag_result({"status": "ok", "target_db": TARGET,
+                                                      "track_db": 0.0, "steps": 0, "peak": 0.5})
+        self.addCleanup(setattr, self.win, "_worker", None)
+        with mock.patch.object(self.mw, "AlbumApplyWorker") as worker, \
+                mock.patch.object(self.win, "_ffmpeg_missing", return_value=False):
+            self.win._on_album_gain()
+        paths = sorted(p for g in worker.call_args.args[0].values() for p in g)
+        self.assertEqual(paths, ["a.mp3", "b.mp3"])

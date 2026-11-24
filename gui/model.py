@@ -107,9 +107,11 @@ def _fmt_int(value: Optional[int]) -> str:
 
 
 def _max_noclip(result: dict) -> Optional[int]:
-    """클리핑 없는 최대 스텝(원본 Max Noclip). 진폭을 모르면 None."""
+    """클리핑 없는 최대 스텝(원본 Max Noclip). 진폭을 모르거나 1e6 이상이면(원본 빈칸) None."""
     peak = result.get("peak")
-    return None if peak is None else max_no_clip_steps(peak)
+    if peak is None or peak * 32768.0 >= 1e6:
+        return None
+    return max_no_clip_steps(peak)
 
 
 # Warning colors only (theme token names). "none" is intentionally left unset so

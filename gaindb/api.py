@@ -203,21 +203,30 @@ def recompute_target(result: dict, target_db: float) -> dict:
 
 
 def shift_after_apply(result: dict, applied_steps: int) -> dict:
-    """게인 적용/undo 후 표시값을 갱신한다(재분석 없음)."""
+    """게인 적용/undo 후 표시값을 갱신한다(재분석 없음).
+
+    진폭(peak·curr_max_amp)은 아는 행이면 상태와 관계없이 옮긴다(원본 AlterDb, D109).
+    """
     updated = dict(result)
+
+    factor = 2.0 ** (applied_steps / 4.0)
+    peak = result.get("peak")
+    cma = result.get("curr_max_amp")
+    if peak is not None:
+        updated["peak"] = peak * factor
+        new_cma = updated["peak"] * 32768.0
+    elif cma is not None:
+        new_cma = float(cma) * factor
+    else:
+        new_cma = None
+    if new_cma is not None:
+        updated["curr_max_amp"] = round(new_cma)
 
     if result.get("status") != "ok" or result.get("track_db") is None:
         return updated
 
     new_track_db = result["track_db"] - applied_steps * DB_PER_STEP
     updated["track_db"] = new_track_db
-
-    cma = result.get("curr_max_amp")
-    if cma is not None:
-        new_cma = float(cma) * (2.0 ** (applied_steps / 4.0))
-        updated["curr_max_amp"] = round(new_cma)
-    else:
-        new_cma = None
 
     target_db = result.get("target_db", DEFAULT_TARGET_DB)
     disp = _compute_display(new_track_db, new_cma, target_db)

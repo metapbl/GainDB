@@ -339,3 +339,7 @@ A: "원본 조건대로"
 Q: CI 원본 대조(run 45187522187)에서 3곡 `-x` 뒤 `-g 3`의 `-s c -o` 표가 다름. mp3gain `-x`는 Track 진폭·min/max와 Album 진폭·min/max만 기록(gain은 안 씀). GaindB `-x`는 Track 진폭·min/max를 안 쓰고 Album gain에 0을 씀. 원본 GUI Max No-clip analysis도 `/x`라 태그를 씀. 1 지금 CLI·analyze_file_max_amp를 mp3gain에 맞게 고치기 (추천) / 2 CLI는 두고 F10만
 A: "지금 고치기"
 → D108
+### Q073 · 2026-11-24 · 단계 8 (작업 11 명세 검토) · [U] · 1.3.1 수정 범위
+Q: 명세 검토 지적 — 1 게인 변경 뒤 `peak`를 옮기지 않아 Max Noclip 컬럼·Max No-clip 적용·0 스텝 no-clip 조건이 옛 진폭을 씀(두 번 적용하면 클리핑) / 2 진폭만 분석한 행(status max_amp)은 게인 변경 뒤 진폭 표시가 안 옮겨짐 / 3 Max No-clip analysis가 진폭을 아는 파일도 다시 디코딩(원본은 모르는 파일만) / 4 진폭 1e6 이상이면 Max Noclip 칸이 0.0(원본은 빈칸) / 5 앨범 Max No-clip에서 진폭을 못 구한 파일은 건너뜀(원본은 적용). 1 1~4 고치고 1.3.1 (추천, 5는 안전해서 유지) / 2 1만
+A: "1~4 고치고 1.3.1"
+→ D109

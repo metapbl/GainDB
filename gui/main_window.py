@@ -1817,10 +1817,21 @@ class MainWindow(QMainWindow):
         self._apply_maximizing()
 
     def _on_max_amp_analysis(self):
-        """Max No-clip analysis: 음량 분석 없이 최대 진폭만 구한다(선택 행, 없으면 전체)."""
-        if self._is_busy() or self._ffmpeg_missing():
+        """Max No-clip analysis: 음량 분석 없이 최대 진폭만 구한다(선택 행, 없으면 전체).
+
+        원본처럼 진폭을 아직 모르는 파일만 분석한다(D109).
+        """
+        if self._is_busy():
             return
-        self._start_file_action("max_amp", self._target_source_rows())
+        rows = [r for r in self._target_source_rows()
+                if self.model.get_row(r) is not None
+                and (self.model.get_row(r).result or {}).get("peak") is None]
+        if not rows:
+            self.statusBar().showMessage(self.tr("No files to analyze"))
+            return
+        if self._ffmpeg_missing():
+            return
+        self._start_file_action("max_amp", rows)
 
     def _on_max_noclip(self, album: bool):
         """Max No-clip 적용(선택 행, 없으면 전체). 앨범이면 묶음 최솟값을 묶음 전체에 쓴다."""
@@ -2129,8 +2140,7 @@ class MainWindow(QMainWindow):
             self._safe_log(log_change, self._log_config, path, undo_steps)
             return
         fr = self.model.get_row(r)
-        if fr.result and fr.result.get("status") == "ok" \
-                and fr.result.get("track_db") is not None:
+        if fr.result:  # 음량·진폭 중 아는 값만 옮긴다(shift_after_apply)
             fr.result = shift_after_apply(fr.result, undo_steps)
             self.model.row_changed(r)
         self._safe_log(log_change, self._log_config, path, undo_steps)

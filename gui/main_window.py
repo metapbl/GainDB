@@ -855,6 +855,7 @@ class MainWindow(QMainWindow):
         # 컬럼 헤더는 model.headerData 가 tr() 하므로 헤더 갱신 신호만.
         self.model.headerDataChanged.emit(
             Qt.Orientation.Horizontal, 0, COLUMN_COUNT - 1)
+        self._fit_header_widths()
 
         # 겸용 버튼·상태바는 현재 상태 기준으로 다시 세팅(정적 부분만).
         self._update_action_states()
@@ -1168,6 +1169,21 @@ class MainWindow(QMainWindow):
         value = self.table.fontMetrics().horizontalAdvance("-12.0") + 16
         return max(cdef.default_width, text + 30, value)
 
+    def _fit_header_widths(self):
+        """머리글보다 좁은 숫자 컬럼만 넓힌다(언어 변경·저장 폭 복원·컬럼 보이기 뒤, D111).
+
+        사용자가 더 넓혀 둔 폭은 그대로 둔다. 숨긴 컬럼은 보일 때 다시 부른다.
+        """
+        fm = self.table.horizontalHeader().fontMetrics()
+        for cdef in COLUMNS:
+            col = int(cdef.index)
+            if cdef.index == Col.NAME or self.table.isColumnHidden(col):
+                continue
+            header = self.model.headerData(col, Qt.Orientation.Horizontal)
+            need = max(fm.horizontalAdvance(line) for line in header.split("\n")) + 30
+            if self.table.columnWidth(col) < need:
+                self.table.setColumnWidth(col, need)
+
     def _default_window_extent(self) -> tuple[int, int]:
         """가로 스크롤이 생기지 않는 창 폭과 황금비(폭/1.618) 높이."""
         total = sum(self.table.columnWidth(int(cdef.index)) for cdef in COLUMNS)
@@ -1207,6 +1223,7 @@ class MainWindow(QMainWindow):
                 w = self._settings.value(key, type=int)
                 if w and w > 0:
                     self.table.setColumnWidth(int(cdef.index), w)
+            self._fit_header_widths()  # 다른 언어에서 저장된 폭이면 머리글이 잘린다
 
         # 정렬 복원. sortByColumn 재생 -> 프록시/QCollator/None 뒤로 정책이
         # 그대로 태워진다. 저장값 없으면 NAME 오름 유지.
@@ -1808,6 +1825,7 @@ class MainWindow(QMainWindow):
                     self.act_max_noclip_album):
             act.setVisible(on)
         self.table.setColumnHidden(int(Col.MAX_NOCLIP), not on)
+        self._fit_header_widths()  # 숨긴 동안 언어가 바뀌었을 수 있다
 
     def _on_toggle_maximizing(self, on: bool):
         if on:  # 원본처럼 켤 때 한 번 안내한다

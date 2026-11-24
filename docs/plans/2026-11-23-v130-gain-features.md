@@ -51,7 +51,7 @@ Status: active | 시작: 2026-11-23 | 근거: PRD §2.1 1.3 작업, F10 (D100~D1
   - 확인: 테스트 통과, 원본 GUI exe로 같은 사본을 처리한 결과와 한 번 대조(로컬)
 - [x] 7. 번역 (작업 4~6에서 문구마다 5개 언어 165개 완료, ko 새 문구 28개 사용자 검수 "이대로 확정" 2026-11-24, test_i18n·번역 검사·가로 스크롤 테스트 통과) — 5개 언어 .ts/.qm, ko는 사용자 검수 (after: 4, 5, 6)
   - 확인: `test_i18n.py` 통과(미번역 0, 자리표시자·단축 문자 일치), 6개 언어 첫 창 가로 스크롤 없음, ko 검수 결과
-- [ ] 8. 버전·README — 1.3.0, 6개 언어 README 기능 절에 Constant Gain·Maximizing 설명, 노트 초안(사용자 승인). 스크린샷은 다시 만들지 않는다(D106)
+- [x] 8. 버전·README (407638a, 254건 OK, `-v` 1.3.0, 노트 사용자 승인 2026-11-24) — 1.3.0, 6개 언어 README 기능 절에 Constant Gain·Maximizing 설명, 노트 초안(사용자 승인). 스크린샷은 다시 만들지 않는다(D106)
   - 확인: `gaindb_cli.py -v` 출력 1.3.0, `test_readme.py` 통과, readme 표준 §6 검사, 노트 승인
 - [ ] 9. 빌드·캡처 — pip-audit, `build_release.ps1`, 빌드 exe에서 Constant Gain 대화상자와 Maximizing 메뉴 캡처 (실행 전 사용자 확인)
   - 확인: pip_audit 결과, `BUILD OK`, 캡처 PNG 확인

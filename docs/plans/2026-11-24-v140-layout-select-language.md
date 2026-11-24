@@ -35,7 +35,7 @@ Status: active | 시작: 2026-11-24 | 근거: PRD §2.1 1.4 작업, F11 (D110~D1
   - 먼저 실패 테스트: en 폭에서 ru로 바꾸거나 ru로 다시 실행하면 모든 숫자 컬럼이 머리글+30 이상, 사용자가 더 넓힌 컬럼은 그대로
 - [x] 4. Maximizing 켤 때 창 넓히기 (272건 OK) — `_on_toggle_maximizing` (after: 2)
   - 먼저 실패 테스트: 최대화가 아닌 기본 창에서 켜면 가로 스크롤이 없다(화면 안에서), 최대화 상태면 창 크기 그대로
-- [ ] 5. 선택 메뉴 — 파일 메뉴 Select All Files(Ctrl+A)·Select No Files(Ctrl+N)·Invert selection(Ctrl+V)
+- [x] 5. 선택 메뉴 (274건 OK, 새 문구 3개 5개 언어) — 파일 메뉴 Select All Files(Ctrl+A)·Select No Files(Ctrl+N)·Invert selection(Ctrl+V)
   - 먼저 실패 테스트: 파일 3개에서 선택이 3·0·(하나 선택 뒤)2개, 메뉴 위치, 단축키가 다른 키와 겹치지 않음
 - [ ] 6. 언어 System default — 언어 메뉴 맨 위 + 구분선, 고르면 저장값을 지우고 로케일 규칙으로 바로 바꿈
   - 먼저 실패 테스트: 저장 ru·로케일 ja_JP에서 고르면 바로 日本語, 저장값 없음, 다시 실행해도 日本語이고 System default 체크

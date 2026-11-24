@@ -101,7 +101,7 @@ import sys
 
 from PySide6.QtCore import (
     Qt, QSortFilterProxyModel, QCollator, QModelIndex, Signal, QRect, QPoint,
-    QSettings, QByteArray, QEvent, QStandardPaths,
+    QSettings, QByteArray, QEvent, QStandardPaths, QItemSelection, QItemSelectionModel,
 )
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDoubleSpinBox,
@@ -547,6 +547,17 @@ class MainWindow(QMainWindow):
         self._set_shortcut_tip(self.act_album_gain, self.tr("Apply album gain to files per folder/group"))
         self.act_album_gain.triggered.connect(self._on_album_gain)
 
+        # 선택 메뉴(원본 GUI 파일 메뉴, D113).
+        self.act_select_all = QAction(self.tr("Select All Files"), self)
+        self.act_select_all.setShortcut(QKeySequence("Ctrl+A"))
+        self.act_select_all.triggered.connect(lambda: self.table.selectAll())
+        self.act_select_none = QAction(self.tr("Select No Files"), self)
+        self.act_select_none.setShortcut(QKeySequence("Ctrl+N"))
+        self.act_select_none.triggered.connect(lambda: self.table.clearSelection())
+        self.act_invert_selection = QAction(self.tr("Invert selection"), self)
+        self.act_invert_selection.setShortcut(QKeySequence("Ctrl+V"))
+        self.act_invert_selection.triggered.connect(self._invert_selection)
+
         # Apply Constant Gain(원본 GUI Modify Gain 메뉴, D103).
         self.act_constant_gain = QAction(self.tr("Apply Constant Gain..."), self)
         self.act_constant_gain.setShortcut(QKeySequence("Ctrl+O"))
@@ -673,6 +684,10 @@ class MainWindow(QMainWindow):
         self.menu_file.addAction(self.act_add_files)
         self.menu_file.addAction(self.act_add_folder)
         self.menu_file.addSeparator()
+        self.menu_file.addAction(self.act_select_all)
+        self.menu_file.addAction(self.act_select_none)
+        self.menu_file.addAction(self.act_invert_selection)
+        self.menu_file.addSeparator()
         self.menu_file.addAction(self.act_clear)
 
         self.menu_analysis.addAction(self.act_analyze)
@@ -775,6 +790,9 @@ class MainWindow(QMainWindow):
         # Album 액션.
         self.act_album_analyze.setText(self.tr("Album Analysis"))
         self._set_shortcut_tip(self.act_album_analyze, self.tr("Analyze album gain per folder/group without applying"))
+        self.act_select_all.setText(self.tr("Select All Files"))
+        self.act_select_none.setText(self.tr("Select No Files"))
+        self.act_invert_selection.setText(self.tr("Invert selection"))
         self.act_album_gain.setText(self.tr("Album Gain"))
         self._set_shortcut_tip(self.act_album_gain, self.tr("Apply album gain to files per folder/group"))
         self.act_constant_gain.setText(self.tr("Apply Constant Gain..."))
@@ -1817,6 +1835,16 @@ class MainWindow(QMainWindow):
             self._play_row(r)
 
     # --- 파일 액션 워커(undo / remove_tags) 시작 ---
+
+    def _invert_selection(self):
+        """선택된 행은 풀고 나머지를 선택한다(원본 Invert selection)."""
+        model = self.table.model()
+        if model.rowCount() == 0:
+            return
+        rows = QItemSelection(model.index(0, 0),
+                              model.index(model.rowCount() - 1, model.columnCount() - 1))
+        self.table.selectionModel().select(
+            rows, QItemSelectionModel.SelectionFlag.Toggle | QItemSelectionModel.SelectionFlag.Rows)
 
     def _apply_maximizing(self):
         """Maximizing 기능 메뉴와 Max Noclip Gain 컬럼을 옵션에 맞춰 보이거나 숨긴다."""

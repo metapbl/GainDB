@@ -190,3 +190,35 @@ class MaximizingWidensWindowTest(_WindowBase):
         width = again.width()
         self._turn_on(again, maximized=True)
         self.assertEqual(again.width(), width)
+
+
+class SelectionMenuTest(_WindowBase):
+    """F11 인수 기준 4: 원본 파일 메뉴의 선택 항목 3개 (D113)."""
+
+    def test_select_all_none_invert(self):
+        win = self._window("en")
+        win.model.add_paths(["a.mp3", "b.mp3", "c.mp3"])
+        count = lambda: len(win.table.selectionModel().selectedRows())
+        win.act_select_all.trigger()
+        self.assertEqual(count(), 3)
+        win.act_select_none.trigger()
+        self.assertEqual(count(), 0)
+        win.table.selectRow(1)
+        win.act_invert_selection.trigger()
+        self.assertEqual(count(), 2)
+        self.assertNotIn(1, [i.row() for i in win.table.selectionModel().selectedRows()])
+
+    def test_menu_place_and_shortcuts(self):
+        from PySide6.QtGui import QAction
+        win = self._window("en")
+        acts = win.menu_file.actions()
+        i = acts.index(win.act_add_folder)
+        self.assertTrue(acts[i + 1].isSeparator())
+        self.assertEqual(acts[i + 2:i + 5],
+                         [win.act_select_all, win.act_select_none, win.act_invert_selection])
+        self.assertTrue(acts[i + 5].isSeparator())
+        self.assertEqual([(a.text(), a.shortcut().toString()) for a in acts[i + 2:i + 5]],
+                         [("Select All Files", "Ctrl+A"), ("Select No Files", "Ctrl+N"),
+                          ("Invert selection", "Ctrl+V")])
+        keys = [a.shortcut().toString() for a in win.findChildren(QAction) if not a.shortcut().isEmpty()]
+        self.assertEqual(len(keys), len(set(keys)))

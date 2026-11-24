@@ -1,16 +1,18 @@
 # PROGRESS — Gain dB (GaindB)
 
 ## 상태
-- 단계: 8 구현 · 활성 계획 없음 (`docs/plans/2026-11-23-v130-gain-features.md` 완료)
+- 단계: 8 구현 · 활성 계획 `docs/plans/2026-11-24-v140-layout-select-language.md` (1.4: F11 두 줄 머리글·좁은 창·잘림 수정·선택 메뉴·언어 시스템 기본값, D110~D115)
 - 버전: 1.3.1 게시 (태그 v1.3.1 = cac4261, v1.3.0 = 6215ffd) · 테스트 262건 (로컬 OK, skip 4 = mp3gain 대조 / CI 3개 OS 초록, run 45357639832 at cac4261), 약 2.5분 (.venv Python 3.15.1)
-- 갱신: 2026-11-24 · v1.3.1 Release: 게인 변경 뒤 진폭 갱신(Max No-clip 두 번 적용 시 클리핑 버그), Max No-clip analysis는 모르는 파일만, 1e6 이상 빈칸 (D109, fc5d1fc)
+- 갱신: 2026-11-24 · 1.4 범위 PRD 변경 승인(시안 확정 Q075)·계획 승인
+- 2026-11-24 · v1.3.1 Release: 게인 변경 뒤 진폭 갱신(Max No-clip 두 번 적용 시 클리핑 버그), Max No-clip analysis는 모르는 파일만, 1e6 이상 빈칸 (D109, fc5d1fc)
 - 2026-11-24 · v1.3.0 Release: F10 Constant Gain·Maximizing(Max No-clip analysis·컬럼·곡별/앨범 적용)·steps==0 건너뛰기(D107), CLI `-x` 태그를 mp3gain과 일치(D108)
 - 2026-11-23 · README 스크린샷 생성 스크립트·6개 언어 Screenshots 절 (D096~D099)
 - 이전: 2026-11-23 · v1.2.0 Release (GUI 6개 언어, README 6개 언어)
 
 ## 다음 할 일
 - AVD 사본 1.3.1 동기화 (D012): `gaindb/api.py`(apply_file_constant_gain·analyze_file_max_amp·shift_after_apply), `gaindb/apply_gain.py`(max_no_clip_steps, gain 없이 진폭만 채우기), `gaindb_cli.py`(`-x`). 사용자가 AVD 세션에서 진행
-- 다음 범위: scipy 제거 (용량 절감, D100, 별도 PRD 변경으로 시작)
+- 계획 작업 1부터: 머리글 줄바꿈 함수
+- 1.4.0 뒤 다음 범위: scipy 제거 (용량 절감, D100, 별도 PRD 변경으로 시작)
 - 참고: 컬럼이 9개가 되어 기존 사용자의 저장된 컬럼 폭·정렬은 1.3에서 한 번 기본값으로 돌아감. README 스크린샷 생성 스크립트는 실제 앱 설정을 읽어 결과가 설정에 따라 달라짐(기존 동작)
 - 참고: README 스크린샷은 주 창이 바뀌면 AGENTS.md 명령으로 다시 만들고, 내용이 바뀌면 파일 이름 버전(-v3 등)을 올린다 (D098·D099). 생성 중 `M:` 드라이브가 잠시 보임
 - 참고: 이 PC(한국어 Windows)에서 중·일 화면과 표·머리글은 한국어 글꼴로 대체 표시되고 `\`가 `₩`로 보임 (D089)

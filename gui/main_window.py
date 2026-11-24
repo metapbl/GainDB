@@ -512,6 +512,7 @@ class MainWindow(QMainWindow):
         self._apply_maximizing()  # 창 기본 폭 계산 전에 숨김 컬럼을 정한다
         self._restore_settings()
         self._update_action_states()
+        self.table.setFocus()  # 시작부터 Ctrl+A·Ctrl+V 가 목표 볼륨 칸이 아니라 파일 선택으로(D117)
 
     # --- UI 구성 ---
 
@@ -884,7 +885,8 @@ class MainWindow(QMainWindow):
         # 컬럼 헤더는 model.headerData 가 tr() 하므로 헤더 갱신 신호만.
         self.model.headerDataChanged.emit(
             Qt.Orientation.Horizontal, 0, COLUMN_COUNT - 1)
-        self._fit_header_widths()
+        if self._fit_header_widths():
+            self._widen_to_fit()
 
         # 겸용 버튼·상태바는 현재 상태 기준으로 다시 세팅(정적 부분만).
         self._update_action_states()
@@ -1202,8 +1204,10 @@ class MainWindow(QMainWindow):
         """머리글보다 좁은 숫자 컬럼만 넓힌다(언어 변경·저장 폭 복원·컬럼 보이기 뒤, D111).
 
         사용자가 더 넓혀 둔 폭은 그대로 둔다. 숨긴 컬럼은 보일 때 다시 부른다.
+        넓힌 컬럼이 있으면 True(언어 변경 때 창도 넓힐지 정한다, D117).
         """
         fm = self.table.horizontalHeader().fontMetrics()
+        widened = False
         for cdef in COLUMNS:
             col = int(cdef.index)
             if cdef.index == Col.NAME or self.table.isColumnHidden(col):
@@ -1212,6 +1216,8 @@ class MainWindow(QMainWindow):
             need = max(fm.horizontalAdvance(line) for line in header.split("\n")) + 30
             if self.table.columnWidth(col) < need:
                 self.table.setColumnWidth(col, need)
+                widened = True
+        return widened
 
     def _default_window_extent(self) -> tuple[int, int]:
         """가로 스크롤이 생기지 않는 창 폭과 황금비(폭/1.618) 높이."""
@@ -1361,6 +1367,8 @@ class MainWindow(QMainWindow):
         self.act_album_gain.setEnabled(has_rows and not busy)
         self.act_constant_gain.setEnabled(has_rows and not busy)
         self.act_max_amp_analysis.setEnabled(has_rows and not busy)
+        for act in (self.act_select_all, self.act_select_none, self.act_invert_selection):
+            act.setEnabled(not busy)  # 원본도 작업 중에는 선택 메뉴를 끈다(D117)
         self.act_max_noclip_each.setEnabled(has_rows and not busy)
         self.act_max_noclip_album.setEnabled(has_rows and not busy)
         self.act_clear.setEnabled(has_rows and not busy)
@@ -1874,11 +1882,17 @@ class MainWindow(QMainWindow):
                 "louder or quieter than each other. Use Track Gain or Album Gain "
                 "to make volumes even."))
         self._apply_maximizing()
-        if on and not self.isMaximized():  # 새 컬럼만큼 넓혀 가로 스크롤을 피한다(화면 안에서, D115)
-            width = min(self._default_window_extent()[0],
-                        self.screen().availableGeometry().width())
-            if width > self.width():
-                self.resize(width, self.height())
+        if on:
+            self._widen_to_fit()
+
+    def _widen_to_fit(self):
+        """컬럼이 넓어졌으면 가로 스크롤이 없어지는 폭까지 창을 넓힌다(최대화 아님, 화면 안, D115·D117)."""
+        if self.isMaximized():
+            return
+        width = min(self._default_window_extent()[0],
+                    self.screen().availableGeometry().width())
+        if width > self.width():
+            self.resize(width, self.height())
 
     def _on_max_amp_analysis(self):
         """Max No-clip analysis: 음량 분석 없이 최대 진폭만 구한다(선택 행, 없으면 전체).

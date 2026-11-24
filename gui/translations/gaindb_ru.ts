@@ -591,7 +591,7 @@
         <location filename="../main_window.py" line="735"/>
         <location filename="../main_window.py" line="787"/>
         <source>System default</source>
-        <translation>Системный</translation>
+        <translation>Как в системе</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="863"/>

@@ -96,12 +96,15 @@ class _WindowBase(unittest.TestCase):
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
         from PySide6.QtCore import QSettings
         from PySide6.QtWidgets import QApplication
+        import gui.i18n as i18n
         import gui.main_window as mw
         from gui.i18n import install_translator
         self.app = QApplication.instance() or QApplication([])
         self.mw = mw
         for p in (mock.patch.object(mw, "_SETTINGS_ORG", "GaindBTest"),
-                  mock.patch.object(mw, "_SETTINGS_APP", "GaindBTest")):
+                  mock.patch.object(mw, "_SETTINGS_APP", "GaindBTest"),
+                  mock.patch.object(i18n, "_SETTINGS_ORG", "GaindBTest"),
+                  mock.patch.object(i18n, "_SETTINGS_APP", "GaindBTest")):
             p.start()
             self.addCleanup(p.stop)
         self.addCleanup(lambda: QSettings("GaindBTest", "GaindBTest").clear())
@@ -222,3 +225,55 @@ class SelectionMenuTest(_WindowBase):
                           ("Invert selection", "Ctrl+V")])
         keys = [a.shortcut().toString() for a in win.findChildren(QAction) if not a.shortcut().isEmpty()]
         self.assertEqual(len(keys), len(set(keys)))
+
+
+class SelectionWhileBusyTest(_WindowBase):
+    """D117: 원본처럼 작업 중에는 선택 메뉴를 끄고, 시작 포커스는 파일 표."""
+
+    def test_disabled_while_busy(self):
+        from unittest import mock
+        win = self._window("en")
+        acts = (win.act_select_all, win.act_select_none, win.act_invert_selection)
+        self.assertTrue(all(a.isEnabled() for a in acts))
+        with mock.patch.object(win, "_is_busy", return_value=True):
+            win._update_action_states()
+            self.assertFalse(any(a.isEnabled() for a in acts))
+        win._update_action_states()
+        self.assertTrue(all(a.isEnabled() for a in acts))
+
+    def test_start_focus_on_table(self):
+        win = self._window("en")
+        self.assertIs(win.focusWidget(), win.table)
+
+
+class LanguageSwitchWidensWindowTest(_WindowBase):
+    """D117: 언어를 바꿔 컬럼이 넓어지면 Maximizing 때와 같은 규칙으로 창도 넓힌다."""
+
+    def test_en_to_ru_no_horizontal_scroll(self):
+        from unittest import mock
+        from gui.i18n import install_translator
+        win = self._window("en")
+        from gui.columns import Col
+        win.model.add_paths(["a.mp3"])
+        # 새 언어 머리글이 더 넓은 상황: 테스트 환경 글꼴은 언어마다 폭이 같아 컬럼을 미리 좁혀 둔다
+        win.table.setColumnWidth(int(Col.ALBUM_VOLUME), 20)
+        win.resize(*win._default_window_extent())
+        win.show()
+        self.app.processEvents()
+        screen = mock.MagicMock()
+        screen.availableGeometry.return_value.width.return_value = 5000
+        with mock.patch.object(win, "screen", return_value=screen):
+            install_translator(self.app, "ru")
+            self.app.processEvents()
+        self.assertEqual(win.width(), win._default_window_extent()[0])
+        self.assertEqual(win.table.horizontalScrollBar().maximum(), 0)
+
+    def test_no_widen_when_no_column_grew(self):
+        # 넓어진 컬럼이 없으면 사용자가 줄여 둔 창을 그대로 둔다
+        from gui.i18n import install_translator
+        win = self._window("en")
+        width, height = win._default_window_extent()
+        win.resize(width - 100, height)
+        install_translator(self.app, "ru")
+        self.app.processEvents()
+        self.assertEqual(win.width(), width - 100)

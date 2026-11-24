@@ -85,6 +85,7 @@ def _render(out_dir: Path, album: Path) -> dict:
     app = QApplication.instance() or QApplication(sys.argv[:1])
     from gui import theme
     from gui.__main__ import _apply_platform_font
+    import gui.i18n as i18n
     from gui.i18n import install_translator
     import gui.main_window as mw
     _apply_platform_font(app)  # 실제 앱과 같은 UI 글꼴
@@ -95,7 +96,9 @@ def _render(out_dir: Path, album: Path) -> dict:
     QSettings(_SHOT_SETTINGS, _SHOT_SETTINGS).clear()
     with mock.patch.object(mw, "resolve_language", return_value="en"), \
             mock.patch.object(mw, "_SETTINGS_ORG", _SHOT_SETTINGS), \
-            mock.patch.object(mw, "_SETTINGS_APP", _SHOT_SETTINGS):
+            mock.patch.object(mw, "_SETTINGS_APP", _SHOT_SETTINGS), \
+            mock.patch.object(i18n, "_SETTINGS_ORG", _SHOT_SETTINGS), \
+            mock.patch.object(i18n, "_SETTINGS_APP", _SHOT_SETTINGS):
         win = mw.MainWindow()
     win.resize(*win._default_window_extent())
     win.show()

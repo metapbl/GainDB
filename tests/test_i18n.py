@@ -185,7 +185,7 @@ class LanguageBehaviourTest(unittest.TestCase):
             acts = win.menu_language.actions()
             self.assertEqual(acts[0].data(), "")
             self.assertTrue(acts[1].isSeparator())
-            self.assertEqual(acts[0].text(), "Системный")
+            self.assertEqual(acts[0].text(), "Как в системе")
             self.assertFalse(acts[0].isChecked())
             acts[0].trigger()
             self.assertEqual(win.menu_analysis.title(), "解析")

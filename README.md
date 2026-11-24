@@ -53,8 +53,8 @@ depends on the MP3 `global_gain` field, which other formats do not have.
     <th>Dark</th>
   </tr>
   <tr>
-    <td><img src="docs/images/main-light-v2.png" alt="Gain dB main window in the light theme after Album Analysis of four sample MP3 files"></td>
-    <td><img src="docs/images/main-dark-v2.png" alt="Gain dB main window in the dark theme after Album Analysis of four sample MP3 files"></td>
+    <td><img src="docs/images/main-light-v3.png" alt="Gain dB main window in the light theme after Album Analysis of four sample MP3 files"></td>
+    <td><img src="docs/images/main-dark-v3.png" alt="Gain dB main window in the dark theme after Album Analysis of four sample MP3 files"></td>
   </tr>
 </table>
 
@@ -178,6 +178,8 @@ Options menu can keep file dates, avoid clipping in Track Gain, and always
 recalculate instead of reading stored tags. Modify > Apply Constant Gain
 changes files by a fixed number of steps, and Options > Enable "Maximizing"
 features adds the max no-clip analysis and gain of the original mp3gain GUI.
+The File menu can select all files, none, or the opposite of the current
+selection, and Language > System default follows the language of your OS.
 
 ## How this project relates to mp3gain
 

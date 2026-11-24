@@ -90,7 +90,7 @@ class ReadmeTest(unittest.TestCase):
                 sections = re.split(r"^## ", text, flags=re.M)
                 imgs = re.findall(r'<img src="(docs/images/[^"]+)" alt="([^"]*)"', sections[2])
                 self.assertEqual([src for src, _ in imgs],
-                                 ["docs/images/main-light-v2.png", "docs/images/main-dark-v2.png"])
+                                 ["docs/images/main-light-v3.png", "docs/images/main-dark-v3.png"])
                 for src, alt in imgs:
                     path = os.path.join(ROOT, src)
                     self.assertTrue(os.path.isfile(path), src)

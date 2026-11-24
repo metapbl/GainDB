@@ -52,8 +52,8 @@ Gain dB は設計上 **MP3 ファイルのみ** を扱います。無劣化の�
     <th>ダーク</th>
   </tr>
   <tr>
-    <td><img src="docs/images/main-light-v2.png" alt="サンプル MP3 4 件をアルバム解析した後の Gain dB メインウィンドウ（ライトテーマ）"></td>
-    <td><img src="docs/images/main-dark-v2.png" alt="サンプル MP3 4 件をアルバム解析した後の Gain dB メインウィンドウ（ダークテーマ）"></td>
+    <td><img src="docs/images/main-light-v3.png" alt="サンプル MP3 4 件をアルバム解析した後の Gain dB メインウィンドウ（ライトテーマ）"></td>
+    <td><img src="docs/images/main-dark-v3.png" alt="サンプル MP3 4 件をアルバム解析した後の Gain dB メインウィンドウ（ダークテーマ）"></td>
   </tr>
 </table>
 
@@ -175,7 +175,9 @@ python -m gui
 では、ファイルの日時の保持、Track ゲインでのクリッピング回避、保存済みタグを
 読まずに常に再計算することを選べます。変更 > 固定ゲインを適用 は決めたステップ数
 だけファイルを変え、オプション > 「最大化」機能を有効にする をオンにすると、元の
-mp3gain GUI のクリップなし最大の解析とゲインが現れます。
+mp3gain GUI のクリップなし最大の解析とゲインが現れます。ファイルメニューではすべての
+ファイルを選択、選択を解除、選択を反転ができ、言語 > システムの既定 は OS の言語に
+従います。
 
 ## mp3gain との関係
 

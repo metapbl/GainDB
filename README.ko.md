@@ -51,8 +51,8 @@ Gain dB는 설계상 **MP3 파일만** 다룹니다. 무손실 방식이 MP3의 
     <th>다크</th>
   </tr>
   <tr>
-    <td><img src="docs/images/main-light-v2.png" alt="샘플 MP3 네 개를 앨범 분석한 뒤의 Gain dB 주 창, 라이트 테마"></td>
-    <td><img src="docs/images/main-dark-v2.png" alt="샘플 MP3 네 개를 앨범 분석한 뒤의 Gain dB 주 창, 다크 테마"></td>
+    <td><img src="docs/images/main-light-v3.png" alt="샘플 MP3 네 개를 앨범 분석한 뒤의 Gain dB 주 창, 라이트 테마"></td>
+    <td><img src="docs/images/main-dark-v3.png" alt="샘플 MP3 네 개를 앨범 분석한 뒤의 Gain dB 주 창, 다크 테마"></td>
   </tr>
 </table>
 
@@ -173,7 +173,8 @@ python -m gui
 바로 바꿉니다. 옵션 메뉴에서 파일 날짜 유지, Track 게인의 클리핑 방지, 저장된
 태그를 읽지 않고 항상 다시 계산하기를 고를 수 있습니다. 수정 > 고정 게인 적용은
 정한 스텝만큼 파일을 바꾸고, 옵션 > "최대화" 기능 사용을 켜면 원본 mp3gain GUI의
-클리핑 없는 최대 분석과 게인이 나타납니다.
+클리핑 없는 최대 분석과 게인이 나타납니다. 파일 메뉴에서 모든 파일 선택, 선택 해제,
+선택 반전을 할 수 있고, 언어 > 시스템 기본값은 OS 언어를 따릅니다.
 
 ## mp3gain과의 관계
 

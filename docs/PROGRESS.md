@@ -13,7 +13,7 @@
 - AVD 사본 1.3.1 동기화 (D012): `gaindb/api.py`(apply_file_constant_gain·analyze_file_max_amp·shift_after_apply), `gaindb/apply_gain.py`(max_no_clip_steps, gain 없이 진폭만 채우기), `gaindb_cli.py`(`-x`). 사용자가 AVD 세션에서 진행
 - 계획 작업 1부터: 머리글 줄바꿈 함수
 - 1.4.0 뒤 다음 범위: scipy 제거 (용량 절감, D100, 별도 PRD 변경으로 시작)
-- 참고: 컬럼이 9개가 되어 기존 사용자의 저장된 컬럼 폭·정렬은 1.3에서 한 번 기본값으로 돌아감. README 스크린샷 생성 스크립트는 실제 앱 설정을 읽어 결과가 설정에 따라 달라짐(기존 동작)
+- 참고: 컬럼이 9개가 되어 기존 사용자의 저장된 컬럼 폭·정렬은 1.3에서 한 번 기본값으로 돌아감. README 스크린샷 생성 스크립트는 1.4부터 전용 설정 이름을 써서 사용자 설정과 무관(전에는 QSettings(org, app)가 레지스트리를 써서 임시 INI 분리가 안 됐음)
 - 참고: README 스크린샷은 주 창이 바뀌면 AGENTS.md 명령으로 다시 만들고, 내용이 바뀌면 파일 이름 버전(-v3 등)을 올린다 (D098·D099). 생성 중 `M:` 드라이브가 잠시 보임
 - 참고: 이 PC(한국어 Windows)에서 중·일 화면과 표·머리글은 한국어 글꼴로 대체 표시되고 `\`가 `₩`로 보임 (D089)
 - 참고: 로컬 `_local/mp3gain/src/mp3gain.exe`는 DLL이 없어 실행 불가(0xC0000135). 원본 대조는 CI에서만

@@ -50,8 +50,8 @@ Gain dB 按设计**只处理 MP3 文件**：无损方法依赖 MP3 的 `global_g
     <th>深色</th>
   </tr>
   <tr>
-    <td><img src="docs/images/main-light-v2.png" alt="对四个示例 MP3 文件进行专辑分析后的 Gain dB 主窗口，浅色主题"></td>
-    <td><img src="docs/images/main-dark-v2.png" alt="对四个示例 MP3 文件进行专辑分析后的 Gain dB 主窗口，深色主题"></td>
+    <td><img src="docs/images/main-light-v3.png" alt="对四个示例 MP3 文件进行专辑分析后的 Gain dB 主窗口，浅色主题"></td>
+    <td><img src="docs/images/main-dark-v3.png" alt="对四个示例 MP3 文件进行专辑分析后的 Gain dB 主窗口，深色主题"></td>
   </tr>
 </table>
 
@@ -167,7 +167,8 @@ python -m gui
 取消、日志窗口和托盘图标。语言菜单和 选项 > 主题 会立即改变界面。选项菜单可以
 保留文件日期、在 Track 增益中避免削波，以及总是重新计算而不读取已保存的标签。
 修改 > 应用固定增益 会按固定步数改变文件；打开 选项 > 启用“最大化”功能 后，会出现
-原版 mp3gain GUI 的无削波最大分析和增益。
+原版 mp3gain GUI 的无削波最大分析和增益。文件菜单可以选择所有文件、取消选择和反向选择，
+语言 > 系统默认 会跟随操作系统的语言。
 
 ## 与 mp3gain 的关系
 

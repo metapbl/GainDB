@@ -56,8 +56,8 @@ depende del campo `global_gain` de MP3, que otros formatos no tienen.
     <th>Oscuro</th>
   </tr>
   <tr>
-    <td><img src="docs/images/main-light-v2.png" alt="Ventana principal de Gain dB con el tema claro tras el análisis de álbum de cuatro archivos MP3 de ejemplo"></td>
-    <td><img src="docs/images/main-dark-v2.png" alt="Ventana principal de Gain dB con el tema oscuro tras el análisis de álbum de cuatro archivos MP3 de ejemplo"></td>
+    <td><img src="docs/images/main-light-v3.png" alt="Ventana principal de Gain dB con el tema claro tras el análisis de álbum de cuatro archivos MP3 de ejemplo"></td>
+    <td><img src="docs/images/main-dark-v3.png" alt="Ventana principal de Gain dB con el tema oscuro tras el análisis de álbum de cuatro archivos MP3 de ejemplo"></td>
   </tr>
 </table>
 
@@ -182,7 +182,9 @@ el recorte en la ganancia Track y recalcular siempre en lugar de leer las
 etiquetas guardadas. Modificar > Aplicar ganancia constante cambia los archivos
 un número fijo de pasos, y Opciones > Activar las funciones de "maximización"
 añade el análisis y la ganancia máximos sin saturación de la GUI original de
-mp3gain.
+mp3gain. El menú Archivo puede seleccionar todos los archivos, ninguno o invertir
+la selección, e Idioma > Predeterminado del sistema sigue el idioma del sistema
+operativo.
 
 ## Relación con mp3gain
 

@@ -9,8 +9,8 @@ README 이미지는 실제 플랫폼에서 만든다(offscreen 은 글꼴이 없
 주 창을 라이트·다크로 렌더해 main-{light,dark}-v2.png 를 쓴다(화면 캡처 아님).
 Windows 에서는 임시 폴더를 빈 드라이브 문자에 subst 로 잠시 연결해, 화면 경로가
 `M:\Music\Album\01 Sample.mp3` 꼴이 되고 사용자 이름·임시 폴더가 보이지 않는다.
-끝나면 연결을 풀고 임시 폴더를 지운다. QSettings 는 임시 INI 라 사용자 설정을 건드리지
-않는다. 마지막 줄에 결과 JSON 을 쓴다.
+끝나면 연결을 풀고 임시 폴더를 지운다. 앱 설정은 전용 이름(_SHOT_SETTINGS)을 써서 사용자
+설정을 읽거나 건드리지 않는다. 마지막 줄에 결과 JSON 을 쓴다.
 """
 
 from __future__ import annotations
@@ -34,7 +34,8 @@ from tests._support import MP3_DIR
 
 SAMPLES = ("test_gain_44k.mp3", "test_gain_48k.mp3", "test_mono_44k.mp3", "test_stereo_44k.mp3")
 # 이미지 내용이 바뀌면 올린다. GitHub 이미지 캐시가 같은 이름의 옛 그림을 계속 보여 준다 (D098).
-IMAGE_VERSION = "v2"
+IMAGE_VERSION = "v3"
+_SHOT_SETTINGS = "GaindBReadmeShots"  # 사용자 설정과 분리된 앱 설정 이름
 
 
 def _mount(folder: str) -> tuple[Path, list[str] | None]:
@@ -73,6 +74,7 @@ def render(out_dir: Path) -> dict:
         if unmount:
             subprocess.run(unmount, check=False, capture_output=True)
         shutil.rmtree(tmp, ignore_errors=True)
+        QSettings(_SHOT_SETTINGS, _SHOT_SETTINGS).clear()
 
 
 def _render(out_dir: Path, album: Path) -> dict:
@@ -88,7 +90,12 @@ def _render(out_dir: Path, album: Path) -> dict:
     _apply_platform_font(app)  # 실제 앱과 같은 UI 글꼴
     install_translator(app, "en")
     theme.apply_theme(app, "light")
-    with mock.patch.object(mw, "resolve_language", return_value="en"):
+    # QSettings(org, app) 는 기본 형식 설정과 상관없이 레지스트리를 쓴다. 사용자 설정(Maximizing 등)이
+    # 화면에 섞이지 않게 빈 전용 이름을 쓰고 끝나면 지운다.
+    QSettings(_SHOT_SETTINGS, _SHOT_SETTINGS).clear()
+    with mock.patch.object(mw, "resolve_language", return_value="en"), \
+            mock.patch.object(mw, "_SETTINGS_ORG", _SHOT_SETTINGS), \
+            mock.patch.object(mw, "_SETTINGS_APP", _SHOT_SETTINGS):
         win = mw.MainWindow()
     win.resize(*win._default_window_extent())
     win.show()

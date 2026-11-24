@@ -76,6 +76,7 @@
 | T21 | 셸 heredoc의 Python으로 파일을 고쳤더니 `Album\01`이 제어 문자(0x01)로 바뀌어 계획 파일·docstring이 두 번 깨짐 재발 2026-11-24: heredoc Python·`sed` 치환에 넣은 `"\n"`이 실제 줄바꿈이 되어 코드·테스트가 세 번 깨짐 | 일반 문자열 리터럴 안의 `\0`·`\M` 등이 이스케이프로 해석됨(SyntaxWarning을 흘려 봄) | 백슬래시가 든 텍스트는 Edit 도구나 raw 문자열(`r"..."`)로 쓰고, 쓴 뒤 `repr`로 확인. SyntaxWarning이 나오면 멈추고 결과를 본다 코드 속 `\n`·`\` 가 든 수정은 처음부터 Edit 도구로 한다 | README 스크린샷 작업 1·인수 (2026-11-23) |
 | T22 | CLI `-x`가 출력 값은 mp3gain과 같았지만 태그는 달랐음(Track 진폭·min/max 누락, Album gain 0 기록). 1.2까지 대조 테스트가 없어 못 봄 | 원본 대조가 `-x` 출력만 보고 뒤이은 태그 표(`-s c -o`)는 보지 않음 | 옵션을 대조할 때 출력과 함께 그 뒤 태그 표까지 비교한다(`test_max_amp_and_constant_gain_match`). 표의 NA 칸도 비교 (D108) | CI run 45187522187 |
 | T23 | 1.3.0의 Max No-clip을 두 번 적용하면 클리핑 (게시 뒤 명세 검토가 찾음) | 새 기능이 결과 dict의 `peak`를 읽었는데, 게인 변경 뒤 표시값을 옮기는 `shift_after_apply`는 원래 쓰던 `curr_max_amp`만 옮기고 `peak`는 그대로 둠. 테스트는 매번 파일을 다시 분석해 옛 값을 쓰는 경로를 못 봄 | 결과 dict의 필드를 새로 읽을 때는 그 값을 바꾸는 함수(`shift_after_apply`·`recompute_target`)가 그 필드도 갱신하는지 확인하고, "적용 → 표시값으로 다시 적용" 테스트를 둔다 (D109) | 1.3.0 명세 검토 |
+| T24 | 창을 기본 폭-100으로 줄이는 GUI 테스트가 Windows에선 통과, Linux·macOS CI에선 실패(800 != 754) | Linux·macOS 오프스크린에서 주 창 최소 폭이 800px이라 resize가 막힘 | 창 크기를 바꾼 뒤에는 요청값이 아니라 실제 `width()`를 기준으로 비교한다 | 1.4.1 CI run 45513928813 |
 
 ## R§5 환경·도구
 - 개발 PC: Windows 11, PowerShell 7, Python 3.15 (`py` launcher; `python`은 스토어 별칭). `.venv`는 재생성 필요(D046).

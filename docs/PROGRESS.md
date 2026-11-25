@@ -1,20 +1,20 @@
 # PROGRESS — Gain dB (GaindB)
 
 ## 상태
-- 단계: 8 구현 · 활성 계획 `docs/plans/2026-11-24-v140-layout-select-language.md` (1.4: F11 두 줄 머리글·좁은 창·잘림 수정·선택 메뉴·언어 시스템 기본값, D110~D115)
-- 버전: 1.3.1 게시 (태그 v1.3.1 = cac4261, v1.3.0 = 6215ffd) · 테스트 262건 (로컬 OK, skip 4 = mp3gain 대조 / CI 3개 OS 초록, run 45357639832 at cac4261), 약 2.5분 (.venv Python 3.15.1)
-- 갱신: 2026-11-24 · 1.4 범위 PRD 변경 승인(시안 확정 Q075)·계획 승인
-- 2026-11-24 · v1.3.1 Release: 게인 변경 뒤 진폭 갱신(Max No-clip 두 번 적용 시 클리핑 버그), Max No-clip analysis는 모르는 파일만, 1e6 이상 빈칸 (D109, fc5d1fc)
-- 2026-11-24 · v1.3.0 Release: F10 Constant Gain·Maximizing(Max No-clip analysis·컬럼·곡별/앨범 적용)·steps==0 건너뛰기(D107), CLI `-x` 태그를 mp3gain과 일치(D108)
-- 2026-11-23 · README 스크린샷 생성 스크립트·6개 언어 Screenshots 절 (D096~D099)
+- 단계: 8 구현 · 활성 계획 없음 (`docs/plans/2026-11-24-v140-layout-select-language.md` 완료)
+- 버전: 1.4.1 게시 (태그 v1.4.1 = 51a0086, v1.4.0 = cff5fc1) · 테스트 279건 (로컬 OK, skip 4 = mp3gain 대조 / CI 3개 OS 초록, run 45518783503 at 51a0086), 약 2.5분 (.venv Python 3.15.1)
+- 갱신: 2026-11-25 · v1.4.1 Release: 작업 중 선택 메뉴 끄기, 시작 포커스 파일 표, 언어 변경 뒤 창 넓히기, 러시아어 System default, 스크립트·테스트 설정 분리 (D117)
+- 2026-11-25 · v1.4.0 Release: F11 두 줄 머리글·좁은 창(20~33%), 머리글 잘림 수정, 선택 메뉴 3개, 언어 System default, 화면 배치 1회 초기화 (D110~D116), README 스크린샷 -v3
+- 2026-11-24 · v1.3.1 Release: 게인 변경 뒤 진폭 갱신 (D109) · v1.3.0: F10 Constant Gain·Maximizing·steps==0 건너뛰기, CLI `-x` 태그 수정 (D107, D108)
 - 이전: 2026-11-23 · v1.2.0 Release (GUI 6개 언어, README 6개 언어)
 
 ## 다음 할 일
-- AVD 사본 1.3.1 동기화 (D012): `gaindb/api.py`(apply_file_constant_gain·analyze_file_max_amp·shift_after_apply), `gaindb/apply_gain.py`(max_no_clip_steps, gain 없이 진폭만 채우기), `gaindb_cli.py`(`-x`). 사용자가 AVD 세션에서 진행
-- 계획 작업 1부터: 머리글 줄바꿈 함수
-- 1.4.0 뒤 다음 범위: scipy 제거 (용량 절감, D100, 별도 PRD 변경으로 시작)
-- 참고: 컬럼이 9개가 되어 기존 사용자의 저장된 컬럼 폭·정렬은 1.3에서 한 번 기본값으로 돌아감. README 스크린샷 생성 스크립트는 1.4부터 전용 설정 이름을 써서 사용자 설정과 무관(전에는 QSettings(org, app)가 레지스트리를 써서 임시 INI 분리가 안 됐음)
-- 참고: README 스크린샷은 주 창이 바뀌면 AGENTS.md 명령으로 다시 만들고, 내용이 바뀌면 파일 이름 버전(-v3 등)을 올린다 (D098·D099). 생성 중 `M:` 드라이브가 잠시 보임
+- 다음 범위 정하기 (사용자 선택): 1 Designarche 화면 점검(추천: 주 창·대화상자 3개를 `slop-signs.md`·`desktop.md` 기준으로 점검해 보고서, 코드 변경 없음, 고칠 점은 PRD 변경으로) / 2 scipy 제거(용량 215→145MB 예상, 코어 변경·mp3gain 재검증·AVD 동기화 대상, D100)
+- AVD 사본 1.3.1 동기화 (D012): `gaindb/api.py`(apply_file_constant_gain·analyze_file_max_amp·shift_after_apply), `gaindb/apply_gain.py`(max_no_clip_steps, gain 없이 진폭만 채우기), `gaindb_cli.py`(`-x`). 1.4.x는 코어 변경 없음. 사용자가 AVD 세션에서 진행
+- 참고: Designarche 테마는 이미 최신(Graphite/Paper 1.4.3, 생성기 출력과 `gui/theme.py`·아이콘 8개 바이트 동일, 2026-11-25 확인). 생성기 새 경로 `C:\Users\Administrator\My Projects\Designarche\designarche\scripts\generate.py`
+- 참고: 1.4.0을 처음 실행하면 창 크기·위치·최대화 상태·컬럼 폭이 한 번 초기화됨(`_LAYOUT_VERSION` 2, D116). 정렬·옵션·언어는 유지
+- 참고: GUI 테스트는 Windows 오프스크린(상자 글꼴)과 Linux·macOS 오프스크린(실제 글꼴)에서 폭이 다르다. 글꼴 폭에 기대는 테스트는 전제를 직접 만든다 (T24)
+- 참고: README 스크린샷은 주 창이 바뀌면 AGENTS.md 명령으로 다시 만들고, 내용이 바뀌면 파일 이름 버전(-v4 등)을 올린다 (D098·D099). 스크립트는 전용 설정 이름을 써서 사용자 설정과 무관. 생성 중 `M:` 드라이브가 잠시 보임
 - 참고: 이 PC(한국어 Windows)에서 중·일 화면과 표·머리글은 한국어 글꼴로 대체 표시되고 `\`가 `₩`로 보임 (D089)
 - 참고: 로컬 `_local/mp3gain/src/mp3gain.exe`는 DLL이 없어 실행 불가(0xC0000135). 원본 대조는 CI에서만
 

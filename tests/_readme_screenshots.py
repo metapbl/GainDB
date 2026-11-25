@@ -34,7 +34,7 @@ from tests._support import MP3_DIR
 
 SAMPLES = ("test_gain_44k.mp3", "test_gain_48k.mp3", "test_mono_44k.mp3", "test_stereo_44k.mp3")
 # 이미지 내용이 바뀌면 올린다. GitHub 이미지 캐시가 같은 이름의 옛 그림을 계속 보여 준다 (D098).
-IMAGE_VERSION = "v3"
+IMAGE_VERSION = "v4"
 _SHOT_SETTINGS = "GaindBReadmeShots"  # 사용자 설정과 분리된 앱 설정 이름
 
 

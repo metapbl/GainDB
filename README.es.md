@@ -56,8 +56,8 @@ depende del campo `global_gain` de MP3, que otros formatos no tienen.
     <th>Oscuro</th>
   </tr>
   <tr>
-    <td><img src="docs/images/main-light-v3.png" alt="Ventana principal de Gain dB con el tema claro tras el análisis de álbum de cuatro archivos MP3 de ejemplo"></td>
-    <td><img src="docs/images/main-dark-v3.png" alt="Ventana principal de Gain dB con el tema oscuro tras el análisis de álbum de cuatro archivos MP3 de ejemplo"></td>
+    <td><img src="docs/images/main-light-v4.png" alt="Ventana principal de Gain dB con el tema claro tras el análisis de álbum de cuatro archivos MP3 de ejemplo"></td>
+    <td><img src="docs/images/main-dark-v4.png" alt="Ventana principal de Gain dB con el tema oscuro tras el análisis de álbum de cuatro archivos MP3 de ejemplo"></td>
   </tr>
 </table>
 

@@ -54,8 +54,8 @@ Gain dB по замыслу работает **только с файлами MP
     <th>Тёмная</th>
   </tr>
   <tr>
-    <td><img src="docs/images/main-light-v3.png" alt="Главное окно Gain dB в светлой теме после анализа альбома из четырёх демонстрационных MP3-файлов"></td>
-    <td><img src="docs/images/main-dark-v3.png" alt="Главное окно Gain dB в тёмной теме после анализа альбома из четырёх демонстрационных MP3-файлов"></td>
+    <td><img src="docs/images/main-light-v4.png" alt="Главное окно Gain dB в светлой теме после анализа альбома из четырёх демонстрационных MP3-файлов"></td>
+    <td><img src="docs/images/main-dark-v4.png" alt="Главное окно Gain dB в тёмной теме после анализа альбома из четырёх демонстрационных MP3-файлов"></td>
   </tr>
 </table>
 

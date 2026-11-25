@@ -36,7 +36,7 @@ class AboutDialog(QDialog):
         self.setWindowTitle(self.tr("About %1").replace("%1", PROGNAME))
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(10)
+        layout.setSpacing(12)
 
         # --- Header: icon + name/version ---
         header = QHBoxLayout()
@@ -50,7 +50,6 @@ class AboutDialog(QDialog):
             header.addWidget(icon_label)
 
         title_box = QVBoxLayout()
-        title_box.setSpacing(2)
         name_label = QLabel(f"<b><span style='font-size:16pt'>{PROGNAME}</span></b>",
                             self)
         title_box.addWidget(name_label)

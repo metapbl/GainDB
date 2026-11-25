@@ -45,8 +45,13 @@ class ConstantGainDialog(QDialog):
         self.rb_left = QRadioButton(self.tr("Channel 1 (Left)"))
         self.rb_right = QRadioButton(self.tr("Channel 2 (Right)"))
         self.rb_left.setChecked(True)
-        for w in (self.chk_one, self.rb_left, self.rb_right):
-            layout.addWidget(w)
+        layout.addSpacing(12)
+        layout.addWidget(self.chk_one)
+        channels = QVBoxLayout()
+        channels.setContentsMargins(24, 0, 0, 0)  # 체크박스에 딸린 선택임을 들여쓰기로
+        channels.addWidget(self.rb_left)
+        channels.addWidget(self.rb_right)
+        layout.addLayout(channels)
         self.chk_one.toggled.connect(self._sync_channel)
 
         buttons = QDialogButtonBox(

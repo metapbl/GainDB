@@ -41,7 +41,7 @@ class ReadmeScreenshotsTest(unittest.TestCase):
     def test_render_writes_light_and_dark(self):
         from PySide6.QtGui import QImage
         names = [Path(p).name for p in self.report["images"]]
-        self.assertEqual(names, ["main-light-v3.png", "main-dark-v3.png"])
+        self.assertEqual(names, ["main-light-v4.png", "main-dark-v4.png"])
         for name in names:
             with self.subTest(image=name):
                 path = self.out / name

@@ -891,10 +891,18 @@ class MainWindow(QMainWindow):
         # 겸용 버튼·상태바는 현재 상태 기준으로 다시 세팅(정적 부분만).
         self._update_action_states()
 
+    def _style_toolbar(self):
+        # 테마가 구분선을 그리지 않아 Qt 기본색이 다크에서 거의 안 보인다(1.07:1).
+        self._toolbar.setStyleSheet(theme.qss(
+            "QToolBar::separator { background: @line; width: 1px; margin: 4px 4px; }"))
+
     def _build_toolbar(self):
         tb = QToolBar("Main", self)
         tb.setMovable(False)
         self.addToolBar(tb)
+        self._toolbar = tb
+        theme.notifier.changed.connect(self._style_toolbar)
+        self._style_toolbar()
 
         self.act_add_files = QAction(self.tr("Add Files"), self)
         self.act_add_files.setShortcut(QKeySequence("Ctrl+F"))

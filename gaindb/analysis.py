@@ -277,7 +277,8 @@ def _iir_mats(sample_rate: int):
 def _iir(sample_rate: int, x: np.ndarray, zi: np.ndarray):
     """캐스케이드 필터. x: (채널, N), zi: (채널, 상태 수) → (y, zf).
 
-    lfilter(bb, ba, lfilter(yb, ya, x, zi=zi[:, :10]), zi=zi[:, 10:]) 와 같은 값.
+    zi 의 앞쪽은 yulewalk, 뒤쪽은 Butterworth 상태이며, 두 lfilter 를 이어 부른
+    결과(각 zi 를 나눠 넘김)와 같은 값.
     같은 입력이라도 블록·그룹 경계가 달라지면 반올림이 달라질 수 있으므로,
     스트리밍(TrackAnalyzer)은 곡 시작 기준 그룹 경계에 맞춰서만 부른다.
     """
@@ -393,6 +394,7 @@ class TrackAnalyzer:
       db = an.result()                   # 최종 게인(dB) 또는 NOT_ENOUGH_SAMPLES
       peak = an.peak_normalized()        # 정규화 peak(0~1)
       hist = an.histogram()              # Album 누적용 히스토그램
+    histogram()/result() 를 부른 뒤에는 feed 하지 않는다(곡 끝 자투리를 그때 처리함).
     """
 
     def __init__(self, sample_rate: int) -> None:

@@ -44,7 +44,7 @@ Other components
   users may replace the Qt libraries. When distributing pre-built
   binaries, the LGPL v3 text and a usage notice are included.
 
-- NumPy and SciPy are used under the BSD 3-Clause License. See
+- NumPy is used under the BSD 3-Clause License. See
   THIRD_PARTY_LICENSES.
 
 Source availability

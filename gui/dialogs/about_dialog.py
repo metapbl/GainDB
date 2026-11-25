@@ -3,7 +3,7 @@
 """gui/dialogs/about_dialog.py - About dialog.
 
 Shows the program name, version, a one-line description, copyright, license,
-and third-party component notices (PySide6/Qt LGPLv3, NumPy/SciPy BSD, ffmpeg
+and third-party component notices (PySide6/Qt LGPLv3, NumPy BSD, ffmpeg
 external). The name and version come from gaindb.__init__ (single source of
 truth); the icon comes from gui.resources.app_icon.
 
@@ -88,7 +88,7 @@ class AboutDialog(QDialog):
             self.tr("Third-party components:") + "\n"
             + "  \u2022 PySide6 / Qt \u2014 "
             + self.tr("used under the GNU LGPL v3") + "\n"
-            + "  \u2022 NumPy, SciPy \u2014 "
+            + "  \u2022 NumPy \u2014 "
             + self.tr("used under the BSD 3-Clause License") + "\n"
             + "  \u2022 ffmpeg \u2014 "
             + self.tr("used as an external tool (called from PATH, not "

@@ -61,4 +61,5 @@ Status: active | 시작: 2026-11-25 (78b6016) | 근거: PRD §2.1 1.5 작업 (D1
 - [x] 9. 남은 SciPy 고지 제거 (NOTICE·About 창·주석·docstring 수정, 배포 대상 NOTICE·THIRD_PARTY_LICENSES·gui·gaindb에 SciPy 고지 없음 — analysis.py 내부 주석 2곳(계수 형식·대체 이력)만 남김, 282건 OK skip 4) — `NOTICE`(NumPy만), `gui/dialogs/about_dialog.py` About 창 서드파티 목록·머리 주석, `gaindb/analysis.py` `_iir` docstring 일반형·`TrackAnalyzer` 사용 설명에 "histogram()/result() 뒤 feed 안 함"
   - 확인: 배포물에 들어가는 파일(NOTICE·THIRD_PARTY_LICENSES·gui·gaindb)에 SciPy 없음(grep), 전체 테스트 OK
 - [ ] 10. 1.5.1 — 버전·노트(승인)·push·CI 3개 OS·pip-audit·빌드(BUILD OK, zip의 licenses/NOTICE에 SciPy 없음)·exe About 창 확인·태그·Release (실행 전 확인) (after: 9)
-  - 진행 2026-11-25: 노트 사용자 승인
+  - 진행 2026-11-25: 노트 사용자 승인, push e0a4488..7a01aa4, CI run 45551501955 3개 OS 초록 282건(Windows skip 4, macOS·Ubuntu skip 2). pip-audit 취약점 없음, BUILD OK, zip 65664507 bytes·폴더 153 MB, zip의 licenses/NOTICE는 NumPy만·THIRD_PARTY_LICENSES에 SciPy 없음, scipy 패키지 없음(이름이 비슷한 것은 numpy.libs의 libscipy_openblas64 DLL = numpy 자체 OpenBLAS), .qm 5개.
+  - Result: 2026-11-25 pass — 사용자 "눔파이확인했어요"(빌드 exe About 창 서드파티 목록에 NumPy만)

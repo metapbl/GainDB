@@ -62,7 +62,7 @@ Gain dB는 설계상 **MP3 파일만** 다룹니다. 무손실 방식이 MP3의 
 
 - **ffmpeg와 ffprobe** — 분석에 필요합니다. 함께 배포하지 않으므로 직접
   설치하세요(아래 참고).
-- **소스에서 실행할 때:** Python 3.13 이상. 패키지(numpy, scipy, PySide6)는
+- **소스에서 실행할 때:** Python 3.13 이상. 패키지(numpy, PySide6)는
   `requirements.txt`로 설치합니다.
 
 ### ffmpeg 설치
@@ -202,11 +202,13 @@ ReplayGain 사양을 따르며, 필터 계수는 여러 독립 구현이 공유�
 - Pull request를 보내기 전에 전체 테스트를 돌려 주세요(ffmpeg 필요).
 
 ```
+pip install -r requirements-dev.txt
 python tests/_gen_fixtures.py
 python -m unittest discover -s tests
 ```
 
-첫 명령은 테스트용 MP3 파일을 만들고, 두 번째 명령은 모든 테스트를 돌립니다.
+첫 명령은 테스트용 패키지(SciPy 추가)를 설치하고, 두 번째 명령은 테스트용 MP3 파일을
+만들고, 세 번째 명령은 모든 테스트를 돌립니다.
 
 ## 보안
 
@@ -219,13 +221,13 @@ python -m unittest discover -s tests
 Gain dB는 Glen Sawyer의 [mp3gain](https://sourceforge.net/projects/mp3gain/)을
 바탕으로 합니다. ReplayGain 분석은 David Robinson과 Glen Sawyer가 만들고 Frank
 Klemm과 Marcel Mueller가 개선했습니다. [numpy](https://numpy.org/),
-[SciPy](https://scipy.org/), [PySide6](https://doc.qt.io/qtforpython-6/)를 쓰고,
+[PySide6](https://doc.qt.io/qtforpython-6/)를 쓰고,
 외부 프로그램으로 [ffmpeg](https://ffmpeg.org/)를 씁니다.
 
 ## 라이선스
 
 [LGPL-2.1-or-later](LICENSE). mp3gain 저작권 고지는 [NOTICE](NOTICE)에,
 의존성 라이선스는 [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES)에 있습니다.
-numpy와 SciPy는 BSD-3-Clause, PySide6(Qt for Python)는 LGPLv3입니다. ffmpeg는
+numpy는 BSD-3-Clause, PySide6(Qt for Python)는 LGPLv3입니다. ffmpeg는
 함께 배포하지 않습니다. 이 소프트웨어와 함께 ffmpeg 빌드를 배포한다면 LGPL
 빌드를 쓰고 그 라이선스 조건을 따르세요.

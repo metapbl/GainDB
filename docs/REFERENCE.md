@@ -22,7 +22,7 @@
 - 무손실 원리: 디코더가 샘플에 2^(gain/4)을 곱하므로 1스텝 ≈ 1.5dB. Track Gain 제수는 정밀값 5·log10(2) (D008).
 - 태그 필드: REPLAYGAIN_TRACK_GAIN/_PEAK, REPLAYGAIN_ALBUM_GAIN/_PEAK, (ID3) RVA2·replaygain_reference_loudness, MP3GAIN_MINMAX, MP3GAIN_ALBUM_MINMAX, MP3GAIN_UNDO. 적용 시 undo 누적, gain에서 dB 차감, peak에 2^(N/4) 곱, minmax에 N 가감.
 - ffmpeg/ffprobe: 외부 프로세스, 동봉 안 함. Windows는 `creationflags=CREATE_NO_WINDOW` (T10). 찾는 위치는 PRD F6.
-- PySide6(LGPLv3)·numpy·scipy(BSD-3). exe는 onedir 필수(Qt DLL 교체 가능성 = LGPLv3) (D020).
+- PySide6(LGPLv3)·numpy(BSD-3). scipy는 1.5부터 개발 의존성만(D119). exe는 onedir 필수(Qt DLL 교체 가능성 = LGPLv3) (D020).
 - 원본 저작권 헤더가 있는 파일: frame·id3·tag·writer·analysis·gaindb_cli. 라이선스 상세는 `_local/LICENSE_REVIEW.md`(로컬 전용).
 - 새 소스 파일을 추가하면 저작권 감사(원본 유래 식별 → 중립화 → 테스트 통과 → 커밋)를 거치고 `_local/LICENSE_REVIEW.md`에 기록한다. 기존 트리(코어·CLI·GUI·tests)는 감사 완료.
 - AVD가 `gaindb/` 코어를 소비할 때는 LGPL 의무(고지·해당 모듈 소스 제공·교체 가능성)도 함께 진다. 소비 방식(vendoring·pip)을 정할 때 다시 검토한다 (D012).
@@ -68,7 +68,7 @@
 | T13 | Linux·macOS에서 클리핑 질문에 파이프로 준 `y`가 무시됨 (Windows는 정상) | ffmpeg/ffprobe가 부모 stdin을 물려받아 키 입력용으로 먼저 읽음 | 자식 프로세스는 `stdin=subprocess.DEVNULL` (dd4c421) | test_clip_integration (CI Ubuntu) |
 | T14 | 전체 테스트가 위젯 테스트에서 0xC0000409로 죽음 (단독 실행은 통과) | discover가 모든 모듈을 먼저 import하는데, test_gui_pure가 그때 `QCoreApplication`을 만들어 위젯 생성 불가 | 테스트의 Qt 앱은 offscreen `QApplication`으로 통일 | test_gui_pure, test_ffmpeg_locate |
 | T15 | 편집한 Windows 경로에 `\f`·`\b` 제어 문자가 들어감 | Bash heredoc으로 넘긴 Python 문자열에서 `\\`가 `\`로 바뀜 | 백슬래시가 든 편집은 Edit 도구로. 편집 뒤 제어 문자 검사 | 작업 3 (2026-10-25) |
-| T16 | exe 용량(≈215MB)을 `.spec` excludes로 줄이면 앱이 깨지거나 효과 없음 | scipy.signal이 fft·spatial 등에 의존, Qt 모듈은 훅이 DLL을 그대로 가져옴 | 근본 절감은 scipy `lfilter`를 numpy로 대체(≈145MB)뿐. 보류 항목(PRD §2.3), 하면 mp3gain 수치 재검증 | legacy 10.1 |
+| T16 | exe 용량(≈215MB)을 `.spec` excludes로 줄이면 앱이 깨지거나 효과 없음 | scipy.signal이 fft·spatial 등에 의존, Qt 모듈은 훅이 DLL을 그대로 가져옴 | 근본 절감은 scipy `lfilter`를 numpy로 대체하는 것뿐 → 1.5에서 함(numpy 블록 IIR, D118~D121). 1.4.1 dist 225MB 중 scipy 48MB·scipy.libs 20MB | legacy 10.1 |
 | T17 | `build_release.ps1`이 실패했는데 출력 끝부분만 보고 놓칠 뻔함 | 실행 중인 GainDB.exe가 `dist`를 잠금 / .venv 밖에서 실행해 PyInstaller 없음 | 빌드 전 `Get-Process GainDB` 없음 확인, `.venv\Scripts\Activate.ps1` 먼저, 성공은 출력 전체에서 `BUILD OK`로 판정 | v1.0.0 (2026-11-09~10), v1.1.1 재발 (2026-11-11, CLAUDE.md 명령에 반영) |
 | T18 | 원본 mp3gain.exe를 돌렸는데 파일이 그대로라 "원본도 같다"고 잘못 판단 | 이 PC에 C 런타임 DLL이 없어 exe가 시작조차 못 함(0xC0000135, Git Bash는 dll 오류). 출력·종료 코드를 버려서 못 봄 | 원본 대조는 CI의 mp3gain(test_mp3gain_parity)으로. 로컬에서 exe를 쓰면 종료 코드와 파일 해시 변화를 먼저 확인 | v1.1 작업 1 (2026-11-10) |
 | T19 | 계획 자기 검토에 "F9 인수 기준은 작업 2~8의 테스트"라고 적었지만 기준 1·3·6·7은 테스트가 없었고, 인수 때 명세 검토에서야 드러남 | 인수 기준과 테스트를 이름으로 짝짓지 않고 "덮었다"고만 적음 | 계획에 기준마다 테스트 이름(`파일::테스트`)을 적고, 인수 때 그 이름이 실제로 있는지 확인. 언어 저장 테스트는 `gui.main_window`와 `gui.i18n` 양쪽 QSettings 이름을 GaindBTest로 바꿔야 사용자 설정을 덮지 않음 | v1.2 작업 11 (2026-11-21) |

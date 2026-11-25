@@ -38,8 +38,9 @@ Status: active | 시작: 2026-11-25 (78b6016) | 근거: PRD §2.1 1.5 작업 (D1
   - 최적화 뒤 2026-11-25 (같은 프로세스에서 1.4.1 분석기와 번갈아 9회씩, 디코드 포함 중앙값): 가장 긴 fixture 0.105~0.106 → 0.102~0.107초(-2.0~+0.2%), 240초 곡 0.83~0.99 → 0.72~0.92초(-6.5~-13.5%). 분석기만 0.39 → 0.36초. 블록·그룹 조합 128·64는 +0~11%, 64·128은 +43%, 96·64는 -9~-11%라 128·32로 정함. 기준 통과
 - [x] 4. 의존성 정리 (scipy 없는 새 venv(numpy 2.5.5·PySide6 6.12.0): `import scipy` 실패 확인, `gaindb_cli.py -s s` 출력이 1.4.1(scipy) 코드와 diff 없음(fixture 사본 2개·Album), 전체 282건 OK skip 6(mp3gain 4 + scipy 대조 2). 개발 venv 282건 OK skip 4, pip-audit 취약점 없음) — `requirements.txt`·`pyproject.toml`에서 scipy 삭제, `requirements-dev.txt`(`-r requirements.txt` + scipy), CI 두 워크플로가 dev 파일 설치, spec 주석 (after: 2)
   - 확인: scipy 없는 새 venv에서 `gaindb_cli.py`로 fixture 사본 분석 성공, 전체 테스트(scipy 대조 skip 표시) / `pip-audit -r requirements.txt` 취약점 없음
-- [ ] 5. 버전·문서 — 1.5.0, README 6개 언어 의존성·감사 문구, THIRD_PARTY_LICENSES SciPy 항목 삭제, REFERENCE T16, 노트 초안(사용자 승인) (after: 4)
+- [x] 5. 버전·문서 (노트 사용자 승인 2026-11-25) — 1.5.0, README 6개 언어 의존성·감사 문구, THIRD_PARTY_LICENSES SciPy 항목 삭제, REFERENCE T16, 노트 초안(사용자 승인) (after: 4)
   - 확인: `test_readme.py`, readme 표준 §6 검사, 6개 언어 `##` 수 같음, 노트 승인
+  - 진행 2026-11-25: README 6개 언어(의존성 목록·기여 절 `pip install -r requirements-dev.txt` 추가·감사·라이선스 문구), THIRD_PARTY_LICENSES SciPy 절 삭제, REFERENCE T16·R§1 갱신, 1.5.0, 노트 초안(용량은 작업 6에서 채움). 6개 언어 `##` 12·배지 4 같음, `pip install -r requirements-dev.txt` 실행 성공(scipy 1.18.1), 금지 정보 없음, 전체 282건 OK skip 4. 노트 승인 2026-11-25
 - [ ] 6. CI·빌드 — push, CI 3개 OS 초록(mp3gain 대조 포함), `build_release.ps1` BUILD OK, dist에 scipy 폴더 없음, zip·폴더 용량을 1.4.1(96465765 bytes)과 비교해 노트에 기록, 빌드 exe로 fixture 사본 Album 분석·적용·undo (실행 전 확인) (after: 5)
 - [ ] 7. Release — 태그 v1.5.0, GitHub Release (실행 전 확인) (after: 6)
 - [ ] 8. 인수 — PRD §1 성공 기준(원본 mp3gain과 같은 dB·태그, undo 비트 동일)과 D121 완료 기준 전부, 명세 검토(대화 맥락 없는 서브에이전트에 이 파일·PRD §2.1 1.5 작업·`git diff 78b6016..`)

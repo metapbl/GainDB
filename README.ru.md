@@ -66,7 +66,7 @@ Gain dB по замыслу работает **только с файлами MP
 - **ffmpeg и ffprobe** — нужны для анализа. Они не входят в комплект;
   установите их сами (см. ниже).
 - **Для запуска из исходного кода:** Python 3.13 или новее. Пакеты (numpy,
-  scipy, PySide6) устанавливаются из `requirements.txt`.
+  PySide6) устанавливаются из `requirements.txt`.
 
 ### Установка ffmpeg
 
@@ -211,11 +211,13 @@ GNU LGPL v2.1 или более поздней, и Gain dB в целом исп�
 - Перед отправкой pull request'а запустите все тесты (нужен ffmpeg):
 
 ```
+pip install -r requirements-dev.txt
 python tests/_gen_fixtures.py
 python -m unittest discover -s tests
 ```
 
-Первая команда создаёт тестовые MP3-файлы, вторая запускает все тесты.
+Первая команда устанавливает пакеты для тестов (добавляет SciPy), вторая создаёт
+тестовые MP3-файлы, третья запускает все тесты.
 
 ## Безопасность
 
@@ -228,14 +230,14 @@ python -m unittest discover -s tests
 Gain dB основан на [mp3gain](https://sourceforge.net/projects/mp3gain/) Глена
 Сойера (Glen Sawyer); анализ ReplayGain написали David Robinson и Glen Sawyer,
 улучшили Frank Klemm и Marcel Mueller. Используются [numpy](https://numpy.org/),
-[SciPy](https://scipy.org/), [PySide6](https://doc.qt.io/qtforpython-6/) и, как
+[PySide6](https://doc.qt.io/qtforpython-6/) и, как
 внешняя программа, [ffmpeg](https://ffmpeg.org/).
 
 ## Лицензия
 
 [LGPL-2.1-or-later](LICENSE). Уведомления об авторских правах mp3gain — в
 [NOTICE](NOTICE), лицензии зависимостей — в
-[THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES). numpy и SciPy — BSD-3-Clause;
+[THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES). numpy — BSD-3-Clause;
 PySide6 (Qt for Python) — LGPLv3. ffmpeg не входит в комплект; если вы
 распространяете сборку ffmpeg вместе с этой программой, используйте сборку
 под LGPL и соблюдайте её условия.

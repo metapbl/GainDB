@@ -68,7 +68,7 @@ Análisis de álbum de cuatro archivos de ejemplo: el volumen de cada archivo y 
 - **ffmpeg y ffprobe** — necesarios para el análisis. No se incluyen; instálalos
   tú mismo (ver abajo).
 - **Para ejecutar desde el código fuente:** Python 3.13 o posterior. Los paquetes
-  (numpy, scipy, PySide6) se instalan desde `requirements.txt`.
+  (numpy, PySide6) se instalan desde `requirements.txt`.
 
 ### Instalar ffmpeg
 
@@ -217,11 +217,13 @@ estándar compartidos por implementaciones independientes. Consulta
 - Antes de enviar un pull request, ejecuta todas las pruebas (necesitan ffmpeg):
 
 ```
+pip install -r requirements-dev.txt
 python tests/_gen_fixtures.py
 python -m unittest discover -s tests
 ```
 
-El primer comando crea archivos MP3 de prueba; el segundo ejecuta todas las pruebas.
+El primer comando instala los paquetes de prueba (añade SciPy); el segundo crea
+archivos MP3 de prueba; el tercero ejecuta todas las pruebas.
 
 ## Seguridad
 
@@ -234,13 +236,13 @@ no en un issue público.
 Gain dB se basa en [mp3gain](https://sourceforge.net/projects/mp3gain/) de Glen
 Sawyer, con el análisis ReplayGain de David Robinson y Glen Sawyer y mejoras de
 Frank Klemm y Marcel Mueller. Usa [numpy](https://numpy.org/),
-[SciPy](https://scipy.org/), [PySide6](https://doc.qt.io/qtforpython-6/) y, como
+[PySide6](https://doc.qt.io/qtforpython-6/) y, como
 programa externo, [ffmpeg](https://ffmpeg.org/).
 
 ## Licencia
 
 [LGPL-2.1-or-later](LICENSE). Consulta [NOTICE](NOTICE) para los avisos de
 copyright de mp3gain y [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) para las
-dependencias. numpy y SciPy son BSD-3-Clause; PySide6 (Qt for Python) es LGPLv3.
+dependencias. numpy es BSD-3-Clause; PySide6 (Qt for Python) es LGPLv3.
 ffmpeg no se incluye; si distribuyes una compilación de ffmpeg junto con este
 software, usa una compilación LGPL y respeta sus términos de licencia.

@@ -60,7 +60,7 @@ Gain dB 按设计**只处理 MP3 文件**：无损方法依赖 MP3 的 `global_g
 ## 系统要求
 
 - **ffmpeg 和 ffprobe** — 分析时需要。软件不附带它们，请自行安装（见下文）。
-- **从源代码运行时：** Python 3.13 或更高版本。依赖包（numpy、scipy、PySide6）
+- **从源代码运行时：** Python 3.13 或更高版本。依赖包（numpy、PySide6）
   通过 `requirements.txt` 安装。
 
 ### 安装 ffmpeg
@@ -194,11 +194,12 @@ C 源代码，后者以 GNU LGPL v2.1 或更高版本授权，Gain dB 整体也�
 - 提交 Pull request 前，请运行完整测试（需要 ffmpeg）：
 
 ```
+pip install -r requirements-dev.txt
 python tests/_gen_fixtures.py
 python -m unittest discover -s tests
 ```
 
-第一条命令生成测试用 MP3 文件；第二条运行所有测试。
+第一条命令安装测试用依赖包（会加装 SciPy）；第二条生成测试用 MP3 文件；第三条运行所有测试。
 
 ## 安全
 
@@ -210,12 +211,12 @@ python -m unittest discover -s tests
 Gain dB 基于 Glen Sawyer 的 [mp3gain](https://sourceforge.net/projects/mp3gain/)。
 ReplayGain 分析由 David Robinson 和 Glen Sawyer 编写，并由 Frank Klemm 和
 Marcel Mueller 改进。本项目使用 [numpy](https://numpy.org/)、
-[SciPy](https://scipy.org/)、[PySide6](https://doc.qt.io/qtforpython-6/)，
+[PySide6](https://doc.qt.io/qtforpython-6/)，
 并将 [ffmpeg](https://ffmpeg.org/) 作为外部程序调用。
 
 ## 许可证
 
 [LGPL-2.1-or-later](LICENSE)。mp3gain 版权声明见 [NOTICE](NOTICE)，依赖项许可证见
-[THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES)。numpy 和 SciPy 为 BSD-3-Clause；
+[THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES)。numpy 为 BSD-3-Clause；
 PySide6（Qt for Python）为 LGPLv3。本软件不附带 ffmpeg；如果你随本软件分发
 ffmpeg 版本，请使用 LGPL 版本并遵守其许可条款。

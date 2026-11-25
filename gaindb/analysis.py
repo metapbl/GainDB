@@ -8,7 +8,7 @@
 # (Copyright (C) 2001-2009 David Robinson and Glen Sawyer; improvements
 # by Frank Klemm and Marcel Mueller), licensed under the GNU LGPL v2.1
 # or later. The Python code here is a new vectorized implementation
-# (numpy/scipy) and is distributed under the same LGPL terms.
+# (numpy) and is distributed under the same LGPL terms.
 """
 gaindb/analysis.py
 
@@ -22,7 +22,7 @@ LGPL-2.1-or-later)를 따른다. 이 프로젝트가 쓰는 전 샘플레이트
 사양처럼 공유하는 값이다. 그 수치를 scipy lfilter 규약(b/a 분리,
 a[0]=1.0)에 맞게 재배치해 전사했다(사양의 표는 한 배열에 b·a 계수를 교차
 저장하는 형태이므로, 같은 수치를 lfilter 형식으로 옮겼을 뿐 값은 동일하다).
-코드 자체는 C 레퍼런스와 달리 numpy/scipy 벡터화로 새로 작성했으며,
+코드 자체는 C 레퍼런스와 달리 numpy 벡터화로 새로 작성했으며,
 프로젝트 전체와 함께 LGPL-2.1-or-later 로 배포된다. 상세 경위는 CLAUDE.md
 10 진척 로그(6단계) 참조. 사실 고지는 NOTICE/README 에서 다룬다.
 
@@ -41,7 +41,6 @@ from __future__ import annotations
 import math
 
 import numpy as np
-from scipy.signal import lfilter
 
 # --- 사양 상수 (ReplayGain 공식 사양) ---
 RMS_PERCENTILE = 0.95        # 상위 95퍼센타일
@@ -200,11 +199,122 @@ _FILTER_COEFFS = {
 NOT_ENOUGH_SAMPLES = object()
 
 
-def _filter_channel(samples: np.ndarray, yb, ya, bb, ba) -> np.ndarray:
-    """한 채널에 yulewalk → Butterworth 캐스케이드를 적용한다."""
-    stepped = lfilter(yb, ya, samples)
-    out = lfilter(bb, ba, stepped)
-    return out
+# --- numpy 블록 IIR (scipy lfilter 대체, D118) ---
+# yulewalk → Butterworth 캐스케이드를 상태공간 하나(상태 = [yule 상태, butter
+# 상태], 각각 lfilter 의 zi 와 같은 전치 직접형 II 형식)로 합친다. 블록(_IIR_BLOCK
+# 샘플) 안의 출력은 행렬곱으로, 블록 시작 상태는 그룹(_IIR_GROUP 블록) 단위
+# 행렬곱으로 구하고 그룹 사이만 순차로 넘긴다. 좌우 채널은 함께 처리한다.
+_IIR_BLOCK = 128
+_IIR_GROUP = 32
+_IIR_MATS: dict = {}
+
+
+def _state_space(b, a):
+    """lfilter(b, a) 와 같은 (A, B, C, D): z' = A z + B x, y = C z + D x."""
+    n = max(len(a), len(b)) - 1
+    bn = np.concatenate((np.asarray(b, float), np.zeros(n + 1 - len(b)))) / a[0]
+    an = np.concatenate((np.asarray(a, float), np.zeros(n + 1 - len(a)))) / a[0]
+    A = np.zeros((n, n))
+    A[:, 0] = -an[1:]
+    A[:-1, 1:] = np.eye(n - 1)
+    B = bn[1:] - an[1:] * bn[0]
+    C = np.zeros(n)
+    C[0] = 1.0
+    return A, B, C, bn[0]
+
+
+def _iir_mats(sample_rate: int):
+    """샘플레이트별 캐스케이드 블록 행렬 (T, O, R, A, P, M) 을 만들어 캐시한다."""
+    mats = _IIR_MATS.get(sample_rate)
+    if mats is not None:
+        return mats
+    yb, ya, bb, ba = _FILTER_COEFFS[sample_rate]
+    A1, B1, C1, D1 = _state_space(yb, ya)
+    A2, B2, C2, D2 = _state_space(bb, ba)
+    n1, n2 = A1.shape[0], A2.shape[0]
+    A = np.zeros((n1 + n2, n1 + n2))
+    A[:n1, :n1] = A1
+    A[n1:, :n1] = np.outer(B2, C1)
+    A[n1:, n1:] = A2
+    B = np.concatenate((B1, B2 * D1))
+    C = np.concatenate((D2 * C1, C2))
+    D = D2 * D1
+
+    L, G = _IIR_BLOCK, _IIR_GROUP
+    n = n1 + n2
+    O = np.empty((L, n))                   # O[k] = C A^k: 초기 상태 → y[k]
+    Ak = np.eye(n)
+    for k in range(L):
+        O[k] = C @ Ak
+        Ak = A @ Ak
+    AL = Ak                                # A^L: 블록 하나만큼 상태 진행
+    h = np.empty(L)                        # 임펄스 응답
+    h[0] = D
+    h[1:] = O[:-1] @ B
+    T = np.zeros((L, L))                   # 영상태 응답(하삼각 토플리츠)
+    for k in range(L):
+        T[k:, k] = h[: L - k]
+    R = np.empty((n, L))                   # R[:, k] = A^(L-1-k) B: x[k] → 블록 끝 상태
+    v = B.copy()
+    for k in range(L - 1, -1, -1):
+        R[:, k] = v
+        v = A @ v
+    # 상태는 행벡터로 다룬다(s' = s @ A^T). P[k] = (A^L)^T 의 k 제곱.
+    P = np.empty((G + 1, n, n))
+    P[0] = np.eye(n)
+    for k in range(G):
+        P[k + 1] = P[k] @ AL.T
+    # M: 그룹 안 블록별 입력 기여(XR) → 그룹 안 k 번째 블록 시작 상태(k = 0..G).
+    M = np.zeros((G * n, (G + 1) * n))
+    for j in range(G):
+        for k in range(j + 1, G + 1):
+            M[j * n:(j + 1) * n, k * n:(k + 1) * n] = P[k - 1 - j]
+    mats = (T, O, R, A, P, M)
+    _IIR_MATS[sample_rate] = mats
+    return mats
+
+
+def _iir(sample_rate: int, x: np.ndarray, zi: np.ndarray):
+    """캐스케이드 필터. x: (채널, N), zi: (채널, 상태 수) → (y, zf).
+
+    lfilter(bb, ba, lfilter(yb, ya, x, zi=zi[:, :10]), zi=zi[:, 10:]) 와 같은 값.
+    같은 입력이라도 블록·그룹 경계가 달라지면 반올림이 달라질 수 있으므로,
+    스트리밍(TrackAnalyzer)은 곡 시작 기준 그룹 경계에 맞춰서만 부른다.
+    """
+    T, O, R, A, P, M = _iir_mats(sample_rate)
+    L, G = _IIR_BLOCK, _IIR_GROUP
+    ch, N = x.shape
+    n = A.shape[0]
+    nb, r = divmod(N, L)
+    s = np.array(zi, dtype=np.float64)
+    if not nb:
+        y = np.empty((ch, N))
+    else:
+        X = x[:, : nb * L].reshape(ch * nb, L)
+        ng = -(-nb // G)
+        XR = np.zeros((ch, ng * G, n))     # 마지막 그룹의 빈 블록은 0 입력
+        XR[:, :nb] = (X @ R.T).reshape(ch, nb, n)
+        Q = (XR.reshape(ch * ng, G * n) @ M).reshape(ch, ng, G + 1, n)
+        SG = np.empty((ch, ng, n))         # 그룹 시작 상태
+        PG = P[G]
+        for g in range(ng):
+            SG[:, g] = s
+            s = s @ PG + Q[:, g, G]
+        S = (SG @ P[:G].transpose(1, 0, 2).reshape(n, G * n)).reshape(ch, ng, G, n)
+        S += Q[:, :, :G]
+        S = S.reshape(ch, ng * G, n)
+        if nb < ng * G:
+            s = S[:, nb].copy()            # 마지막 실제 블록 끝 상태
+        Y = X @ T.T
+        Y += S[:, :nb].reshape(ch * nb, n) @ O.T
+        if not r:
+            return Y.reshape(ch, N), s
+        y = np.empty((ch, N))
+        y[:, : nb * L] = Y.reshape(ch, nb * L)
+    xt = x[:, nb * L:]
+    y[:, nb * L:] = xt @ T[:r, :r].T + s @ O[:r].T
+    s = s @ np.linalg.matrix_power(A, r).T + xt @ R[:, L - r:].T
+    return y, s
 
 
 def _loudness_histogram(
@@ -212,43 +322,12 @@ def _loudness_histogram(
 ) -> np.ndarray:
     """
     필터 + 50ms RMS + dB 환산 후 0.01dB 히스토그램(길이 STEPS_PER_DB*MAX_DB)을 반환.
+
+    스트리밍과 결과가 완전히 같도록 TrackAnalyzer 에 한 번에 먹인다 (D010).
     """
-    if sample_rate not in _FILTER_COEFFS:
-        raise ValueError(
-            f"Unsupported sample rate: {sample_rate} Hz "
-            f"(currently supported: {sorted(_FILTER_COEFFS)})"
-        )
-
-    yb, ya, bb, ba = _FILTER_COEFFS[sample_rate]
-    lout = _filter_channel(left, yb, ya, bb, ba)
-    rout = _filter_channel(right, yb, ya, bb, ba)
-
-    window = int(np.ceil(sample_rate * RMS_WINDOW_MS / 1000.0))
-    nbins = STEPS_PER_DB * MAX_DB
-    hist = np.zeros(nbins, dtype=np.int64)
-
-    n_windows = lout.size // window
-    if n_windows == 0:
-        return hist  # 윈도우 하나도 못 채움 → 빈 히스토그램
-
-    trim = n_windows * window
-    lsq = lout[:trim] ** 2
-    rsq = rout[:trim] ** 2
-
-    # 윈도우별 합산: (n_windows, window) 로 reshape 후 행 합.
-    lsum = lsq.reshape(n_windows, window).sum(axis=1)
-    rsum = rsq.reshape(n_windows, window).sum(axis=1)
-
-    # 양 채널 평균제곱. ReplayGain 사양의 등가식: 10*log10(meanSquare).
-    mean_sq = (lsum + rsum) / window * 0.5 + 1.0e-37
-    db = STEPS_PER_DB * 10.0 * np.log10(mean_sq)
-
-    ival = db.astype(np.int64)
-    np.clip(ival, 0, nbins - 1, out=ival)
-
-    # 각 칸의 빈도 누적.
-    np.add.at(hist, ival, 1)
-    return hist
+    an = TrackAnalyzer(sample_rate)
+    an.feed(left, right)
+    return an.histogram()
 
 
 def _gain_from_histogram(hist: np.ndarray):
@@ -296,9 +375,10 @@ class TrackAnalyzer:
     것이며, 결과는 일괄 처리(_loudness_histogram)와 수학적으로 동일하다.
 
     동일성의 근거:
-      - 필터: lfilter 의 zi(초기 조건)를 청크마다 이어받아 연속으로 통과시킨다.
-        전체를 한 번에 lfilter 한 것과 부동소수 연산까지 동일하다. 최초 상태는
-        0(일괄 경로가 zi 없이 부를 때의 내부 초기값과 동일)으로 시작한다.
+      - 필터: 입력을 곡 시작 기준 그룹(_IIR_BLOCK*_IIR_GROUP) 경계에 맞춰
+        버퍼링하고, 상태를 이어받아 완전한 그룹만 통과시킨다. 곡 끝 자투리는 histogram()/result()
+        에서 한 번 처리한다. 청크를 어떻게 나눠도 같은 블록 연산이 되므로 일괄
+        경로(_loudness_histogram 도 이 클래스를 씀)와 부동소수까지 같다.
       - RMS 윈도우: 필터 '출력'을 윈도우(50ms)로 자르는 것은 일괄 경로와 같다.
         청크 경계가 윈도우 경계와 어긋날 수 있으므로, 완전한 윈도우만 이번에
         처리하고 남는 자투리(필터 출력)는 버퍼에 남겨 다음 feed 에 이어붙인다.
@@ -322,23 +402,21 @@ class TrackAnalyzer:
                 f"(currently supported: {sorted(_FILTER_COEFFS)})"
             )
         self._sample_rate = sample_rate
-        self._yb, self._ya, self._bb, self._ba = _FILTER_COEFFS[sample_rate]
 
         self._window = int(np.ceil(sample_rate * RMS_WINDOW_MS / 1000.0))
         self._nbins = STEPS_PER_DB * MAX_DB
         self._hist = np.zeros(self._nbins, dtype=np.int64)
 
-        # 필터 zi 상태(좌/우 × yule/butter). 0 으로 시작 = 일괄 경로와 동일.
-        n_yule = max(len(self._yb), len(self._ya)) - 1
-        n_butter = max(len(self._bb), len(self._ba)) - 1
-        self._zi_ly = np.zeros(n_yule)
-        self._zi_lb = np.zeros(n_butter)
-        self._zi_ry = np.zeros(n_yule)
-        self._zi_rb = np.zeros(n_butter)
+        # 필터 상태(좌/우 × [yule, butter]). 0 으로 시작 = lfilter 의 zi 없는 호출과 같음.
+        self._zi = np.zeros((2, _iir_mats(sample_rate)[3].shape[0]))
 
         # 필터 출력의 윈도우 자투리 버퍼(다음 feed 에 이어붙일 제곱합용 원신호).
         self._buf_l = np.empty(0, dtype=np.float64)
         self._buf_r = np.empty(0, dtype=np.float64)
+
+        # 필터 입력의 그룹 자투리 버퍼(좌/우). 그룹 경계를 곡 시작 기준으로 고정한다.
+        self._in = np.empty((2, 0), dtype=np.float64)
+        self._flushed = False
 
         self._peak_raw = 0.0  # 필터 전 원샘플 abs 최댓값(±32768 스케일)
 
@@ -355,11 +433,28 @@ class TrackAnalyzer:
         if rmax > self._peak_raw:
             self._peak_raw = rmax
 
-        # 필터: zi 를 이어받아 연속 통과(전체 lfilter 와 동일 결과).
-        ly, self._zi_ly = lfilter(self._yb, self._ya, left, zi=self._zi_ly)
-        lo, self._zi_lb = lfilter(self._bb, self._ba, ly, zi=self._zi_lb)
-        ry, self._zi_ry = lfilter(self._yb, self._ya, right, zi=self._zi_ry)
-        ro, self._zi_rb = lfilter(self._bb, self._ba, ry, zi=self._zi_rb)
+        # 입력 자투리 + 이번 청크를 한 버퍼에 모으고, 완전한 그룹만 필터에 넣는다.
+        rest = self._in.shape[1]
+        x = np.empty((2, rest + left.size))
+        x[:, :rest] = self._in
+        x[0, rest:] = left
+        x[1, rest:] = right
+        full = x.shape[1] - x.shape[1] % (_IIR_BLOCK * _IIR_GROUP)
+        self._in = x[:, full:]
+        if full:
+            self._filter_and_accumulate(x[:, :full])
+
+    def _flush(self) -> None:
+        """곡 끝의 블록 자투리 입력을 필터에 넣는다(한 번만)."""
+        if self._flushed:
+            return
+        self._flushed = True
+        if self._in.shape[1]:
+            self._filter_and_accumulate(self._in)
+
+    def _filter_and_accumulate(self, x: np.ndarray) -> None:
+        # 필터: 상태를 이어받아 연속 통과.
+        (lo, ro), self._zi = _iir(self._sample_rate, x, self._zi)
 
         # 직전 자투리 + 이번 필터 출력을 이어붙인다.
         lout = np.concatenate((self._buf_l, lo)) if self._buf_l.size else lo
@@ -393,6 +488,7 @@ class TrackAnalyzer:
 
     def histogram(self) -> np.ndarray:
         """누적 히스토그램(0.01dB 해상도)을 반환한다(Album 누적용)."""
+        self._flush()
         return self._hist
 
     def result(self):
@@ -401,7 +497,7 @@ class TrackAnalyzer:
         충분한 샘플이 없으면 NOT_ENOUGH_SAMPLES 를 반환한다. 곡 끝의 마지막
         불완전 윈도우(_buf 에 남은 자투리)는 일괄 경로와 동일하게 버린다.
         """
-        return _gain_from_histogram(self._hist)
+        return _gain_from_histogram(self.histogram())
 
     def peak_normalized(self) -> float:
         """정규화 peak(0~1, 1.0 초과 가능)를 반환한다(track_peak 과 동일 정의)."""

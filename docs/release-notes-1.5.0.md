@@ -5,7 +5,7 @@ Analyze and even out MP3 loudness without re-encoding, from the command line or 
 A smaller download. Gain dB no longer needs SciPy, so it is left out of the Windows build. Analysis numbers, tag formats and CLI output are unchanged.
 
 ### Changed
-- **SciPy is no longer a dependency.** The ReplayGain loudness filter now runs on numpy alone. The Windows zip shrinks from 96.5 MB to {zip size} MB, and the unzipped folder from 225 MB to {folder size} MB.
+- **SciPy is no longer a dependency.** The ReplayGain loudness filter now runs on numpy alone. The Windows zip shrinks from 96.5 MB to 65.7 MB, and the unzipped folder from about 225 MB to 153 MB.
 - Analysis is about as fast as before. On a 4-minute test track it was 6–13% faster on the test PC.
 - To run from source you only need numpy and PySide6 (`requirements.txt`). SciPy is now used only to create test files and to check the new filter against the old one (`requirements-dev.txt`).
 

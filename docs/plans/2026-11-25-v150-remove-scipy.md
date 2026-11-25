@@ -41,7 +41,10 @@ Status: active | 시작: 2026-11-25 (78b6016) | 근거: PRD §2.1 1.5 작업 (D1
 - [x] 5. 버전·문서 (노트 사용자 승인 2026-11-25) — 1.5.0, README 6개 언어 의존성·감사 문구, THIRD_PARTY_LICENSES SciPy 항목 삭제, REFERENCE T16, 노트 초안(사용자 승인) (after: 4)
   - 확인: `test_readme.py`, readme 표준 §6 검사, 6개 언어 `##` 수 같음, 노트 승인
   - 진행 2026-11-25: README 6개 언어(의존성 목록·기여 절 `pip install -r requirements-dev.txt` 추가·감사·라이선스 문구), THIRD_PARTY_LICENSES SciPy 절 삭제, REFERENCE T16·R§1 갱신, 1.5.0, 노트 초안(용량은 작업 6에서 채움). 6개 언어 `##` 12·배지 4 같음, `pip install -r requirements-dev.txt` 실행 성공(scipy 1.18.1), 금지 정보 없음, 전체 282건 OK skip 4. 노트 승인 2026-11-25
-- [ ] 6. CI·빌드 — push, CI 3개 OS 초록(mp3gain 대조 포함), `build_release.ps1` BUILD OK, dist에 scipy 폴더 없음, zip·폴더 용량을 1.4.1(96465765 bytes)과 비교해 노트에 기록, 빌드 exe로 fixture 사본 Album 분석·적용·undo (실행 전 확인) (after: 5)
+- [x] 6. CI·빌드 — push, CI 3개 OS 초록(mp3gain 대조 포함), `build_release.ps1` BUILD OK, dist에 scipy 폴더 없음, zip·폴더 용량을 1.4.1(96465765 bytes)과 비교해 노트에 기록, 빌드 exe로 fixture 사본 Album 분석·적용·undo (실행 전 확인) (after: 5)
+  - 진행 2026-11-25: push 78b6016..8c3cca0, CI run 45547788070 3개 OS 초록 282건(macOS·Ubuntu skip 2 = Windows 전용 subst, mp3gain 1.6.2 대조 4건 ok / Windows skip 4 = mp3gain 없음), 세 러너 모두 requirements-dev.txt로 scipy 1.18.1 설치, scipy 대조 테스트 ok.
+  - 빌드 2026-11-25: pip-audit 취약점 없음, BUILD OK, `_internal`에 scipy·scipy.libs·openblas 없음(numpy 2.5.4만), zip 65664786 bytes(1.4.1 96465765, -32%), 폴더 153 MB(du -sm, 1.4.1 225 MB, -32%), zip에 .qm 5개·licenses 있음. 노트 용량 채움
+  - Result: 2026-11-25 pass — 사용자 "모두 예"(첫 답은 시험 전 잘못 클릭이라 철회, 파일 무변경으로 확인). 빌드 exe로 사본 3개 Album 분석·적용·undo, exe가 쓴 태그 Track -7.88/-7.41/-7.88·Album -7.87 dB·-5스텝(CLI 기대값과 같음), undo 뒤 audio_body_sha256 세 파일 모두 적용 전과 같음
 - [ ] 7. Release — 태그 v1.5.0, GitHub Release (실행 전 확인) (after: 6)
 - [ ] 8. 인수 — PRD §1 성공 기준(원본 mp3gain과 같은 dB·태그, undo 비트 동일)과 D121 완료 기준 전부, 명세 검토(대화 맥락 없는 서브에이전트에 이 파일·PRD §2.1 1.5 작업·`git diff 78b6016..`)
   - 확인: 전체 테스트 OK, CI 대조 통과 run 번호 기록

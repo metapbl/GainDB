@@ -13,7 +13,6 @@
 
 ## 다음 할 일
 - 다음 범위 정하기 (사용자 선택). 화면 점검에서 실행 못 한 것: 고대비·150% 배율·키보드 Tab 한 바퀴
-- About 문구 "Python re-implementation": AGENTS.md("재구현" 금지)와 PRD §18("리팩토링한 재구현" 허용)이 어긋남, 사용자 결정 대기
 - AVD 사본 1.3.1 동기화 (D012): `gaindb/api.py`(apply_file_constant_gain·analyze_file_max_amp·shift_after_apply), `gaindb/apply_gain.py`(max_no_clip_steps, gain 없이 진폭만 채우기), `gaindb_cli.py`(`-x`). 1.4.x는 코어 변경 없음. 1.5.x는 `gaindb/analysis.py`(numpy 블록 IIR, scipy import 없음, 1.5.1은 docstring만, 1.5.2는 `gaindb/__init__.py` 버전만) 추가. 사용자가 AVD 세션에서 진행
 - 참고: Designarche 테마는 이미 최신(Graphite/Paper 1.4.3, 생성기 출력과 `gui/theme.py`·아이콘 8개 바이트 동일, 2026-11-25 확인). 생성기 새 경로 `C:\Users\Administrator\My Projects\Designarche\designarche\scripts\generate.py`
 - 참고: 1.4.0을 처음 실행하면 창 크기·위치·최대화 상태·컬럼 폭이 한 번 초기화됨(`_LAYOUT_VERSION` 2, D116). 정렬·옵션·언어는 유지

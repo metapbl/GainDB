@@ -137,3 +137,4 @@
 | D119 | 2026-11-25 | 7 | 실행 의존성은 numpy·PySide6. scipy는 `requirements-dev.txt`로 옮겨 fixture 생성용으로만 쓰고 CI만 설치한다. exe·`requirements.txt`·`pyproject.toml` 의존성에서 뺀다 (D023의 scipy 부분 대체) | [U] | Q077 | fixture 스크립트도 numpy로 (fixture 바이트가 바뀜) | 확정 |
 | D120 | 2026-11-25 | 7 | D010(스트리밍=통짜) 유지: 필터 입력을 블록 단위로 버퍼링해 청크 분할과 무관하게 히스토그램이 완전히 같게 한다 | [U] | Q077 | 게인 일치로 완화 | 확정 |
 | D121 | 2026-11-25 | 7 | 1.5.0 완료 기준: fixture 전체에서 게인·peak·적용 스텝이 1.4.1(scipy) 결과와 정확히 같음, CI 원본 mp3gain 대조 통과, 곡당 분석 시간(디코드 포함) 증가 10% 이내, 빌드 zip·폴더 용량을 재서 릴리스 노트에 기록(목표치 없음), 나머지는 1.0.0과 같은 릴리스 검증 | [U] | Q077 | 용량 목표치 (145MB는 추정) | 확정 |
+| D122 | 2026-11-25 | 8 | D006 금지어 "독립 구현/재구현"은 "독립 구현"·"독립 재구현"(independent (re-)implementation)을 뜻한다. "독립" 없는 "재구현"(re-implementation)은 D027·PRD §1·AGENTS 소개·NOTICE·About에서 쓰는 허용 서술. AGENTS.md 규칙 문구만 명확히 고치고 About·NOTICE는 그대로 | [X] | - | About·NOTICE·pyproject의 "re-implementation"을 "refactored from the mp3gain source"로 바꾸기 (근거 문서 다수와 어긋나고 번역 5개 재작업) | 확정 |

@@ -52,4 +52,6 @@
 - 2026-11-24 1.3.1: 명세 검토 → 진폭 갱신 버그 수정 (fc5d1fc, D109·T23) · v1.3.1 Release (태그 cac4261) · 사용자 exe 실제 파일 확인
 - 2026-11-24~25 1.4: PRD 변경·시안 확정 (6e31d72, Q075) · 줄바꿈 함수 (61cf034) · 두 줄 머리글·좁은 폭 (44335f5) · 잘림 수정 (e96d382) · Maximizing 창 넓히기 (093828c) · 선택 메뉴 (bebedc1) · System default (5697ffa) · README·스크린샷 -v3·스크립트 설정 분리 (4d0479b) · v1.4.0 Release (태그 cff5fc1)
 - 2026-11-25 1.4.1: 명세 검토 지적 6건 (d11d634, D117) · CI 테스트 전제 수정 (040ac5b, 6b38b4d, 51a0086, T24) · v1.4.1 Release (태그 51a0086) · Designarche 테마 최신 확인
+- 2026-11-25 1.5: PRD 변경·계획 (082e873, Q077·D118~D121) · scipy 대조 테스트 (b9e58d2) · numpy 블록 IIR (6896731) · 속도 최적화·측정 (5a68ae6, Q078) · requirements-dev.txt (4d9bc6e) · 문서·1.5.0 (8c3cca0) · 빌드·exe 확인 (e0a4488) · v1.5.0 Release (태그 e0a4488)
+- 2026-11-25 1.5.1: 명세 검토 → NOTICE·About SciPy 고지 제거 (31d0f61) · 버전·노트 (7a01aa4) · v1.5.1 Release (태그 b7f470c) — 계획 2026-11-25-v150-remove-scipy done (d0b5ed2)
 - 2026-10-25 metarche 이관: PRD 승인, 결정 46개 기록 (커밋 전)

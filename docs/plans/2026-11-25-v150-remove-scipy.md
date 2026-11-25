@@ -1,5 +1,5 @@
 # v1.5.0 — scipy 제거 (numpy 블록 IIR) · Release
-Status: active | 시작: 2026-11-25 (78b6016) | 근거: PRD §2.1 1.5 작업 (D118~D121)
+Status: done (2026-11-25) | 시작: 2026-11-25 (78b6016) | 근거: PRD §2.1 1.5 작업 (D118~D121)
 
 목표: 분석 필터를 numpy만으로 바꿔 exe에서 scipy를 뺀다. 게인·peak·적용 스텝·태그는 1.4.1과 같고, 스트리밍과 통짜 히스토그램은 계속 완전히 같다. v1.5.0을 게시하고 용량을 기록한다.
 
@@ -46,7 +46,7 @@ Status: active | 시작: 2026-11-25 (78b6016) | 근거: PRD §2.1 1.5 작업 (D1
   - 빌드 2026-11-25: pip-audit 취약점 없음, BUILD OK, `_internal`에 scipy·scipy.libs·openblas 없음(numpy 2.5.4만), zip 65664786 bytes(1.4.1 96465765, -32%), 폴더 153 MB(du -sm, 1.4.1 225 MB, -32%), zip에 .qm 5개·licenses 있음. 노트 용량 채움
   - Result: 2026-11-25 pass — 사용자 "모두 예"(첫 답은 시험 전 잘못 클릭이라 철회, 파일 무변경으로 확인). 빌드 exe로 사본 3개 Album 분석·적용·undo, exe가 쓴 태그 Track -7.88/-7.41/-7.88·Album -7.87 dB·-5스텝(CLI 기대값과 같음), undo 뒤 audio_body_sha256 세 파일 모두 적용 전과 같음
 - [x] 7. Release (CI 3개 OS 초록 run 45550251819 at e0a4488, 빌드 뒤 앱 코드 변경 없음, 태그 v1.5.0 = e0a4488, https://github.com/metapbl/GainDB/releases/tag/v1.5.0, zip 65664786 bytes, latest = v1.5.0, 2026-11-25) — 태그 v1.5.0, GitHub Release (실행 전 확인) (after: 6)
-- [ ] 8. 인수 — PRD §1 성공 기준(원본 mp3gain과 같은 dB·태그, undo 비트 동일)과 D121 완료 기준 전부, 명세 검토(대화 맥락 없는 서브에이전트에 이 파일·PRD §2.1 1.5 작업·`git diff 78b6016..`)
+- [x] 8. 인수 (D121 기준 전부 근거 있음, 명세 검토 지적은 1.5.1로 처리) — PRD §1 성공 기준(원본 mp3gain과 같은 dB·태그, undo 비트 동일)과 D121 완료 기준 전부, 명세 검토(대화 맥락 없는 서브에이전트에 이 파일·PRD §2.1 1.5 작업·`git diff 78b6016..`)
   - 확인: 전체 테스트 OK, CI 대조 통과 run 번호 기록
   - 진행 2026-11-25: fixture 사본 13개 전체에서 `-s s -o` 출력(Track dB·스텝·Max Amplitude·global gain·Album)이 1.4.1(78b6016, scipy)과 diff 없음(새 쪽은 scipy 없는 venv), Album 적용(`-a -c`) 뒤 13개 파일 바이트 동일. CI 대조 run 45547788070·45550251819. 속도·용량·exe는 작업 3·6
   - 명세 검토(서브에이전트): 수학·D010 동일성 이상 없음. 지적 — NOTICE:47과 About 창(`gui/dialogs/about_dialog.py:6,91`)에 'NumPy, SciPy'가 남음(1.5.0 zip·exe에 들어감, 번역 문구 아님) / `_iir` docstring의 `zi[:, :10]` 고정 서술 / `_flush` 뒤 `feed`는 지원 안 함(현재 호출처는 무관) / 자체 검토의 '블록 길이 512'가 실제 128·32와 다름 / peak·Album 전체 대조 근거 부족 → 위 13개 대조로 보완. 처리: 사용자 결정 "1 고치고 1.5.1" → 작업 9·10. 자체 검토 512 줄은 고침
@@ -60,6 +60,6 @@ Status: active | 시작: 2026-11-25 (78b6016) | 근거: PRD §2.1 1.5 작업 (D1
 ## 1.5.1 (작업 8 명세 검토 지적, 사용자 결정 "1 고치고 1.5.1" 2026-11-25)
 - [x] 9. 남은 SciPy 고지 제거 (NOTICE·About 창·주석·docstring 수정, 배포 대상 NOTICE·THIRD_PARTY_LICENSES·gui·gaindb에 SciPy 고지 없음 — analysis.py 내부 주석 2곳(계수 형식·대체 이력)만 남김, 282건 OK skip 4) — `NOTICE`(NumPy만), `gui/dialogs/about_dialog.py` About 창 서드파티 목록·머리 주석, `gaindb/analysis.py` `_iir` docstring 일반형·`TrackAnalyzer` 사용 설명에 "histogram()/result() 뒤 feed 안 함"
   - 확인: 배포물에 들어가는 파일(NOTICE·THIRD_PARTY_LICENSES·gui·gaindb)에 SciPy 없음(grep), 전체 테스트 OK
-- [ ] 10. 1.5.1 — 버전·노트(승인)·push·CI 3개 OS·pip-audit·빌드(BUILD OK, zip의 licenses/NOTICE에 SciPy 없음)·exe About 창 확인·태그·Release (실행 전 확인) (after: 9)
+- [x] 10. 1.5.1 (CI run 45552950527 at b7f470c 초록, 태그 v1.5.1 = b7f470c, https://github.com/metapbl/GainDB/releases/tag/v1.5.1, zip 65664507 bytes, latest = v1.5.1, 2026-11-25) — 버전·노트(승인)·push·CI 3개 OS·pip-audit·빌드(BUILD OK, zip의 licenses/NOTICE에 SciPy 없음)·exe About 창 확인·태그·Release (실행 전 확인) (after: 9)
   - 진행 2026-11-25: 노트 사용자 승인, push e0a4488..7a01aa4, CI run 45551501955 3개 OS 초록 282건(Windows skip 4, macOS·Ubuntu skip 2). pip-audit 취약점 없음, BUILD OK, zip 65664507 bytes·폴더 153 MB, zip의 licenses/NOTICE는 NumPy만·THIRD_PARTY_LICENSES에 SciPy 없음, scipy 패키지 없음(이름이 비슷한 것은 numpy.libs의 libscipy_openblas64 DLL = numpy 자체 OpenBLAS), .qm 5개.
   - Result: 2026-11-25 pass — 사용자 "눔파이확인했어요"(빌드 exe About 창 서드파티 목록에 NumPy만)

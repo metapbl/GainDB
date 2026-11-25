@@ -274,7 +274,9 @@ class LanguageSwitchWidensWindowTest(_WindowBase):
         win = self._window("en")
         width, height = win._default_window_extent()
         win.resize(width - 100, height)
-        narrowed = win.width()  # 플랫폼에 따라 최소 폭에 막힐 수 있다(Linux·macOS 800)
+        win.show()
+        self.app.processEvents()  # 최소 폭(Linux·macOS 800)은 이벤트 처리 뒤 적용된다
+        narrowed = win.width()
         self.assertLess(narrowed, width)
         install_translator(self.app, "ru")
         self.app.processEvents()

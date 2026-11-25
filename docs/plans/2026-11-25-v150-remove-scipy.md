@@ -45,12 +45,20 @@ Status: active | 시작: 2026-11-25 (78b6016) | 근거: PRD §2.1 1.5 작업 (D1
   - 진행 2026-11-25: push 78b6016..8c3cca0, CI run 45547788070 3개 OS 초록 282건(macOS·Ubuntu skip 2 = Windows 전용 subst, mp3gain 1.6.2 대조 4건 ok / Windows skip 4 = mp3gain 없음), 세 러너 모두 requirements-dev.txt로 scipy 1.18.1 설치, scipy 대조 테스트 ok.
   - 빌드 2026-11-25: pip-audit 취약점 없음, BUILD OK, `_internal`에 scipy·scipy.libs·openblas 없음(numpy 2.5.4만), zip 65664786 bytes(1.4.1 96465765, -32%), 폴더 153 MB(du -sm, 1.4.1 225 MB, -32%), zip에 .qm 5개·licenses 있음. 노트 용량 채움
   - Result: 2026-11-25 pass — 사용자 "모두 예"(첫 답은 시험 전 잘못 클릭이라 철회, 파일 무변경으로 확인). 빌드 exe로 사본 3개 Album 분석·적용·undo, exe가 쓴 태그 Track -7.88/-7.41/-7.88·Album -7.87 dB·-5스텝(CLI 기대값과 같음), undo 뒤 audio_body_sha256 세 파일 모두 적용 전과 같음
-- [ ] 7. Release — 태그 v1.5.0, GitHub Release (실행 전 확인) (after: 6)
+- [x] 7. Release (CI 3개 OS 초록 run 45550251819 at e0a4488, 빌드 뒤 앱 코드 변경 없음, 태그 v1.5.0 = e0a4488, https://github.com/metapbl/GainDB/releases/tag/v1.5.0, zip 65664786 bytes, latest = v1.5.0, 2026-11-25) — 태그 v1.5.0, GitHub Release (실행 전 확인) (after: 6)
 - [ ] 8. 인수 — PRD §1 성공 기준(원본 mp3gain과 같은 dB·태그, undo 비트 동일)과 D121 완료 기준 전부, 명세 검토(대화 맥락 없는 서브에이전트에 이 파일·PRD §2.1 1.5 작업·`git diff 78b6016..`)
   - 확인: 전체 테스트 OK, CI 대조 통과 run 번호 기록
+  - 진행 2026-11-25: fixture 사본 13개 전체에서 `-s s -o` 출력(Track dB·스텝·Max Amplitude·global gain·Album)이 1.4.1(78b6016, scipy)과 diff 없음(새 쪽은 scipy 없는 venv), Album 적용(`-a -c`) 뒤 13개 파일 바이트 동일. CI 대조 run 45547788070·45550251819. 속도·용량·exe는 작업 3·6
+  - 명세 검토(서브에이전트): 수학·D010 동일성 이상 없음. 지적 — NOTICE:47과 About 창(`gui/dialogs/about_dialog.py:6,91`)에 'NumPy, SciPy'가 남음(1.5.0 zip·exe에 들어감, 번역 문구 아님) / `_iir` docstring의 `zi[:, :10]` 고정 서술 / `_flush` 뒤 `feed`는 지원 안 함(현재 호출처는 무관) / 자체 검토의 '블록 길이 512'가 실제 128·32와 다름 / peak·Album 전체 대조 근거 부족 → 위 13개 대조로 보완. 처리: 사용자 결정 "1 고치고 1.5.1" → 작업 9·10. 자체 검토 512 줄은 고침
 
 ## 자체 검토
 - 빠진 PRD 기능: 없음 (§2.1 1.5 작업 1·2)
 - 테스트로 바꾸지 못한 인수 기준: 속도(작업 3 측정)와 용량(작업 6 측정)은 기록으로, exe 동작은 작업 6 실행으로 확인
 - 순서: 2 after 1 · 3, 4 after 2 · 5~8 순서대로
-- [AI] 세부: 블록 길이 512(시안 값), 새 테스트 파일 이름, fixture 게인 대조를 scipy 실시간 대조로 함(CI 러너마다 ffmpeg가 달라 fixture 바이트가 달라질 수 있어 고정 기준값 대신)
+- [AI] 세부: 블록 길이 128·그룹 32(작업 3 측정으로 정함, 시안은 512), 새 테스트 파일 이름, fixture 게인 대조를 scipy 실시간 대조로 함(CI 러너마다 ffmpeg가 달라 fixture 바이트가 달라질 수 있어 고정 기준값 대신)
+
+## 1.5.1 (작업 8 명세 검토 지적, 사용자 결정 "1 고치고 1.5.1" 2026-11-25)
+- [x] 9. 남은 SciPy 고지 제거 (NOTICE·About 창·주석·docstring 수정, 배포 대상 NOTICE·THIRD_PARTY_LICENSES·gui·gaindb에 SciPy 고지 없음 — analysis.py 내부 주석 2곳(계수 형식·대체 이력)만 남김, 282건 OK skip 4) — `NOTICE`(NumPy만), `gui/dialogs/about_dialog.py` About 창 서드파티 목록·머리 주석, `gaindb/analysis.py` `_iir` docstring 일반형·`TrackAnalyzer` 사용 설명에 "histogram()/result() 뒤 feed 안 함"
+  - 확인: 배포물에 들어가는 파일(NOTICE·THIRD_PARTY_LICENSES·gui·gaindb)에 SciPy 없음(grep), 전체 테스트 OK
+- [ ] 10. 1.5.1 — 버전·노트(승인)·push·CI 3개 OS·pip-audit·빌드(BUILD OK, zip의 licenses/NOTICE에 SciPy 없음)·exe About 창 확인·태그·Release (실행 전 확인) (after: 9)
+  - 진행 2026-11-25: 노트 사용자 승인

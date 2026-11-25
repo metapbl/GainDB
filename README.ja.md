@@ -52,8 +52,8 @@ Gain dB は設計上 **MP3 ファイルのみ** を扱います。無劣化の�
     <th>ダーク</th>
   </tr>
   <tr>
-    <td><img src="docs/images/main-light-v4.png" alt="サンプル MP3 4 件をアルバム解析した後の Gain dB メインウィンドウ（ライトテーマ）"></td>
-    <td><img src="docs/images/main-dark-v4.png" alt="サンプル MP3 4 件をアルバム解析した後の Gain dB メインウィンドウ（ダークテーマ）"></td>
+    <td><img src="docs/images/main-light-v5.png" alt="サンプル MP3 4 件をアルバム解析した後の Gain dB メインウィンドウ（ライトテーマ）"></td>
+    <td><img src="docs/images/main-dark-v5.png" alt="サンプル MP3 4 件をアルバム解析した後の Gain dB メインウィンドウ（ダークテーマ）"></td>
   </tr>
 </table>
 

@@ -3,7 +3,8 @@
 ## 상태
 - 단계: 8 구현 · 활성 계획 없음 (`docs/plans/2026-11-25-v150-remove-scipy.md` 완료)
 - 버전: 1.5.2 게시 (태그 v1.5.2 = b1b346f, v1.5.1 = b7f470c) · 테스트 282건 (로컬 OK, skip 4 = mp3gain 대조 / CI 3개 OS 초록, run 45557304566 at b1b346f), 약 1분 (.venv Python 3.15.1)
-- 갱신: 2026-11-25 · v1.5.2 Release: Designarche 화면 점검 must-fix 없음, 반영 3건 — About 간격 12, Constant Gain 채널 들여쓰기·간격 12, 도구 모음 구분선 `@line`(다크 1.07→1.26:1). README 스크린샷 -v4
+- 갱신: 2026-11-25 · 1.5.2 사용자 확인 뒤(미출시): 도구 모음 구분선 `@line2`(라이트 1.58·다크 1.66:1), README 스크린샷 -v5
+- 2026-11-25 · v1.5.2 Release: Designarche 화면 점검 must-fix 없음, 반영 3건 — About 간격 12, Constant Gain 채널 들여쓰기·간격 12, 도구 모음 구분선 `@line`(다크 1.07→1.26:1). README 스크린샷 -v4
 - 2026-11-25 · v1.5.1 Release: NOTICE·About 창에 남은 SciPy 고지 제거(1.5.0 명세 검토 지적)
 - 2026-11-25 · v1.5.0 Release: scipy 제거(numpy 블록 IIR, 결과 동일, 분석 6~13% 빠름), zip 96.5→65.7 MB·폴더 225→153 MB, scipy는 requirements-dev.txt (D118~D121)
 - 2026-11-25 · v1.4.1 Release: 작업 중 선택 메뉴 끄기, 시작 포커스 파일 표, 언어 변경 뒤 창 넓히기, 러시아어 System default, 스크립트·테스트 설정 분리 (D117)
@@ -12,7 +13,9 @@
 - 이전: 2026-11-23 · v1.2.0 Release (GUI 6개 언어, README 6개 언어)
 
 ## 다음 할 일
-- 다음 범위 정하기 (사용자 선택). 화면 점검에서 실행 못 한 것: 고대비·150% 배율·키보드 Tab 한 바퀴
+- 다음 범위 정하기 (사용자 선택). 구분선 `@line2`는 다음 릴리스에 포함
+- 고대비(must-fix): Windows 고대비 "밤하늘"에서 테마 색 그대로(사용자 확인 2026-11-25). Designarche 테마 `apply_theme`가 `styleHints().accessibility().contrastPreference()`(PySide6 6.12에 있음)를 안 봄 → Designarche 저장소에서 고친 뒤 GaindB는 Update 절차로 재생성. 사용자 지시 대기
+- 언어 변경 뒤 창이 넓어지기만 하는 것은 D117(4) 의도 동작(사용자 문의 2026-11-25에 답함)
 - AVD 사본 1.3.1 동기화 (D012): `gaindb/api.py`(apply_file_constant_gain·analyze_file_max_amp·shift_after_apply), `gaindb/apply_gain.py`(max_no_clip_steps, gain 없이 진폭만 채우기), `gaindb_cli.py`(`-x`). 1.4.x는 코어 변경 없음. 1.5.x는 `gaindb/analysis.py`(numpy 블록 IIR, scipy import 없음, 1.5.1은 docstring만, 1.5.2는 `gaindb/__init__.py` 버전만) 추가. 사용자가 AVD 세션에서 진행
 - 참고: Designarche 테마는 이미 최신(Graphite/Paper 1.4.3, 생성기 출력과 `gui/theme.py`·아이콘 8개 바이트 동일, 2026-11-25 확인). 생성기 새 경로 `C:\Users\Administrator\My Projects\Designarche\designarche\scripts\generate.py`
 - 참고: 1.4.0을 처음 실행하면 창 크기·위치·최대화 상태·컬럼 폭이 한 번 초기화됨(`_LAYOUT_VERSION` 2, D116). 정렬·옵션·언어는 유지
@@ -25,7 +28,7 @@
 - 없음
 
 ## 확인 대기 (사람만 확인 가능)
-- 1.5.2 exe 눈 확인(선택): 다크 도구 모음 구분선, Constant Gain 채널 들여쓰기, About 간격. 빌드 BUILD OK·zip 65665438 bytes, 사람 확인 안 함
+- 1.5.2 exe 사용자 확인 2026-11-25: 구분선 흐림(→ `@line2`로 수정), 고대비 미대응(위), 배율 150%에서 창 제목만 커짐 → 배율 150%로 둔 채 앱을 새로 켜서 내용도 커지는지 재확인 필요(커지지 않으면 must-fix). 나머지 항목은 지적 없음
 - (이전) 1.3.1 exe 실제 파일 확인은 사용자 완료 2026-11-24
 <!-- head:end — 이 줄 위(40줄 이내)만 자동 주입된다. 갱신은 이 위만 고친다. -->
 

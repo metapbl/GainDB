@@ -51,8 +51,8 @@ Gain dB는 설계상 **MP3 파일만** 다룹니다. 무손실 방식이 MP3의 
     <th>다크</th>
   </tr>
   <tr>
-    <td><img src="docs/images/main-light-v4.png" alt="샘플 MP3 네 개를 앨범 분석한 뒤의 Gain dB 주 창, 라이트 테마"></td>
-    <td><img src="docs/images/main-dark-v4.png" alt="샘플 MP3 네 개를 앨범 분석한 뒤의 Gain dB 주 창, 다크 테마"></td>
+    <td><img src="docs/images/main-light-v5.png" alt="샘플 MP3 네 개를 앨범 분석한 뒤의 Gain dB 주 창, 라이트 테마"></td>
+    <td><img src="docs/images/main-dark-v5.png" alt="샘플 MP3 네 개를 앨범 분석한 뒤의 Gain dB 주 창, 다크 테마"></td>
   </tr>
 </table>
 

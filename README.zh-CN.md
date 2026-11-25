@@ -50,8 +50,8 @@ Gain dB 按设计**只处理 MP3 文件**：无损方法依赖 MP3 的 `global_g
     <th>深色</th>
   </tr>
   <tr>
-    <td><img src="docs/images/main-light-v4.png" alt="对四个示例 MP3 文件进行专辑分析后的 Gain dB 主窗口，浅色主题"></td>
-    <td><img src="docs/images/main-dark-v4.png" alt="对四个示例 MP3 文件进行专辑分析后的 Gain dB 主窗口，深色主题"></td>
+    <td><img src="docs/images/main-light-v5.png" alt="对四个示例 MP3 文件进行专辑分析后的 Gain dB 主窗口，浅色主题"></td>
+    <td><img src="docs/images/main-dark-v5.png" alt="对四个示例 MP3 文件进行专辑分析后的 Gain dB 主窗口，深色主题"></td>
   </tr>
 </table>
 

@@ -892,9 +892,9 @@ class MainWindow(QMainWindow):
         self._update_action_states()
 
     def _style_toolbar(self):
-        # 테마가 구분선을 그리지 않아 Qt 기본색이 다크에서 거의 안 보인다(1.07:1).
+        # 테마가 구분선을 그리지 않아 Qt 기본색이 다크에서 거의 안 보인다(1.07:1). @line 도 흐려 @line2(1.6:1).
         self._toolbar.setStyleSheet(theme.qss(
-            "QToolBar::separator { background: @line; width: 1px; margin: 4px 4px; }"))
+            "QToolBar::separator { background: @line2; width: 1px; margin: 4px 4px; }"))
 
     def _build_toolbar(self):
         tb = QToolBar("Main", self)

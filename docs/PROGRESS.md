@@ -1,7 +1,7 @@
 # PROGRESS — Gain dB (GaindB)
 
 ## 상태
-- 단계: 8 구현 · 활성 계획 없음 (`docs/plans/2026-11-24-v140-layout-select-language.md` 완료)
+- 단계: 8 구현 · 활성 계획 `docs/plans/2026-11-25-v150-remove-scipy.md` (1.5.0 scipy 제거, D118~D121)
 - 버전: 1.4.1 게시 (태그 v1.4.1 = 51a0086, v1.4.0 = cff5fc1) · 테스트 279건 (로컬 OK, skip 4 = mp3gain 대조 / CI 3개 OS 초록, run 45518783503 at 51a0086), 약 2.5분 (.venv Python 3.15.1)
 - 갱신: 2026-11-25 · v1.4.1 Release: 작업 중 선택 메뉴 끄기, 시작 포커스 파일 표, 언어 변경 뒤 창 넓히기, 러시아어 System default, 스크립트·테스트 설정 분리 (D117)
 - 2026-11-25 · v1.4.0 Release: F11 두 줄 머리글·좁은 창(20~33%), 머리글 잘림 수정, 선택 메뉴 3개, 언어 System default, 화면 배치 1회 초기화 (D110~D116), README 스크린샷 -v3
@@ -9,7 +9,7 @@
 - 이전: 2026-11-23 · v1.2.0 Release (GUI 6개 언어, README 6개 언어)
 
 ## 다음 할 일
-- 다음 범위 정하기 (사용자 선택): 1 Designarche 화면 점검(추천: 주 창·대화상자 3개를 `slop-signs.md`·`desktop.md` 기준으로 점검해 보고서, 코드 변경 없음, 고칠 점은 PRD 변경으로) / 2 scipy 제거(용량 215→145MB 예상, 코어 변경·mp3gain 재검증·AVD 동기화 대상, D100)
+- 1.5 계획 작업 1부터: scipy 대조 실패 테스트 → numpy 블록 IIR 교체 → 속도 측정 → 의존성 정리 → 문서 → CI·빌드 → Release → 인수
 - AVD 사본 1.3.1 동기화 (D012): `gaindb/api.py`(apply_file_constant_gain·analyze_file_max_amp·shift_after_apply), `gaindb/apply_gain.py`(max_no_clip_steps, gain 없이 진폭만 채우기), `gaindb_cli.py`(`-x`). 1.4.x는 코어 변경 없음. 사용자가 AVD 세션에서 진행
 - 참고: Designarche 테마는 이미 최신(Graphite/Paper 1.4.3, 생성기 출력과 `gui/theme.py`·아이콘 8개 바이트 동일, 2026-11-25 확인). 생성기 새 경로 `C:\Users\Administrator\My Projects\Designarche\designarche\scripts\generate.py`
 - 참고: 1.4.0을 처음 실행하면 창 크기·위치·최대화 상태·컬럼 폭이 한 번 초기화됨(`_LAYOUT_VERSION` 2, D116). 정렬·옵션·언어는 유지

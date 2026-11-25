@@ -1,6 +1,6 @@
 # PRD — Gain dB (GaindB)
 
-Status: approved (2026-11-24) | 단계: 5 확정 | 갱신: 2026-11-24
+Status: approved (2026-11-25) | 단계: 5 확정 | 갱신: 2026-11-25
 <!-- 상태가 approved (YYYY-MM-DD)가 되기 전에는 코드·뼈대·의존성 설치를 하지 않는다. -->
 <!-- 모든 항목 끝에 출처를 단다: [U] 사용자 · [X] 기존 코드·문서 · [AI] AI 기본값. 근거 결정은 (D###). -->
 
@@ -45,11 +45,13 @@ Status: approved (2026-11-24) | 단계: 5 확정 | 갱신: 2026-11-24
   3. 1.4.0 GitHub Release — 완료 기준은 1.0.0과 같고, 빌드 exe를 es로 띄워 머리글이 잘리지 않은 캡처로 확인한다. [U][AI]
   4. 1.4.1 — 명세 검토 지적 6건(작업 중 선택 메뉴 끄기, 시작 포커스, 테스트·스크립트 설정 분리, 언어 변경 뒤 창 넓히기, PRD 문구, 러시아어 번역). 완료 기준: 1.4.0과 같은 릴리스 검증. [U][AI] (D117)
   5. 그다음 범위: scipy 제거 (D100).
+- 1.5 작업 (순서대로): [U] (D118~D121)
+  1. scipy 제거 — 분석 필터(`lfilter`)를 numpy만으로 만든 블록 IIR로 바꾼다. 필터 입력을 블록 단위로 버퍼링해 스트리밍과 통짜의 히스토그램이 완전히 같다(D010 유지). 실행 의존성은 numpy·PySide6, scipy는 `requirements-dev.txt`(fixture 생성용, CI만 설치)로 옮긴다. README 6개 언어의 의존성·감사 문구와 THIRD_PARTY_LICENSES에서 SciPy를 뺀다. 코어 변경이라 AVD 동기화 대상(D012). [U][AI] (D118~D120)
+  2. 1.5.0 GitHub Release — 완료 기준: fixture 전체에서 게인·peak·적용 스텝이 1.4.1 결과와 정확히 같음, CI 원본 mp3gain 대조 통과, 곡당 분석 시간(디코드 포함, 같은 PC·가장 긴 fixture·3회 중앙값) 증가 10% 이내, 빌드 zip·폴더 용량을 재서 릴리스 노트에 기록(목표치 없음), 나머지는 1.0.0과 같음. [U][AI] (D121)
 ### 2.2 있으면 좋음
 - 없음. 보류 목록(2.3)이 그 역할. [U] (D034)
 ### 2.3 이번에는 안 함
 - AVD 연계 (다른 세션에서 진행). [U] (D032)
-- 사용자가 먼저 요구하기 전까지 보류: scipy 제거(용량 절감, 1.3.0 뒤 진행 예정). [X][U] (D100)
 ### 2.4 반목표 (절대 그렇게 되면 안 되는 동작)
 - 타 포맷 지원. [X] (D001)
 - mp3gain 기능을 합의 없이 축소·단순화. [X] (D002)
@@ -225,7 +227,7 @@ Status: approved (2026-11-24) | 단계: 5 확정 | 갱신: 2026-11-24
 | 항목 | 선택 | 버린 안 (이유) | 근거 |
 |---|---|---|---|
 | 언어 | Python ≥3.13 | - | D023 |
-| 신호처리 | numpy + scipy | - | D023 |
+| 신호처리 | numpy (scipy는 fixture 생성용 개발 의존성만) | scipy lfilter 유지 (exe 용량) | D023, D119 |
 | 디코딩 | ffmpeg 외부 호출, PATH + 알려진 설치 위치 | mpglib 이식 (실용성) / PATH만 (macOS) | D028 |
 | GUI | PySide6, 코어 직접 import | exe subprocess | D007 |
 | 배포 | PyInstaller onedir | onefile (LGPLv3) | D020 |
@@ -243,7 +245,7 @@ Status: approved (2026-11-24) | 단계: 5 확정 | 갱신: 2026-11-24
 
 ## 6. 검증과 운영
 - 자동 테스트 대상 / 실기기 확인 대상과 결과 전달 방식: 코어·CLI·GUI 순수부는 unittest. 원본 mp3gain 대조는 CI에서 자동(Ubuntu·macOS의 mp3gain CLI). 실클릭 회귀(취소 후 무결성)는 수동. [X][U] (D019, D038, D039)
-- CI: GitHub Actions, main push와 수동 실행. Windows·macOS·Ubuntu × Python 3.13(최소 지원). 각 러너는 ffmpeg 설치 → `tests/_gen_fixtures.py`로 합성 fixture 생성 → 전체 unittest. Ubuntu(apt)·macOS(brew)는 mp3gain을 설치해 성공 기준 대조 스크립트도 실행. mp3gain 설치 실패나 대조 불일치는 실패로 처리. GUI Album offscreen 대조 테스트는 새로 작성. [AI] (D038, D039)
+- CI: GitHub Actions, main push와 수동 실행. Windows·macOS·Ubuntu × Python 3.13(최소 지원). 각 러너는 ffmpeg 설치 → `requirements-dev.txt` 설치 → `tests/_gen_fixtures.py`로 합성 fixture 생성 → 전체 unittest. Ubuntu(apt)·macOS(brew)는 mp3gain을 설치해 성공 기준 대조 스크립트도 실행. mp3gain 설치 실패나 대조 불일치는 실패로 처리. GUI Album offscreen 대조 테스트는 새로 작성. [AI] (D038, D039)
 - 전체 테스트 명령과 걸리는 시간: `python -m unittest discover -s tests` (139건). 약 3분 (184초, Python 3.15.1, 2026-10-25 측정, D046). [X]
 - 편집 때 자동 검사 (확장자별 린터·타입 검사 명령): `.py` → `python -m py_compile <파일>`. [U] (D040)
 - 응답 끝 검사 (프로젝트 전체 검사 명령): 없음. 전체 테스트가 약 2분이라 응답마다 돌리지 않고 작업마다 직접 실행. [U]
@@ -278,3 +280,4 @@ Status: approved (2026-11-24) | 단계: 5 확정 | 갱신: 2026-11-24
 | 2026-11-24 | 1.4 범위: F11 창 폭·머리글·선택·언어, 1.4.0 릴리스 (§2.1, §3) | Q074, D110~D114 |
 | 2026-11-24 | F11 머리글을 1안(모든 머리글 두 줄·좁은 컬럼·Path\File 300)으로, 시안 확정 (§3) | Q075, D115 |
 | 2026-11-25 | 1.4.1: F11 창 넓히기 문구·언어 변경, 선택 메뉴 작업 중 끄기·시작 포커스 (§2.1, §3). 명세 검토 지적, 사용자 승인으로 직접 수정 | Q076, D117 |
+| 2026-11-25 | 1.5 범위: scipy 제거(numpy 블록 IIR, scipy는 개발 의존성), 1.5.0 릴리스 (§2.1, §2.3, §4, §6) | Q077, D118~D121 |

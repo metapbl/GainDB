@@ -270,12 +270,17 @@ class LanguageSwitchWidensWindowTest(_WindowBase):
 
     def test_no_widen_when_no_column_grew(self):
         # 넓어진 컬럼이 없으면 사용자가 줄여 둔 창을 그대로 둔다
+        from gui.columns import COLUMNS, Col
         from gui.i18n import install_translator
         win = self._window("en")
+        # 어느 플랫폼 글꼴에서도 러시아어 머리글보다 넓게 둬서 넓어질 컬럼이 없게 한다
+        for c in COLUMNS:
+            if c.index != Col.NAME:
+                win.table.setColumnWidth(int(c.index), 400)
         width, height = win._default_window_extent()
         win.resize(width - 100, height)
         win.show()
-        self.app.processEvents()  # 최소 폭(Linux·macOS 800)은 이벤트 처리 뒤 적용된다
+        self.app.processEvents()  # 최소 폭·화면 폭은 이벤트 처리 뒤 적용된다
         narrowed = win.width()
         self.assertLess(narrowed, width)
         install_translator(self.app, "ru")

@@ -44,7 +44,7 @@ jobs:
           if command -v mp3gain; then mp3gain -v 2>&1 || true; fi
 
       - name: Install Python packages
-        run: python -m pip install -r requirements.txt
+        run: python -m pip install -r requirements-dev.txt
 
       - name: Generate fixtures
         run: python tests/_gen_fixtures.py

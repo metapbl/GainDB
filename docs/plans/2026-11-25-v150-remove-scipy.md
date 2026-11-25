@@ -36,7 +36,7 @@ Status: active | 시작: 2026-11-25 (78b6016) | 근거: PRD §2.1 1.5 작업 (D1
   - 확인: 증가 10% 이내, 수치를 이 파일에 기록. 넘으면 멈추고 묻는다
   - 측정 2026-11-25: 가장 긴 fixture(test_gain_48k, 2.5초) 0.154~0.165 → 0.160~0.168초(+2~4%, 기준 통과). 대표성이 없어 240초 합성 곡도 잼: 0.91 → 1.08~1.25초(+19~37%, 기준 초과). 필터 자체는 scipy와 같음(0.29 대 0.30초), 차이는 블록 버퍼·행렬곱과 디코드 경합. 1.4.1 dist 225MB 중 scipy 48MB + scipy.libs 20MB → 사용자 결정 "2 더 최적화" (Q078)
   - 최적화 뒤 2026-11-25 (같은 프로세스에서 1.4.1 분석기와 번갈아 9회씩, 디코드 포함 중앙값): 가장 긴 fixture 0.105~0.106 → 0.102~0.107초(-2.0~+0.2%), 240초 곡 0.83~0.99 → 0.72~0.92초(-6.5~-13.5%). 분석기만 0.39 → 0.36초. 블록·그룹 조합 128·64는 +0~11%, 64·128은 +43%, 96·64는 -9~-11%라 128·32로 정함. 기준 통과
-- [ ] 4. 의존성 정리 — `requirements.txt`·`pyproject.toml`에서 scipy 삭제, `requirements-dev.txt`(`-r requirements.txt` + scipy), CI 두 워크플로가 dev 파일 설치, spec 주석 (after: 2)
+- [x] 4. 의존성 정리 (scipy 없는 새 venv(numpy 2.5.5·PySide6 6.12.0): `import scipy` 실패 확인, `gaindb_cli.py -s s` 출력이 1.4.1(scipy) 코드와 diff 없음(fixture 사본 2개·Album), 전체 282건 OK skip 6(mp3gain 4 + scipy 대조 2). 개발 venv 282건 OK skip 4, pip-audit 취약점 없음) — `requirements.txt`·`pyproject.toml`에서 scipy 삭제, `requirements-dev.txt`(`-r requirements.txt` + scipy), CI 두 워크플로가 dev 파일 설치, spec 주석 (after: 2)
   - 확인: scipy 없는 새 venv에서 `gaindb_cli.py`로 fixture 사본 분석 성공, 전체 테스트(scipy 대조 skip 표시) / `pip-audit -r requirements.txt` 취약점 없음
 - [ ] 5. 버전·문서 — 1.5.0, README 6개 언어 의존성·감사 문구, THIRD_PARTY_LICENSES SciPy 항목 삭제, REFERENCE T16, 노트 초안(사용자 승인) (after: 4)
   - 확인: `test_readme.py`, readme 표준 §6 검사, 6개 언어 `##` 수 같음, 노트 승인

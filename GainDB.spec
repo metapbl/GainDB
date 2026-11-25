@@ -22,9 +22,9 @@ datas = [
     (os.path.join(ROOT, "gui", "translations", "gaindb_*.qm"), os.path.join("gui", "translations")),
 ]
 
-# We only use scipy.signal.lfilter and numpy. Let PyInstaller's standard
-# numpy/scipy hooks pull in the required binaries; do NOT bulk-collect all
-# submodules (that dragged in scipy.optimize/sparse/stats/... unnecessarily).
+# The app needs only numpy (scipy is a dev dependency for fixtures, D119).
+# Let PyInstaller's standard numpy hook pull in the required binaries; do NOT
+# bulk-collect submodules.
 hiddenimports = []
 
 a = Analysis(

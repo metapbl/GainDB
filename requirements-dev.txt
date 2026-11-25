@@ -1,0 +1,4 @@
+# Development dependencies: runtime packages + scipy for tests/_gen_fixtures.py
+# and the scipy comparison tests (D119). Not needed to run Gain dB.
+-r requirements.txt
+scipy>=1.13
